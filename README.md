@@ -23,8 +23,9 @@ swift build
 swift test
 ```
 
-Use Xcode to run the eventual SwiftUI application target on an iOS simulator or
-device. The current package contains the local event domain and persistence layer.
+Open `clients/ios/FamilyApp.xcodeproj` in Xcode to run the SwiftUI app on an iOS
+simulator or device. The app links the local `FamilyCore` package, which contains
+the event domain and persistence layer.
 
 ## Continuous integration
 

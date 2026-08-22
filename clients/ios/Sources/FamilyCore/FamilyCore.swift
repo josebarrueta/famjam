@@ -86,7 +86,7 @@ public struct EventConflict: Equatable, Sendable {
 ///
 /// The app depends on this protocol; local and remote backends supply conforming
 /// implementations without exposing their transport or storage details.
-public protocol EventStore {
+public protocol EventStore: Sendable {
     @discardableResult
     func save(_ event: FamilyEvent) async throws -> [EventConflict]
     func events() async throws -> [FamilyEvent]
