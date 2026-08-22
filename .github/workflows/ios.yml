@@ -1,0 +1,25 @@
+name: iOS
+
+on:
+  pull_request:
+    paths:
+      - "clients/ios/**"
+      - ".github/workflows/ios.yml"
+  push:
+    branches: [main]
+    paths:
+      - "clients/ios/**"
+      - ".github/workflows/ios.yml"
+
+jobs:
+  test:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: clients/ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
