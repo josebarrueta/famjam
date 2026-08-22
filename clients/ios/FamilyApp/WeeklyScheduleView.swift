@@ -7,6 +7,7 @@ struct WeeklyScheduleView: View {
         of: .weekOfYear,
         for: .now
     )!.start
+    @State private var isAddingEvent = false
 
     init(eventStore: any EventStore) {
         _viewModel = StateObject(wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore))
@@ -52,10 +53,20 @@ struct WeeklyScheduleView: View {
                     } label: {
                         Image(systemName: "chevron.right")
                     }
+                    Button {
+                        isAddingEvent = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
             .task {
                 await viewModel.loadEvents()
+            }
+            .sheet(isPresented: $isAddingEvent) {
+                AddEventSheet { event in
+                    try await viewModel.addEvent(event)
+                }
             }
         }
     }

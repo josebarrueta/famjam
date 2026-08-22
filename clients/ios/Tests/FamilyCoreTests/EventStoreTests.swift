@@ -89,6 +89,25 @@ final class EventStoreTests: XCTestCase {
         ])
     }
 
+    func testRejectsAnEventWhoseEndTimeIsNotAfterItsStartTime() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
+        let event = FamilyEvent(
+            title: "Invalid practice",
+            kidID: KidID(rawValue: "emma"),
+            startTime: Date(timeIntervalSince1970: 1_735_845_200),
+            endTime: Date(timeIntervalSince1970: 1_735_841_600),
+            source: .manual,
+            status: .confirmed
+        )
+
+        do {
+            _ = try await repository.save(event)
+            XCTFail("Expected the store to reject an invalid time range")
+        } catch let error as EventValidationError {
+            XCTAssertEqual(error, .endTimeMustFollowStartTime)
+        }
+    }
+
     private func temporaryStorageURL() -> URL {
         FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString)

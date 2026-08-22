@@ -21,4 +21,10 @@ final class WeeklyScheduleViewModel: ObservableObject {
             errorMessage = "Your schedule could not be loaded."
         }
     }
+
+    func addEvent(_ event: FamilyEvent) async throws -> [EventConflict] {
+        let conflicts = try await eventStore.save(event)
+        events = try await eventStore.events().sorted { $0.startTime < $1.startTime }
+        return conflicts
+    }
 }

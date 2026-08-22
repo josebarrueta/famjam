@@ -10,6 +10,7 @@
 		A10000000000000000000002 /* WeeklyScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* WeeklyScheduleView.swift */; };
 		A10000000000000000000003 /* WeeklyScheduleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* WeeklyScheduleViewModel.swift */; };
 		A10000000000000000000004 /* FamilyCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000031 /* FamilyCore */; };
+		A10000000000000000000005 /* AddEventSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* AddEventSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -17,6 +18,7 @@
 		A10000000000000000000011 /* FamilyActivityCoordinatorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyActivityCoordinatorApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000012 /* WeeklyScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyScheduleView.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* WeeklyScheduleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyScheduleViewModel.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* AddEventSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEventSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,6 +48,7 @@
 				A10000000000000000000011 /* FamilyActivityCoordinatorApp.swift */,
 				A10000000000000000000012 /* WeeklyScheduleView.swift */,
 				A10000000000000000000013 /* WeeklyScheduleViewModel.swift */,
+				A10000000000000000000014 /* AddEventSheet.swift */,
 			);
 			path = FamilyApp;
 			sourceTree = "<group>";
@@ -134,6 +137,7 @@
 				A10000000000000000000001 /* FamilyActivityCoordinatorApp.swift in Sources */,
 				A10000000000000000000002 /* WeeklyScheduleView.swift in Sources */,
 				A10000000000000000000003 /* WeeklyScheduleViewModel.swift in Sources */,
+				A10000000000000000000005 /* AddEventSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -67,6 +67,10 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+public enum EventValidationError: Error, Equatable, Sendable {
+    case endTimeMustFollowStartTime
+}
+
 public struct EventConflict: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
         case overlappingKidActivity(KidID)
@@ -107,6 +111,10 @@ public actor LocalEventStore: EventStore {
 
     @discardableResult
     public func save(_ event: FamilyEvent) async throws -> [EventConflict] {
+        guard event.endTime > event.startTime else {
+            throw EventValidationError.endTimeMustFollowStartTime
+        }
+
         var savedEvents = try await events()
         savedEvents.removeAll { $0.id == event.id }
         let conflicts = conflicts(for: event, against: savedEvents)
