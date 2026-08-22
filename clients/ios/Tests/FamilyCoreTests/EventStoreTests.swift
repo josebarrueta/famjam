@@ -2,9 +2,9 @@ import Foundation
 import XCTest
 @testable import FamilyCore
 
-final class EventRepositoryTests: XCTestCase {
-    func testCreatesAndListsAnEvent() throws {
-        let repository = EventRepository(storageURL: temporaryStorageURL())
+final class EventStoreTests: XCTestCase {
+    func testCreatesAndListsAnEvent() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
         let event = FamilyEvent(
             title: "Soccer practice",
             kidID: KidID(rawValue: "jake"),
@@ -16,13 +16,14 @@ final class EventRepositoryTests: XCTestCase {
             status: .confirmed
         )
 
-        try repository.save(event)
+        try await repository.save(event)
 
-        XCTAssertEqual(try repository.events(), [event])
+        let savedEvents = try await repository.events()
+        XCTAssertEqual(savedEvents, [event])
     }
 
-    func testReportsAnOverlappingActivityForTheSameKid() throws {
-        let repository = EventRepository(storageURL: temporaryStorageURL())
+    func testReportsAnOverlappingActivityForTheSameKid() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
         let kidID = KidID(rawValue: "emma")
         let practice = FamilyEvent(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
@@ -42,9 +43,9 @@ final class EventRepositoryTests: XCTestCase {
             source: .manual,
             status: .confirmed
         )
-        try repository.save(practice)
+        try await repository.save(practice)
 
-        let conflicts = try repository.save(game)
+        let conflicts = try await repository.save(game)
 
         XCTAssertEqual(conflicts, [
             EventConflict(
@@ -54,8 +55,8 @@ final class EventRepositoryTests: XCTestCase {
         ])
     }
 
-    func testReportsADoubleBookedDriverAcrossKids() throws {
-        let repository = EventRepository(storageURL: temporaryStorageURL())
+    func testReportsADoubleBookedDriverAcrossKids() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
         let practice = FamilyEvent(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
             title: "Basketball practice",
@@ -76,9 +77,9 @@ final class EventRepositoryTests: XCTestCase {
             source: .manual,
             status: .confirmed
         )
-        try repository.save(practice)
+        try await repository.save(practice)
 
-        let conflicts = try repository.save(game)
+        let conflicts = try await repository.save(game)
 
         XCTAssertEqual(conflicts, [
             EventConflict(

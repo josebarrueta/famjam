@@ -1,6 +1,8 @@
-# Supabase backend
+# Supabase backend adapter
 
-This directory is intentionally empty during the local-first iOS phase.
+This directory is intentionally empty during the local-first iOS phase. Supabase is
+an optional backend implementation: the iOS client depends on the `EventStore`
+contract in `clients/ios`, never on Supabase types or SDKs.
 
 When cloud sync begins, keep all Supabase resources here:
 

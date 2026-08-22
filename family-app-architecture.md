@@ -24,10 +24,13 @@ flags scheduling conflicts.
 
 ## 4. Backend
 
-- **Platform:** Supabase (Postgres + Auth + Edge Functions)
+- **Client/backend boundary:** the iOS client depends on backend-neutral contracts
+  (for example, `EventStore`), not a specific vendor SDK or transport.
+- **Initial backend implementation:** Supabase (Postgres + Auth + Edge Functions)
 - **Images (local use):** regular image files bundled with the app (Xcode asset catalog) or selected from the device photo library; do not use Supabase Storage for local images.
-- **Why:** free/near-free at family scale, no server to manage, built-in cron support
-  for scheduled polling, Swift client SDK available
+- **Why Supabase initially:** free/near-free at family scale, no server to manage,
+  built-in cron support for scheduled polling, Swift client SDK available. A custom
+  API or another backend can implement the same client contracts later.
 - **Local development:** Supabase CLI, which runs the full stack (Postgres, Auth,
   Edge Functions runtime, local Studio UI) as Docker containers
   - `supabase init` / `supabase start` — spins up local stack

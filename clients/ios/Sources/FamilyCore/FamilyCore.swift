@@ -82,7 +82,17 @@ public struct EventConflict: Equatable, Sendable {
     }
 }
 
-public final class EventRepository {
+/// Backend-neutral persistence boundary for family events.
+///
+/// The app depends on this protocol; local and remote backends supply conforming
+/// implementations without exposing their transport or storage details.
+public protocol EventStore {
+    @discardableResult
+    func save(_ event: FamilyEvent) async throws -> [EventConflict]
+    func events() async throws -> [FamilyEvent]
+}
+
+public actor LocalEventStore: EventStore {
     private let storageURL: URL
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
@@ -96,8 +106,8 @@ public final class EventRepository {
     }
 
     @discardableResult
-    public func save(_ event: FamilyEvent) throws -> [EventConflict] {
-        var savedEvents = try events()
+    public func save(_ event: FamilyEvent) async throws -> [EventConflict] {
+        var savedEvents = try await events()
         savedEvents.removeAll { $0.id == event.id }
         let conflicts = conflicts(for: event, against: savedEvents)
         savedEvents.append(event)
@@ -105,7 +115,7 @@ public final class EventRepository {
         return conflicts
     }
 
-    public func events() throws -> [FamilyEvent] {
+    public func events() async throws -> [FamilyEvent] {
         guard FileManager.default.fileExists(atPath: storageURL.path) else {
             return []
         }

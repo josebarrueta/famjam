@@ -1,14 +1,15 @@
 # Family Activity Coordinator
 
 A native iOS family activity planner. The app is being built local-first: event data
-and images stay on the device during Phase 1. Supabase backend resources are added
-later for sign-in and realtime sync.
+and images stay on the device during Phase 1. The iOS client depends only on
+backend-neutral storage contracts; Supabase is one optional implementation for later
+sign-in and realtime sync.
 
 ## Repository layout
 
 - `clients/ios/` — iOS app and its testable Swift domain module.
-- `server/supabase/` — Supabase migrations and Edge Functions, added when cloud sync
-  begins.
+- `server/` — optional backend implementations; `supabase/` is the initial planned
+  adapter, not an iOS dependency.
 - `.github/workflows/` — CI workflows.
 - `family-app-architecture.md` — product architecture and delivery phases.
 
