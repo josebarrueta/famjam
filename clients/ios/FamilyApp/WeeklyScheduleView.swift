@@ -10,8 +10,10 @@ struct WeeklyScheduleView: View {
     @State private var isAddingEvent = false
     @State private var editingEvent: FamilyEvent?
 
-    init(eventStore: any EventStore) {
-        _viewModel = StateObject(wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore))
+    init(eventStore: any EventStore, kidStore: any KidStore) {
+        _viewModel = StateObject(
+            wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore, kidStore: kidStore)
+        )
     }
 
     var body: some View {
@@ -65,17 +67,20 @@ struct WeeklyScheduleView: View {
                     }
                 }
             }
-            .task {
-                await viewModel.loadEvents()
+            .onAppear {
+                Task {
+                    await viewModel.loadEvents()
+                }
             }
             .sheet(isPresented: $isAddingEvent) {
-                AddEventSheet { event in
+                AddEventSheet(kids: viewModel.kids) { event in
                     try await viewModel.addEvent(event)
                 }
             }
             .sheet(item: $editingEvent) { event in
                 AddEventSheet(
                     event: event,
+                    kids: viewModel.kids,
                     onSave: { event in
                         try await viewModel.addEvent(event)
                     },

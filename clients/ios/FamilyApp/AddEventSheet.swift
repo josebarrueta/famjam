@@ -4,11 +4,12 @@ import FamilyCore
 struct AddEventSheet: View {
     let onSave: (FamilyEvent) async throws -> [EventConflict]
     let onDelete: ((FamilyEvent) async throws -> Void)?
+    let kids: [Kid]
 
     private let existingEvent: FamilyEvent?
     @Environment(\.dismiss) private var dismiss
     @State private var title: String
-    @State private var kidName: String
+    @State private var selectedKidID: KidID?
     @State private var startTime: Date
     @State private var endTime: Date
     @State private var location: String
@@ -21,14 +22,16 @@ struct AddEventSheet: View {
 
     init(
         event: FamilyEvent? = nil,
+        kids: [Kid],
         onSave: @escaping (FamilyEvent) async throws -> [EventConflict],
         onDelete: ((FamilyEvent) async throws -> Void)? = nil
     ) {
         existingEvent = event
         self.onSave = onSave
         self.onDelete = onDelete
+        self.kids = kids
         _title = State(initialValue: event?.title ?? "")
-        _kidName = State(initialValue: event?.kidID?.rawValue ?? "")
+        _selectedKidID = State(initialValue: event?.kidID)
         _startTime = State(initialValue: event?.startTime ?? .now)
         _endTime = State(initialValue: event?.endTime ?? .now.addingTimeInterval(60 * 60))
         _location = State(initialValue: event?.location ?? "")
@@ -40,7 +43,12 @@ struct AddEventSheet: View {
             Form {
                 Section("Activity") {
                     TextField("Title", text: $title)
-                    TextField("Kid (optional)", text: $kidName)
+                    Picker("Kid", selection: $selectedKidID) {
+                        Text("No kid").tag(KidID?.none)
+                        ForEach(kids) { kid in
+                            Text(kid.name).tag(Optional(kid.id))
+                        }
+                    }
                 }
 
                 Section("Time") {
@@ -145,7 +153,7 @@ struct AddEventSheet: View {
         FamilyEvent(
             id: existingEvent?.id ?? UUID(),
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            kidID: optionalKidID,
+            kidID: selectedKidID,
             startTime: startTime,
             endTime: endTime,
             location: optionalText(location),
@@ -153,13 +161,6 @@ struct AddEventSheet: View {
             source: existingEvent?.source ?? .manual,
             status: existingEvent?.status ?? .confirmed
         )
-    }
-
-    private var optionalKidID: KidID? {
-        guard let kidName = optionalText(kidName) else {
-            return nil
-        }
-        return KidID(rawValue: kidName)
     }
 
     private func optionalText(_ value: String) -> String? {
