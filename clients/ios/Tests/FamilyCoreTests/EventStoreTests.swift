@@ -108,6 +108,53 @@ final class EventStoreTests: XCTestCase {
         }
     }
 
+    func testUpdatesAnEventWithTheSameID() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
+        let eventID = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
+        let originalEvent = FamilyEvent(
+            id: eventID,
+            title: "Soccer practice",
+            kidID: KidID(rawValue: "jake"),
+            startTime: Date(timeIntervalSince1970: 1_735_841_600),
+            endTime: Date(timeIntervalSince1970: 1_735_845_200),
+            source: .manual,
+            status: .confirmed
+        )
+        let updatedEvent = FamilyEvent(
+            id: eventID,
+            title: "Soccer game",
+            kidID: KidID(rawValue: "jake"),
+            startTime: Date(timeIntervalSince1970: 1_735_843_400),
+            endTime: Date(timeIntervalSince1970: 1_735_847_000),
+            source: .manual,
+            status: .confirmed
+        )
+        try await repository.save(originalEvent)
+
+        try await repository.save(updatedEvent)
+
+        let savedEvents = try await repository.events()
+        XCTAssertEqual(savedEvents, [updatedEvent])
+    }
+
+    func testDeletesAnEvent() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
+        let event = FamilyEvent(
+            title: "Soccer practice",
+            kidID: KidID(rawValue: "jake"),
+            startTime: Date(timeIntervalSince1970: 1_735_841_600),
+            endTime: Date(timeIntervalSince1970: 1_735_845_200),
+            source: .manual,
+            status: .confirmed
+        )
+        try await repository.save(event)
+
+        try await repository.delete(event)
+
+        let savedEvents = try await repository.events()
+        XCTAssertEqual(savedEvents, [])
+    }
+
     private func temporaryStorageURL() -> URL {
         FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString)

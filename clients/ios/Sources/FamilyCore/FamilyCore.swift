@@ -93,6 +93,7 @@ public struct EventConflict: Equatable, Sendable {
 public protocol EventStore: Sendable {
     @discardableResult
     func save(_ event: FamilyEvent) async throws -> [EventConflict]
+    func delete(_ event: FamilyEvent) async throws
     func events() async throws -> [FamilyEvent]
 }
 
@@ -121,6 +122,12 @@ public actor LocalEventStore: EventStore {
         savedEvents.append(event)
         try write(savedEvents)
         return conflicts
+    }
+
+    public func delete(_ event: FamilyEvent) async throws {
+        var savedEvents = try await events()
+        savedEvents.removeAll { $0.id == event.id }
+        try write(savedEvents)
     }
 
     public func events() async throws -> [FamilyEvent] {

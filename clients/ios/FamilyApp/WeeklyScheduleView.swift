@@ -8,6 +8,7 @@ struct WeeklyScheduleView: View {
         for: .now
     )!.start
     @State private var isAddingEvent = false
+    @State private var editingEvent: FamilyEvent?
 
     init(eventStore: any EventStore) {
         _viewModel = StateObject(wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore))
@@ -29,6 +30,10 @@ struct WeeklyScheduleView: View {
                             } else {
                                 ForEach(dayEvents) { event in
                                     EventRow(event: event)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            editingEvent = event
+                                        }
                                 }
                             }
                         }
@@ -67,6 +72,17 @@ struct WeeklyScheduleView: View {
                 AddEventSheet { event in
                     try await viewModel.addEvent(event)
                 }
+            }
+            .sheet(item: $editingEvent) { event in
+                AddEventSheet(
+                    event: event,
+                    onSave: { event in
+                        try await viewModel.addEvent(event)
+                    },
+                    onDelete: { event in
+                        try await viewModel.deleteEvent(event)
+                    }
+                )
             }
         }
     }

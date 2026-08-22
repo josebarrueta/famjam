@@ -27,4 +27,9 @@ final class WeeklyScheduleViewModel: ObservableObject {
         events = try await eventStore.events().sorted { $0.startTime < $1.startTime }
         return conflicts
     }
+
+    func deleteEvent(_ event: FamilyEvent) async throws {
+        try await eventStore.delete(event)
+        events = try await eventStore.events().sorted { $0.startTime < $1.startTime }
+    }
 }
