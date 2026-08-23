@@ -13,6 +13,7 @@
 		A10000000000000000000005 /* AddEventSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* AddEventSheet.swift */; };
 		A10000000000000000000007 /* FamilyMembersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* FamilyMembersView.swift */; };
 		A10000000000000000000008 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* NotificationsView.swift */; };
+		A10000000000000000000009 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +24,7 @@
 		A10000000000000000000014 /* AddEventSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEventSheet.swift; sourceTree = "<group>"; };
 		A10000000000000000000016 /* FamilyMembersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMembersView.swift; sourceTree = "<group>"; };
 		A10000000000000000000017 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000018 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,6 +57,7 @@
 				A10000000000000000000014 /* AddEventSheet.swift */,
 				A10000000000000000000016 /* FamilyMembersView.swift */,
 				A10000000000000000000017 /* NotificationsView.swift */,
+				A10000000000000000000018 /* SettingsView.swift */,
 			);
 			path = FamilyApp;
 			sourceTree = "<group>";
@@ -146,6 +149,7 @@
 				A10000000000000000000005 /* AddEventSheet.swift in Sources */,
 				A10000000000000000000007 /* FamilyMembersView.swift in Sources */,
 				A10000000000000000000008 /* NotificationsView.swift in Sources */,
+				A10000000000000000000009 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

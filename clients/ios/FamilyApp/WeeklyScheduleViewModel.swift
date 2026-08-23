@@ -11,11 +11,18 @@ final class WeeklyScheduleViewModel: ObservableObject {
     private let eventStore: any EventStore
     private let memberStore: any FamilyMemberStore
     private let notificationStore: any ConflictNotificationStore
+    private let alertPreferences: ConflictAlertPreferences
 
-    init(eventStore: any EventStore, memberStore: any FamilyMemberStore, notificationStore: any ConflictNotificationStore) {
+    init(
+        eventStore: any EventStore,
+        memberStore: any FamilyMemberStore,
+        notificationStore: any ConflictNotificationStore,
+        alertPreferences: ConflictAlertPreferences = ConflictAlertPreferences()
+    ) {
         self.eventStore = eventStore
         self.memberStore = memberStore
         self.notificationStore = notificationStore
+        self.alertPreferences = alertPreferences
     }
 
     func loadEvents() async {
@@ -30,7 +37,7 @@ final class WeeklyScheduleViewModel: ObservableObject {
 
     func addEvent(_ event: FamilyEvent) async throws -> [EventConflict] {
         let conflicts = try await eventStore.save(event)
-        if !conflicts.isEmpty {
+        if !conflicts.isEmpty, alertPreferences.areConflictAlertsEnabled {
             try await notificationStore.save(ConflictNotification(message: "A newly added event conflicts with an existing schedule."))
         }
         events = try await eventStore.events().sorted { $0.startTime < $1.startTime }

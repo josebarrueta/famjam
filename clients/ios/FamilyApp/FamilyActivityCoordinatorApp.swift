@@ -25,6 +25,8 @@ struct FamilyActivityCoordinatorApp: App {
                     .tabItem { Label("Family", systemImage: "person.2") }
                 NotificationsView(notificationStore: notificationStore)
                     .tabItem { Label("Alerts", systemImage: "bell") }
+                SettingsView()
+                    .tabItem { Label("Settings", systemImage: "gearshape") }
             }
         }
     }
