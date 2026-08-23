@@ -10,9 +10,9 @@ struct WeeklyScheduleView: View {
     @State private var isAddingEvent = false
     @State private var editingEvent: FamilyEvent?
 
-    init(eventStore: any EventStore, memberStore: any FamilyMemberStore) {
+    init(eventStore: any EventStore, memberStore: any FamilyMemberStore, notificationStore: any ConflictNotificationStore) {
         _viewModel = StateObject(
-            wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore, memberStore: memberStore)
+            wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore, memberStore: memberStore, notificationStore: notificationStore)
         )
     }
 

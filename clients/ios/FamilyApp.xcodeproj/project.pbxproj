@@ -12,6 +12,7 @@
 		A10000000000000000000004 /* FamilyCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000031 /* FamilyCore */; };
 		A10000000000000000000005 /* AddEventSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* AddEventSheet.swift */; };
 		A10000000000000000000007 /* FamilyMembersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* FamilyMembersView.swift */; };
+		A10000000000000000000008 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* NotificationsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,6 +22,7 @@
 		A10000000000000000000013 /* WeeklyScheduleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyScheduleViewModel.swift; sourceTree = "<group>"; };
 		A10000000000000000000014 /* AddEventSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEventSheet.swift; sourceTree = "<group>"; };
 		A10000000000000000000016 /* FamilyMembersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMembersView.swift; sourceTree = "<group>"; };
+		A10000000000000000000017 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +54,7 @@
 				A10000000000000000000013 /* WeeklyScheduleViewModel.swift */,
 				A10000000000000000000014 /* AddEventSheet.swift */,
 				A10000000000000000000016 /* FamilyMembersView.swift */,
+				A10000000000000000000017 /* NotificationsView.swift */,
 			);
 			path = FamilyApp;
 			sourceTree = "<group>";
@@ -142,6 +145,7 @@
 				A10000000000000000000003 /* WeeklyScheduleViewModel.swift in Sources */,
 				A10000000000000000000005 /* AddEventSheet.swift in Sources */,
 				A10000000000000000000007 /* FamilyMembersView.swift in Sources */,
+				A10000000000000000000008 /* NotificationsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
