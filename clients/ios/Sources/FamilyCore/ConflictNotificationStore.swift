@@ -14,6 +14,7 @@ public struct ConflictNotification: Codable, Equatable, Identifiable, Sendable {
 
 public protocol ConflictNotificationStore: Sendable {
     func save(_ notification: ConflictNotification) async throws
+    func clear() async throws
     func notifications() async throws -> [ConflictNotification]
 }
 
@@ -25,6 +26,9 @@ public actor LocalConflictNotificationStore: ConflictNotificationStore {
         saved.append(notification)
         try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(saved).write(to: storageURL, options: .atomic)
+    }
+    public func clear() async throws {
+        try FileManager.default.removeItem(at: storageURL)
     }
     public func notifications() async throws -> [ConflictNotification] {
         guard FileManager.default.fileExists(atPath: storageURL.path) else { return [] }

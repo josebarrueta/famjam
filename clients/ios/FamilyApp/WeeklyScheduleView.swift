@@ -9,6 +9,7 @@ struct WeeklyScheduleView: View {
     )!.start
     @State private var isAddingEvent = false
     @State private var editingEvent: FamilyEvent?
+    @State private var selectedParticipantID: KidID?
 
     init(eventStore: any EventStore, memberStore: any FamilyMemberStore, notificationStore: any ConflictNotificationStore) {
         _viewModel = StateObject(
@@ -62,6 +63,14 @@ struct WeeklyScheduleView: View {
                     } label: {
                         Image(systemName: "chevron.right")
                     }
+                    Menu {
+                        Button("All family members") { selectedParticipantID = nil }
+                        ForEach(viewModel.members) { member in
+                            Button(member.name) { selectedParticipantID = member.id }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
                     Button {
                         isAddingEvent = true
                     } label: {
@@ -105,7 +114,10 @@ struct WeeklyScheduleView: View {
 
     private func events(on day: Date) -> [FamilyEvent] {
         let calendar = Calendar.autoupdatingCurrent
-        return viewModel.events.filter { calendar.isDate($0.startTime, inSameDayAs: day) }
+        return viewModel.events.filter {
+            calendar.isDate($0.startTime, inSameDayAs: day)
+                && (selectedParticipantID == nil || $0.participantIDs.contains(selectedParticipantID!))
+        }
     }
 
     private func moveWeek(by offset: Int) {

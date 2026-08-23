@@ -16,7 +16,17 @@ struct NotificationsView: View {
                 }
             }
             .navigationTitle("Alerts")
-            .task { notifications = (try? await notificationStore.notifications().reversed()) ?? [] }
+            .toolbar {
+                if !notifications.isEmpty {
+                    Button("Clear") {
+                        Task {
+                            try? await notificationStore.clear()
+                            notifications = []
+                        }
+                    }
+                }
+            }
+            .task { notifications = Array((try? await notificationStore.notifications())?.reversed() ?? []) }
         }
     }
 }
