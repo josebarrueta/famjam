@@ -23,6 +23,7 @@ public struct FamilyMember: Codable, Equatable, Identifiable, Sendable {
 
 public protocol FamilyMemberStore: Sendable {
     func save(_ member: FamilyMember) async throws
+    func delete(_ member: FamilyMember) async throws
     func members() async throws -> [FamilyMember]
 }
 
@@ -35,6 +36,13 @@ public actor LocalFamilyMemberStore: FamilyMemberStore {
         var saved = try await members()
         saved.removeAll { $0.id == member.id }
         saved.append(member)
+        try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(saved).write(to: storageURL, options: .atomic)
+    }
+
+    public func delete(_ member: FamilyMember) async throws {
+        var saved = try await members()
+        saved.removeAll { $0.id == member.id }
         try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(saved).write(to: storageURL, options: .atomic)
     }
