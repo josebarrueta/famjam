@@ -11,7 +11,6 @@
 		A10000000000000000000003 /* WeeklyScheduleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* WeeklyScheduleViewModel.swift */; };
 		A10000000000000000000004 /* FamilyCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000031 /* FamilyCore */; };
 		A10000000000000000000005 /* AddEventSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* AddEventSheet.swift */; };
-		A10000000000000000000006 /* KidsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* KidsView.swift */; };
 		A10000000000000000000007 /* FamilyMembersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* FamilyMembersView.swift */; };
 /* End PBXBuildFile section */
 
@@ -21,7 +20,6 @@
 		A10000000000000000000012 /* WeeklyScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyScheduleView.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* WeeklyScheduleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyScheduleViewModel.swift; sourceTree = "<group>"; };
 		A10000000000000000000014 /* AddEventSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEventSheet.swift; sourceTree = "<group>"; };
-		A10000000000000000000015 /* KidsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidsView.swift; sourceTree = "<group>"; };
 		A10000000000000000000016 /* FamilyMembersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMembersView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -53,7 +51,6 @@
 				A10000000000000000000012 /* WeeklyScheduleView.swift */,
 				A10000000000000000000013 /* WeeklyScheduleViewModel.swift */,
 				A10000000000000000000014 /* AddEventSheet.swift */,
-				A10000000000000000000015 /* KidsView.swift */,
 				A10000000000000000000016 /* FamilyMembersView.swift */,
 			);
 			path = FamilyApp;
@@ -144,7 +141,6 @@
 				A10000000000000000000002 /* WeeklyScheduleView.swift in Sources */,
 				A10000000000000000000003 /* WeeklyScheduleViewModel.swift in Sources */,
 				A10000000000000000000005 /* AddEventSheet.swift in Sources */,
-				A10000000000000000000006 /* KidsView.swift in Sources */,
 				A10000000000000000000007 /* FamilyMembersView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

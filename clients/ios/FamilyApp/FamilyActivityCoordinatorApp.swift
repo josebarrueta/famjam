@@ -7,6 +7,7 @@ struct FamilyActivityCoordinatorApp: App {
     private let memberStore: any FamilyMemberStore
 
     init() {
+        AppStorage.resetForUnifiedFamilyMembersIfNeeded()
         eventStore = LocalEventStore(storageURL: AppStorage.eventsURL)
         memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
     }
@@ -38,6 +39,13 @@ enum AppStorage {
         storageDirectory
             .appendingPathComponent("members")
             .appendingPathExtension("json")
+    }
+
+    static func resetForUnifiedFamilyMembersIfNeeded() {
+        let resetKey = "didResetForUnifiedFamilyMembers"
+        guard !UserDefaults.standard.bool(forKey: resetKey) else { return }
+        try? FileManager.default.removeItem(at: storageDirectory)
+        UserDefaults.standard.set(true, forKey: resetKey)
     }
 
     private static var storageDirectory: URL {

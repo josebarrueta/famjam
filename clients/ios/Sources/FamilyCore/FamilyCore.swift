@@ -8,20 +8,6 @@ public struct KidID: Codable, Hashable, Sendable {
     }
 }
 
-public struct Kid: Codable, Equatable, Identifiable, Sendable {
-    public let id: KidID
-    public var name: String
-    public var gradeOrBirthYear: String
-    public var colorTag: String
-
-    public init(id: KidID, name: String, gradeOrBirthYear: String, colorTag: String) {
-        self.id = id
-        self.name = name
-        self.gradeOrBirthYear = gradeOrBirthYear
-        self.colorTag = colorTag
-    }
-}
-
 public enum EventSource: String, Codable, Sendable {
     case manual
     case emailSuggested = "email_suggested"

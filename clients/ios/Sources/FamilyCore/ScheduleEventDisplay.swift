@@ -6,13 +6,6 @@ public struct ScheduleEventDisplay: Equatable, Sendable {
     public let kidName: String?
     public let kidColorTag: String?
 
-    public init(event: FamilyEvent, kids: [Kid]) {
-        self.event = event
-        let kid = kids.first { $0.id == event.kidID }
-        kidName = kid?.name
-        kidColorTag = kid?.colorTag
-    }
-
     public init(event: FamilyEvent, members: [FamilyMember]) {
         self.event = event
         let member = members.first { event.participantIDs.contains($0.id) }
