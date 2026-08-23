@@ -3,7 +3,31 @@ import Foundation
 /// Backend-neutral persistence boundary for family members.
 public protocol KidStore: Sendable {
     func save(_ kid: Kid) async throws
+    func delete(_ kid: Kid) async throws
     func kids() async throws -> [Kid]
+}
+
+public enum KidDeletionError: Error, Equatable, Sendable {
+    case kidHasScheduledEvents
+}
+
+/// Coordinates deletion across stores so events never lose their kid reference.
+public actor KidDeletionService {
+    private let kidStore: any KidStore
+    private let eventStore: any EventStore
+
+    public init(kidStore: any KidStore, eventStore: any EventStore) {
+        self.kidStore = kidStore
+        self.eventStore = eventStore
+    }
+
+    public func delete(_ kid: Kid) async throws {
+        let events = try await eventStore.events()
+        guard !events.contains(where: { $0.kidID == kid.id }) else {
+            throw KidDeletionError.kidHasScheduledEvents
+        }
+        try await kidStore.delete(kid)
+    }
 }
 
 public actor LocalKidStore: KidStore {
@@ -21,6 +45,16 @@ public actor LocalKidStore: KidStore {
         var savedKids = try await kids()
         savedKids.removeAll { $0.id == kid.id }
         savedKids.append(kid)
+        try FileManager.default.createDirectory(
+            at: storageURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try encoder.encode(savedKids).write(to: storageURL, options: .atomic)
+    }
+
+    public func delete(_ kid: Kid) async throws {
+        var savedKids = try await kids()
+        savedKids.removeAll { $0.id == kid.id }
         try FileManager.default.createDirectory(
             at: storageURL.deletingLastPathComponent(),
             withIntermediateDirectories: true

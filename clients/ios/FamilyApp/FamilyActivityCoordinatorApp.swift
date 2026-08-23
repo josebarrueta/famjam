@@ -18,7 +18,7 @@ struct FamilyActivityCoordinatorApp: App {
                     .tabItem {
                         Label("Schedule", systemImage: "calendar")
                     }
-                KidsView(kidStore: kidStore)
+                KidsView(kidStore: kidStore, eventStore: eventStore)
                     .tabItem {
                         Label("Kids", systemImage: "person.2")
                     }
