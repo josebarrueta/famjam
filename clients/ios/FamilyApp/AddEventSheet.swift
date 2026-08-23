@@ -9,7 +9,7 @@ struct AddEventSheet: View {
     private let existingEvent: FamilyEvent?
     @Environment(\.dismiss) private var dismiss
     @State private var title: String
-    @State private var selectedKidID: KidID?
+    @State private var selectedParticipantIDs: Set<KidID>
     @State private var startTime: Date
     @State private var endTime: Date
     @State private var location: String
@@ -31,7 +31,7 @@ struct AddEventSheet: View {
         self.onDelete = onDelete
         self.members = members
         _title = State(initialValue: event?.title ?? "")
-        _selectedKidID = State(initialValue: event?.kidID)
+        _selectedParticipantIDs = State(initialValue: Set(event?.participantIDs ?? event?.kidID.map { [$0] } ?? []))
         _startTime = State(initialValue: event?.startTime ?? .now)
         _endTime = State(initialValue: event?.endTime ?? .now.addingTimeInterval(60 * 60))
         _location = State(initialValue: event?.location ?? "")
@@ -43,11 +43,8 @@ struct AddEventSheet: View {
             Form {
                 Section("Activity") {
                     TextField("Title", text: $title)
-                    Picker("Kid", selection: $selectedKidID) {
-                        Text("No kid").tag(KidID?.none)
-                        ForEach(members) { member in
-                            Text(member.name).tag(Optional(member.id))
-                        }
+                    ForEach(members) { member in
+                        Toggle(member.name, isOn: participantBinding(for: member.id))
                     }
                 }
 
@@ -153,14 +150,27 @@ struct AddEventSheet: View {
         FamilyEvent(
             id: existingEvent?.id ?? UUID(),
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            kidID: selectedKidID,
-            participantIDs: selectedKidID.map { [$0] } ?? [],
+            kidID: selectedParticipantIDs.first,
+            participantIDs: Array(selectedParticipantIDs),
             startTime: startTime,
             endTime: endTime,
             location: optionalText(location),
             driver: optionalText(driver),
             source: existingEvent?.source ?? .manual,
             status: existingEvent?.status ?? .confirmed
+        )
+    }
+
+    private func participantBinding(for memberID: KidID) -> Binding<Bool> {
+        Binding(
+            get: { selectedParticipantIDs.contains(memberID) },
+            set: { isSelected in
+                if isSelected {
+                    selectedParticipantIDs.insert(memberID)
+                } else {
+                    selectedParticipantIDs.remove(memberID)
+                }
+            }
         )
     }
 
