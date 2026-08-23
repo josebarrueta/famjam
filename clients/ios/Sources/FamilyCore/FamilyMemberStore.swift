@@ -27,6 +27,28 @@ public protocol FamilyMemberStore: Sendable {
     func members() async throws -> [FamilyMember]
 }
 
+public enum FamilyMemberDeletionError: Error, Sendable {
+    case hasScheduledEvents
+}
+
+public actor FamilyMemberDeletionService {
+    private let memberStore: any FamilyMemberStore
+    private let eventStore: any EventStore
+
+    public init(memberStore: any FamilyMemberStore, eventStore: any EventStore) {
+        self.memberStore = memberStore
+        self.eventStore = eventStore
+    }
+
+    public func delete(_ member: FamilyMember) async throws {
+        let events = try await eventStore.events()
+        guard !events.contains(where: { $0.participantIDs.contains(member.id) }) else {
+            throw FamilyMemberDeletionError.hasScheduledEvents
+        }
+        try await memberStore.delete(member)
+    }
+}
+
 public actor LocalFamilyMemberStore: FamilyMemberStore {
     private let storageURL: URL
 
