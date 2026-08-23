@@ -37,6 +37,7 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public var title: String
     public var kidID: KidID?
+    public var participantIDs: [KidID]
     public var startTime: Date
     public var endTime: Date
     public var location: String?
@@ -48,6 +49,7 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
         id: UUID = UUID(),
         title: String,
         kidID: KidID?,
+        participantIDs: [KidID] = [],
         startTime: Date,
         endTime: Date,
         location: String? = nil,
@@ -58,6 +60,7 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
         self.id = id
         self.title = title
         self.kidID = kidID
+        self.participantIDs = participantIDs.isEmpty ? kidID.map { [$0] } ?? [] : participantIDs
         self.startTime = startTime
         self.endTime = endTime
         self.location = location
@@ -74,6 +77,7 @@ public enum EventValidationError: Error, Equatable, Sendable {
 public struct EventConflict: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
         case overlappingKidActivity(KidID)
+        case overlappingParticipantActivity(KidID)
         case doubleBookedDriver(String)
     }
 
@@ -147,6 +151,13 @@ public actor LocalEventStore: EventStore {
             if let kidID = event.kidID, kidID == savedEvent.kidID {
                 return EventConflict(
                     kind: .overlappingKidActivity(kidID),
+                    eventIDs: [savedEvent.id, event.id]
+                )
+            }
+
+            if let participantID = event.participantIDs.first(where: { savedEvent.participantIDs.contains($0) }) {
+                return EventConflict(
+                    kind: .overlappingParticipantActivity(participantID),
                     eventIDs: [savedEvent.id, event.id]
                 )
             }

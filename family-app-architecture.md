@@ -46,9 +46,12 @@ flags scheduling conflicts.
 Minimal v1 schema — expected to evolve:
 
 - **kids**: id, name, birth_year_or_grade (no exact DOB), color_tag
-- **events**: id, title, kid_id (nullable — can apply to multiple kids), start_time,
-  end_time, location, driver, source (`manual` | `email_suggested` | `voice`),
-  status (`confirmed` | `pending_review`)
+- **family_members**: id, name, role (`parent` | `kid`), grade_or_birth_year
+  (kids only), color_tag
+- **events**: id, title, participant_ids (one or more family members; supports
+  parent work/appointment events and kid activities), start_time, end_time,
+  location, driver, source (`manual` | `email_suggested` | `voice`), status
+  (`confirmed` | `pending_review`)
 - **users**: id, role (`parent` | `kid`), auth link to Supabase Auth
 - **conflicts** (derived, not stored): computed at write-time by checking new events
   against existing ones for overlapping times or the same driver double-booked
@@ -83,10 +86,11 @@ Minimal v1 schema — expected to evolve:
 ### 7.3 Conflict detection
 - Pure logic, no LLM needed
 - On any event write (manual, email-suggested, or voice), check for:
-  - overlapping times for the same kid
-  - the same driver double-booked across kids
-- Push notification on conflict: "Heads up — Jake's game overlaps with Emma's
-  practice on Thursday"
+  - overlapping times for any shared family member (parent or kid)
+  - the same driver double-booked across family members
+- In local-first v1, show an immediate in-app conflict alert to the parent adding
+  the event. With synced accounts, send push notifications to the affected
+  parent(s)/family based on notification preferences.
 
 ## 8. Tech Stack Summary
 

@@ -108,6 +108,39 @@ final class EventStoreTests: XCTestCase {
         }
     }
 
+    func testReportsAnOverlappingActivityForTheSameParent() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
+        let parentID = KidID(rawValue: "parent-1")
+        let workMeeting = FamilyEvent(
+            title: "Work meeting",
+            kidID: nil,
+            participantIDs: [parentID],
+            startTime: Date(timeIntervalSince1970: 1_735_841_600),
+            endTime: Date(timeIntervalSince1970: 1_735_845_200),
+            source: .manual,
+            status: .confirmed
+        )
+        let doctorAppointment = FamilyEvent(
+            title: "Doctor appointment",
+            kidID: nil,
+            participantIDs: [parentID],
+            startTime: Date(timeIntervalSince1970: 1_735_843_400),
+            endTime: Date(timeIntervalSince1970: 1_735_847_000),
+            source: .manual,
+            status: .confirmed
+        )
+        try await repository.save(workMeeting)
+
+        let conflicts = try await repository.save(doctorAppointment)
+
+        XCTAssertEqual(conflicts, [
+            EventConflict(
+                kind: .overlappingParticipantActivity(parentID),
+                eventIDs: [workMeeting.id, doctorAppointment.id]
+            ),
+        ])
+    }
+
     func testUpdatesAnEventWithTheSameID() async throws {
         let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
         let eventID = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
