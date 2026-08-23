@@ -31,7 +31,9 @@ struct WeeklyScheduleView: View {
                                     .foregroundStyle(.secondary)
                             } else {
                                 ForEach(dayEvents) { event in
-                                    EventRow(event: event)
+                                    EventRow(
+                                        display: ScheduleEventDisplay(event: event, kids: viewModel.kids)
+                                    )
                                         .contentShape(Rectangle())
                                         .onTapGesture {
                                             editingEvent = event
@@ -112,21 +114,46 @@ struct WeeklyScheduleView: View {
 }
 
 private struct EventRow: View {
-    let event: FamilyEvent
+    let display: ScheduleEventDisplay
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(event.title)
-                .font(.headline)
-            Text(event.startTime.formatted(date: .omitted, time: .shortened))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            if let location = event.location, !location.isEmpty {
-                Label(location, systemImage: "mappin.and.ellipse")
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color(familyColorTag: display.kidColorTag))
+                .frame(width: 5)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(display.event.title)
+                    .font(.headline)
+                if let kidName = display.kidName {
+                    Text(kidName)
+                        .font(.subheadline)
+                        .foregroundStyle(Color(familyColorTag: display.kidColorTag))
+                }
+                Text(display.event.startTime.formatted(date: .omitted, time: .shortened))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if let location = display.event.location, !location.isEmpty {
+                    Label(location, systemImage: "mappin.and.ellipse")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+private extension Color {
+    init(familyColorTag: String?) {
+        switch familyColorTag?.lowercased() {
+        case "red": self = .red
+        case "orange": self = .orange
+        case "yellow": self = .yellow
+        case "green": self = .green
+        case "blue": self = .blue
+        case "purple": self = .purple
+        case "pink": self = .pink
+        default: self = .gray
+        }
     }
 }
