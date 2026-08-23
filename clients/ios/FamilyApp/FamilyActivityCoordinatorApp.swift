@@ -28,6 +28,7 @@ struct FamilyActivityCoordinatorApp: App {
                 SettingsView()
                     .tabItem { Label("Settings", systemImage: "gearshape") }
             }
+            .tint(AppTheme.coral)
         }
     }
 }

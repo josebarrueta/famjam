@@ -20,6 +20,11 @@ struct WeeklyScheduleView: View {
     var body: some View {
         NavigationStack {
             List {
+                FamilyRallyHeader(
+                    title: "Ready, set, rally!",
+                    subtitle: "One colorful week for the whole crew."
+                )
+                    .listRowBackground(Color.clear)
                 if let errorMessage = viewModel.errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.secondary)
@@ -45,7 +50,9 @@ struct WeeklyScheduleView: View {
                     }
                 }
             }
-            .navigationTitle("Family Schedule")
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.background)
+            .navigationTitle("Family Rally")
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
                     Button("Today") {

@@ -1,6 +1,6 @@
-# Family Activity Coordinator
+# Family Rally
 
-A native iOS family activity planner. The app is being built local-first: event data
+Family Rally is a colorful native iOS planner for keeping the whole home team in sync. The app is being built local-first: event data
 and images stay on the device during Phase 1. The iOS client depends only on
 backend-neutral storage contracts; Supabase is one optional implementation for later
 sign-in and realtime sync.
