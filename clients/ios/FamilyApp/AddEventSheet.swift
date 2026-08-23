@@ -4,7 +4,7 @@ import FamilyCore
 struct AddEventSheet: View {
     let onSave: (FamilyEvent) async throws -> [EventConflict]
     let onDelete: ((FamilyEvent) async throws -> Void)?
-    let kids: [Kid]
+    let members: [FamilyMember]
 
     private let existingEvent: FamilyEvent?
     @Environment(\.dismiss) private var dismiss
@@ -22,14 +22,14 @@ struct AddEventSheet: View {
 
     init(
         event: FamilyEvent? = nil,
-        kids: [Kid],
+        members: [FamilyMember],
         onSave: @escaping (FamilyEvent) async throws -> [EventConflict],
         onDelete: ((FamilyEvent) async throws -> Void)? = nil
     ) {
         existingEvent = event
         self.onSave = onSave
         self.onDelete = onDelete
-        self.kids = kids
+        self.members = members
         _title = State(initialValue: event?.title ?? "")
         _selectedKidID = State(initialValue: event?.kidID)
         _startTime = State(initialValue: event?.startTime ?? .now)
@@ -45,8 +45,8 @@ struct AddEventSheet: View {
                     TextField("Title", text: $title)
                     Picker("Kid", selection: $selectedKidID) {
                         Text("No kid").tag(KidID?.none)
-                        ForEach(kids) { kid in
-                            Text(kid.name).tag(Optional(kid.id))
+                        ForEach(members) { member in
+                            Text(member.name).tag(Optional(member.id))
                         }
                     }
                 }
@@ -154,6 +154,7 @@ struct AddEventSheet: View {
             id: existingEvent?.id ?? UUID(),
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             kidID: selectedKidID,
+            participantIDs: selectedKidID.map { [$0] } ?? [],
             startTime: startTime,
             endTime: endTime,
             location: optionalText(location),

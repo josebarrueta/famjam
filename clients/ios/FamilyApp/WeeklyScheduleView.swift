@@ -10,9 +10,9 @@ struct WeeklyScheduleView: View {
     @State private var isAddingEvent = false
     @State private var editingEvent: FamilyEvent?
 
-    init(eventStore: any EventStore, kidStore: any KidStore) {
+    init(eventStore: any EventStore, memberStore: any FamilyMemberStore) {
         _viewModel = StateObject(
-            wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore, kidStore: kidStore)
+            wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore, memberStore: memberStore)
         )
     }
 
@@ -32,7 +32,7 @@ struct WeeklyScheduleView: View {
                             } else {
                                 ForEach(dayEvents) { event in
                                     EventRow(
-                                        display: ScheduleEventDisplay(event: event, kids: viewModel.kids)
+                                        display: ScheduleEventDisplay(event: event, members: viewModel.members)
                                     )
                                         .contentShape(Rectangle())
                                         .onTapGesture {
@@ -75,14 +75,14 @@ struct WeeklyScheduleView: View {
                 }
             }
             .sheet(isPresented: $isAddingEvent) {
-                AddEventSheet(kids: viewModel.kids) { event in
+                AddEventSheet(members: viewModel.members) { event in
                     try await viewModel.addEvent(event)
                 }
             }
             .sheet(item: $editingEvent) { event in
                 AddEventSheet(
                     event: event,
-                    kids: viewModel.kids,
+                    members: viewModel.members,
                     onSave: { event in
                         try await viewModel.addEvent(event)
                     },

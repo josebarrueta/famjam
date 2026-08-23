@@ -12,4 +12,11 @@ public struct ScheduleEventDisplay: Equatable, Sendable {
         kidName = kid?.name
         kidColorTag = kid?.colorTag
     }
+
+    public init(event: FamilyEvent, members: [FamilyMember]) {
+        self.event = event
+        let member = members.first { event.participantIDs.contains($0.id) }
+        kidName = member?.name
+        kidColorTag = member?.colorTag
+    }
 }

@@ -5,21 +5,21 @@ import FamilyCore
 @MainActor
 final class WeeklyScheduleViewModel: ObservableObject {
     @Published private(set) var events: [FamilyEvent] = []
-    @Published private(set) var kids: [Kid] = []
+    @Published private(set) var members: [FamilyMember] = []
     @Published private(set) var errorMessage: String?
 
     private let eventStore: any EventStore
-    private let kidStore: any KidStore
+    private let memberStore: any FamilyMemberStore
 
-    init(eventStore: any EventStore, kidStore: any KidStore) {
+    init(eventStore: any EventStore, memberStore: any FamilyMemberStore) {
         self.eventStore = eventStore
-        self.kidStore = kidStore
+        self.memberStore = memberStore
     }
 
     func loadEvents() async {
         do {
             events = try await eventStore.events().sorted { $0.startTime < $1.startTime }
-            kids = try await kidStore.kids().sorted { $0.name < $1.name }
+            members = try await memberStore.members().sorted { $0.name < $1.name }
             errorMessage = nil
         } catch {
             errorMessage = "Your schedule could not be loaded."

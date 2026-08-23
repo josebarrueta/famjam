@@ -1,6 +1,6 @@
 import Foundation
 
-public enum FamilyMemberRole: String, Codable, Sendable {
+public enum FamilyMemberRole: String, Codable, Sendable, CaseIterable {
     case parent
     case kid
 }

@@ -4,21 +4,21 @@ import FamilyCore
 @main
 struct FamilyActivityCoordinatorApp: App {
     private let eventStore: any EventStore
-    private let kidStore: any KidStore
+    private let memberStore: any FamilyMemberStore
 
     init() {
         eventStore = LocalEventStore(storageURL: AppStorage.eventsURL)
-        kidStore = LocalKidStore(storageURL: AppStorage.kidsURL)
+        memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
     }
 
     var body: some Scene {
         WindowGroup {
             TabView {
-                WeeklyScheduleView(eventStore: eventStore, kidStore: kidStore)
+                WeeklyScheduleView(eventStore: eventStore, memberStore: memberStore)
                     .tabItem {
                         Label("Schedule", systemImage: "calendar")
                     }
-                KidsView(kidStore: kidStore, eventStore: eventStore)
+                FamilyMembersView(memberStore: memberStore)
                     .tabItem {
                         Label("Kids", systemImage: "person.2")
                     }
@@ -34,9 +34,9 @@ enum AppStorage {
             .appendingPathExtension("json")
     }
 
-    static var kidsURL: URL {
+    static var membersURL: URL {
         storageDirectory
-            .appendingPathComponent("kids")
+            .appendingPathComponent("members")
             .appendingPathExtension("json")
     }
 
