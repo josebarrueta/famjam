@@ -23,8 +23,26 @@ final class ScheduleEventDisplayTests: XCTestCase {
 
         let display = ScheduleEventDisplay(event: event, members: [kid])
 
-        XCTAssertEqual(display.kidName, "Emma")
-        XCTAssertEqual(display.kidColorTag, "purple")
+        XCTAssertEqual(display.participantNames, ["Emma"])
+        XCTAssertEqual(display.primaryColorTag, "purple")
+    }
+
+    func testListsEveryParticipantOnAFamilyEvent() {
+        let alex = FamilyMember(id: KidID(rawValue: "alex"), name: "Alex", role: .parent, colorTag: "blue")
+        let emma = FamilyMember(id: KidID(rawValue: "emma"), name: "Emma", role: .kid, colorTag: "purple")
+        let event = FamilyEvent(
+            title: "School concert",
+            kidID: alex.id,
+            participantIDs: [alex.id, emma.id],
+            startTime: Date(timeIntervalSince1970: 1_735_841_600),
+            endTime: Date(timeIntervalSince1970: 1_735_845_200),
+            source: .manual,
+            status: .confirmed
+        )
+
+        let display = ScheduleEventDisplay(event: event, members: [alex, emma])
+
+        XCTAssertEqual(display.participantNames, ["Alex", "Emma"])
     }
 
     func testKeepsKidDetailsEmptyWhenNoKidIsAssigned() {
@@ -39,7 +57,7 @@ final class ScheduleEventDisplayTests: XCTestCase {
 
         let display = ScheduleEventDisplay(event: event, members: [])
 
-        XCTAssertNil(display.kidName)
-        XCTAssertNil(display.kidColorTag)
+        XCTAssertEqual(display.participantNames, [])
+        XCTAssertNil(display.primaryColorTag)
     }
 }

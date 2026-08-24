@@ -138,15 +138,15 @@ private struct EventRow: View {
     var body: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(Color(familyColorTag: display.kidColorTag))
+                .fill(Color(familyColorTag: display.primaryColorTag))
                 .frame(width: 5)
             VStack(alignment: .leading, spacing: 4) {
                 Text(display.event.title)
                     .font(.headline)
-                if let kidName = display.kidName {
-                    Text(kidName)
+                if !display.participantNames.isEmpty {
+                    Text(display.participantNames.joined(separator: " • "))
                         .font(.subheadline)
-                        .foregroundStyle(Color(familyColorTag: display.kidColorTag))
+                        .foregroundStyle(Color(familyColorTag: display.primaryColorTag))
                 }
                 Text(display.event.startTime.formatted(date: .omitted, time: .shortened))
                     .font(.subheadline)
