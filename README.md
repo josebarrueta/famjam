@@ -27,6 +27,25 @@ Open `clients/ios/FamilyApp.xcodeproj` in Xcode to run the SwiftUI app on an iOS
 simulator or device. The app links the local `FamilyCore` package, which contains
 the event domain and persistence layer.
 
+## Data modes
+
+FamJam defaults to local mode and requires no account or backend:
+
+```bash
+FAMJAM_DATA_MODE=local
+```
+
+A future remote adapter is selected without changing app features or domain code:
+
+```bash
+FAMJAM_DATA_MODE=remote
+FAMJAM_REMOTE_BASE_URL=https://api.example.com
+```
+
+Remote mode configuration is validated by `AppConfiguration`. Authentication,
+events, family members, and conflict notifications use vendor-neutral interfaces;
+a Supabase or custom-server adapter can fill those seams.
+
 ## Continuous integration
 
 The iOS workflow runs the package build and test suite on GitHub-hosted macOS. The
