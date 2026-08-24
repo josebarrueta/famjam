@@ -38,7 +38,12 @@ final class WeeklyScheduleViewModel: ObservableObject {
     func addEvent(_ event: FamilyEvent) async throws -> [EventConflict] {
         let conflicts = try await eventStore.save(event)
         if !conflicts.isEmpty, alertPreferences.areConflictAlertsEnabled {
-            try await notificationStore.save(ConflictNotification(message: "A newly added event conflicts with an existing schedule."))
+            let message = ConflictNotificationMessage.make(
+                event: event,
+                conflicts: conflicts,
+                members: members
+            )
+            try await notificationStore.save(ConflictNotification(message: message))
         }
         events = try await eventStore.events().sorted { $0.startTime < $1.startTime }
         return conflicts

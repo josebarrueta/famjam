@@ -111,7 +111,11 @@ struct AddEventSheet: View {
                 if conflicts.isEmpty {
                     dismiss()
                 } else {
-                    alertMessage = "The event was saved, but it conflicts with another scheduled activity."
+                    alertMessage = ConflictNotificationMessage.make(
+                        event: event,
+                        conflicts: conflicts,
+                        members: members
+                    )
                     dismissAfterAlert = true
                     isShowingAlert = true
                 }
