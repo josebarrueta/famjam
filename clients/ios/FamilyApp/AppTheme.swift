@@ -8,6 +8,21 @@ enum AppTheme {
     static let background = Color(red: 1.00, green: 0.97, blue: 0.91)
 }
 
+extension Color {
+    init(familyColorTag: String?) {
+        switch familyColorTag?.lowercased() {
+        case "red": self = .red
+        case "orange": self = .orange
+        case "yellow": self = .yellow
+        case "green": self = .green
+        case "blue": self = .blue
+        case "purple": self = .purple
+        case "pink": self = .pink
+        default: self = .gray
+        }
+    }
+}
+
 struct FamJamHeader: View {
     let title: String
     let subtitle: String

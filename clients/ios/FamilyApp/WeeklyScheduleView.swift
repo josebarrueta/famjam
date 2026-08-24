@@ -161,18 +161,3 @@ private struct EventRow: View {
         .accessibilityElement(children: .combine)
     }
 }
-
-private extension Color {
-    init(familyColorTag: String?) {
-        switch familyColorTag?.lowercased() {
-        case "red": self = .red
-        case "orange": self = .orange
-        case "yellow": self = .yellow
-        case "green": self = .green
-        case "blue": self = .blue
-        case "purple": self = .purple
-        case "pink": self = .pink
-        default: self = .gray
-        }
-    }
-}

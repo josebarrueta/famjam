@@ -23,9 +23,26 @@ struct FamilyMembersView: View {
                     if !members.isEmpty {
                         Section(role == .parent ? "Parents" : "Kids") {
                             ForEach(members) { member in
-                                Text(member.name)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { editingMember = member }
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color(familyColorTag: member.colorTag).opacity(0.2))
+                                            .frame(width: 42, height: 42)
+                                        Image(systemName: member.role == .parent ? "person.fill" : "face.smiling.fill")
+                                            .foregroundStyle(Color(familyColorTag: member.colorTag))
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(member.name)
+                                            .font(.headline)
+                                        if let grade = member.gradeOrBirthYear, !grade.isEmpty {
+                                            Text(grade)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { editingMember = member }
                             }
                         }
                     }
@@ -83,7 +100,17 @@ private struct FamilyMemberEditor: View {
                 TextField("Name", text: $name)
                 Picker("Role", selection: $role) { Text("Parent").tag(FamilyMemberRole.parent); Text("Kid").tag(FamilyMemberRole.kid) }
                 if role == .kid { TextField("Grade or birth year", text: $grade) }
-                TextField("Color", text: $color)
+                Picker("Color", selection: $color) {
+                    ForEach(["red", "orange", "yellow", "green", "blue", "purple", "pink"], id: \.self) { colorTag in
+                        HStack {
+                            Circle()
+                                .fill(Color(familyColorTag: colorTag))
+                                .frame(width: 14, height: 14)
+                            Text(colorTag.capitalized)
+                        }
+                        .tag(colorTag)
+                    }
+                }
             }
             .navigationTitle(existingMember == nil ? "Add Family Member" : "Edit Family Member")
             .toolbar {
