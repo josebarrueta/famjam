@@ -3,12 +3,27 @@ import { buildApp } from "../src/app.js";
 import { InMemoryFamJamRepository } from "../src/in-memory-repository.js";
 import type { IdentityProvider } from "../src/identity-provider.js";
 
+const codeChallenge = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
+const codeVerifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
+
 const identityProvider: IdentityProvider = {
+  googleAuthorizationURL(challenge) {
+    if (challenge !== codeChallenge) throw new Error("invalid challenge");
+    return "https://identity.example/google";
+  },
+  async authenticateOAuthToken(token, verifier) {
+    if (token !== "oauth-token" || verifier !== codeVerifier) throw new Error("invalid OAuth token");
+    return {
+      identity: { subject: "parent-subject", displayName: "Alex" },
+      accessToken: "parent-token",
+    };
+  },
   async verifySession(token) {
     if (token === "parent-token") return { subject: "parent-subject", displayName: "Alex" };
     if (token === "kid-token") return { subject: "kid-subject", displayName: "Emma" };
     throw new Error("invalid session");
   },
+  async revokeSession() {},
 };
 
 function repository() {
@@ -38,6 +53,31 @@ function repository() {
 }
 
 describe("FamJam API", () => {
+  it("exposes backend-owned Google authorization and session exchange", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+
+    const authorization = await app.inject({
+      method: "GET",
+      url: `/v1/auth/google?codeChallenge=${codeChallenge}`,
+    });
+    expect(authorization.statusCode).toBe(302);
+    expect(authorization.headers.location).toBe("https://identity.example/google");
+
+    const session = await app.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: { oauthToken: "oauth-token", codeVerifier },
+    });
+    expect(session.statusCode).toBe(200);
+    expect(session.json()).toEqual({
+      accountID: "parent-1",
+      displayName: "Alex",
+      role: "parent",
+      accessToken: "parent-token",
+    });
+    await app.close();
+  });
+
   it("requires a verified bearer session", async () => {
     const app = buildApp({ identityProvider, repository: repository() });
     const response = await app.inject({ method: "GET", url: "/v1/events" });

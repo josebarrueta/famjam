@@ -17,9 +17,7 @@ final class AuthenticationTests: XCTestCase {
         let signedOutSession = try await authentication.currentSession()
         XCTAssertNil(signedOutSession)
 
-        let session = try await authentication.signIn(
-            credentials: SignInCredentials(email: "parent@example.com", password: "password")
-        )
+        let session = try await authentication.signIn()
 
         XCTAssertEqual(session.role, .parent)
     }

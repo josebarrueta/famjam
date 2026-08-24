@@ -34,7 +34,7 @@ private actor TokenAuthentication: Authentication {
     func currentSession() async throws -> AuthSession? {
         AuthSession(accountID: "1", displayName: "Alex", role: .parent, accessToken: "secret-token")
     }
-    func signIn(credentials: SignInCredentials) async throws -> AuthSession {
+    func signIn() async throws -> AuthSession {
         try await currentSession()!
     }
     func signOut() async throws {}

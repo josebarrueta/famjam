@@ -43,17 +43,31 @@ Family-member fields are `id`, `name`, `role` (`parent` or `kid`), optional
 
 ## Authentication
 
-The client authenticates directly with the configured identity provider. For the
-reference implementation, the Stytch iOS SDK performs Google OAuth and returns a
-Stytch session JWT. FamJam API requests include:
+The FamJam backend owns the identity-provider integration. The iOS client only
+uses FamJam endpoints and has no Stytch SDK or Stytch configuration.
 
-```http
-Authorization: Bearer <stytch-session-jwt>
+1. The client generates a PKCE verifier and opens
+   `GET /v1/auth/google?codeChallenge=…` in a system authentication browser.
+2. FamJam forwards the challenge and redirects the browser to its configured
+   Stytch Google OAuth flow.
+3. Google/Stytch redirects to `famjam://oauth-callback?stytch_token_type=oauth&token=…`.
+4. `POST /v1/sessions` with `{ "oauthToken": "…", "codeVerifier": "…" }`
+   exchanges the one-time token through the backend's `IdentityProvider` adapter.
+5. The backend returns the FamJam session contract:
+
+```json
+{
+  "accountID": "parent-1",
+  "displayName": "Alex",
+  "role": "parent",
+  "accessToken": "opaque-session-token"
+}
 ```
 
-The TypeScript backend verifies that JWT through the `IdentityProvider` seam, then
-loads the associated FamJam account to determine its family and `parent`/`kid`
-role. The server must authorize every operation; client-side read-only controls are
-not a security boundary.
+Authenticated requests include `Authorization: Bearer <accessToken>`. The backend
+validates the opaque Stytch session through its provider adapter, loads the FamJam
+account, and applies family and role authorization. `DELETE /v1/sessions` revokes
+the hosted session.
 
-No Stytch project secret is ever sent to the iOS app.
+No Stytch secret, SDK, configuration, or provider-specific type exists in the iOS
+code. The browser only interacts with Stytch after following the FamJam redirect.

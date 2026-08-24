@@ -24,20 +24,10 @@ public struct AuthSession: Codable, Equatable, Sendable {
     }
 }
 
-public struct SignInCredentials: Codable, Sendable {
-    public let email: String
-    public let password: String
-
-    public init(email: String, password: String) {
-        self.email = email
-        self.password = password
-    }
-}
-
 /// Vendor-neutral authentication seam used by local and remote adapters.
 public protocol Authentication: Sendable {
     func currentSession() async throws -> AuthSession?
-    func signIn(credentials: SignInCredentials) async throws -> AuthSession
+    func signIn() async throws -> AuthSession
     func signOut() async throws
 }
 
@@ -52,7 +42,7 @@ public actor LocalAuthentication: Authentication {
         session
     }
 
-    public func signIn(credentials: SignInCredentials) async throws -> AuthSession {
+    public func signIn() async throws -> AuthSession {
         session = Self.localParentSession
         return Self.localParentSession
     }

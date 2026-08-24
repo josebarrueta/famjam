@@ -25,6 +25,12 @@ const eventSchema = z.object({
   message: "endTime must follow startTime",
 });
 
+const oauthAuthorizationSchema = z.object({ codeChallenge: z.string().min(43).max(128) });
+const oauthSessionSchema = z.object({
+  oauthToken: z.string().min(1),
+  codeVerifier: z.string().min(43).max(128),
+});
+
 const memberSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1),
@@ -43,7 +49,7 @@ export function buildApp({ identityProvider, repository }: Dependencies) {
   app.decorateRequest("account", null);
 
   app.addHook("onRequest", async (request, reply) => {
-    if (request.url === "/health") return;
+    if (["/health", "/v1/auth/google", "/v1/sessions"].includes(request.routeOptions.url ?? "")) return;
     const token = bearerToken(request.headers.authorization);
     if (!token) return reply.code(401).send({ error: "missing_bearer_token" });
     try {
@@ -56,6 +62,42 @@ export function buildApp({ identityProvider, repository }: Dependencies) {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
+
+  app.get("/v1/auth/google", async (request, reply) => {
+    const parsed = oauthAuthorizationSchema.safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_code_challenge" });
+    return reply.redirect(identityProvider.googleAuthorizationURL(parsed.data.codeChallenge));
+  });
+
+  app.post("/v1/sessions", async (request, reply) => {
+    const parsed = oauthSessionSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_oauth_token" });
+    try {
+      const issued = await identityProvider.authenticateOAuthToken(
+        parsed.data.oauthToken,
+        parsed.data.codeVerifier,
+      );
+      const account = await repository.accountForIdentity(issued.identity.subject);
+      if (!account) return reply.code(403).send({ error: "account_not_provisioned" });
+      const members = await repository.membersForFamily(account.familyID);
+      const member = members.find((candidate) => candidate.id === account.memberID);
+      return {
+        accountID: account.memberID,
+        displayName: member?.name ?? issued.identity.displayName,
+        role: account.role,
+        accessToken: issued.accessToken,
+      };
+    } catch {
+      return reply.code(401).send({ error: "invalid_oauth_token" });
+    }
+  });
+
+  app.delete("/v1/sessions", async (request, reply) => {
+    const token = bearerToken(request.headers.authorization);
+    if (!token) return reply.code(401).send({ error: "missing_bearer_token" });
+    await identityProvider.revokeSession(token);
+    return reply.code(204).send();
+  });
 
   app.get("/v1/events", async (request) => {
     const account = requiredAccount(request);

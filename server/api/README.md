@@ -11,7 +11,7 @@ Requirements: Node 20+, PostgreSQL, and a Stytch test project.
 
 ```bash
 cp .env.example .env
-# Fill in STYTCH_PROJECT_ID and STYTCH_SECRET.
+# Fill in all STYTCH_* values and register famjam://oauth-callback in Stytch.
 docker compose up --build
 ```
 
@@ -26,7 +26,8 @@ psql "$DATABASE_URL" -f migrations/001_initial.sql
 npm run dev
 ```
 
-The Stytch secret is server-only. Never add it to the iOS app or commit `.env`.
+All Stytch integration and configuration is backend-owned. Never add Stytch
+credentials, tokens, or SDKs to the iOS app, and never commit `.env`.
 
 ## Provisioning the first parent
 

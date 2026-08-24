@@ -55,16 +55,14 @@ final class SessionGateViewModel: ObservableObject {
         }
     }
 
-    func signIn(email: String, password: String) async {
+    func signIn() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            session = try await authentication.signIn(
-                credentials: SignInCredentials(email: email, password: password)
-            )
+            session = try await authentication.signIn()
             errorMessage = nil
         } catch {
-            errorMessage = "We couldn't sign you in. Check your details and try again."
+            errorMessage = "We couldn't sign you in with Google. Please try again."
         }
     }
 }
@@ -79,8 +77,6 @@ struct SignOutAction {
 
 private struct SignInView: View {
     @ObservedObject var viewModel: SessionGateViewModel
-    @State private var email = ""
-    @State private var password = ""
 
     var body: some View {
         NavigationStack {
@@ -97,21 +93,14 @@ private struct SignInView: View {
                     Text("Sign in to rally your family's week.")
                         .foregroundStyle(.secondary)
                 }
-                VStack(spacing: 14) {
-                    TextField("Email", text: $email)
-                        .textContentType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                    SecureField("Password", text: $password)
-                        .textContentType(.password)
-                }
-                .textFieldStyle(.roundedBorder)
-                Button("Sign In") {
-                    Task { await viewModel.signIn(email: email, password: password) }
+                Button {
+                    Task { await viewModel.signIn() }
+                } label: {
+                    Label("Continue with Google", systemImage: "person.crop.circle.badge.checkmark")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(AppTheme.coral)
-                .disabled(email.isEmpty || password.isEmpty)
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
