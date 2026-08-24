@@ -8,7 +8,7 @@ enum AppTheme {
     static let background = Color(red: 1.00, green: 0.97, blue: 0.91)
 }
 
-struct FamilyRallyHeader: View {
+struct FamJamHeader: View {
     let title: String
     let subtitle: String
 

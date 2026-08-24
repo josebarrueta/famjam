@@ -20,8 +20,8 @@ struct WeeklyScheduleView: View {
     var body: some View {
         NavigationStack {
             List {
-                FamilyRallyHeader(
-                    title: "Ready, set, rally!",
+                FamJamHeader(
+                    title: "Let's jam!",
                     subtitle: "One colorful week for the whole crew."
                 )
                     .listRowBackground(Color.clear)
@@ -52,7 +52,7 @@ struct WeeklyScheduleView: View {
             }
             .scrollContentBackground(.hidden)
             .background(AppTheme.background)
-            .navigationTitle("Family Rally")
+            .navigationTitle("FamJam")
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
                     Button("Today") {

@@ -16,7 +16,7 @@ struct FamilyMembersView: View {
     var body: some View {
         NavigationStack {
             List {
-                FamilyRallyHeader(title: "Your home team", subtitle: "Parents and kids, all in one place.")
+                FamJamHeader(title: "Your home team", subtitle: "Parents and kids, all in one place.")
                     .listRowBackground(Color.clear)
                 ForEach(FamilyMemberRole.allCases, id: \.self) { role in
                     let members = viewModel.members.filter { $0.role == role }

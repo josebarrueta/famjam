@@ -19,7 +19,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("App", value: "Family Rally")
+                    LabeledContent("App", value: "FamJam")
                     LabeledContent("Data", value: "Stored on this device")
                 }
             }
