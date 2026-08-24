@@ -26,7 +26,8 @@ flags scheduling conflicts.
 
 - **Client/backend boundary:** the iOS client depends on backend-neutral contracts
   (for example, `EventStore`), not a specific vendor SDK or transport.
-- **Initial backend implementation:** Supabase (Postgres + Auth + Edge Functions)
+- **Initial backend implementation:** TypeScript + Fastify with PostgreSQL;
+  deployable on a general host or behind Supabase infrastructure
 - **Images (local use):** regular image files bundled with the app (Xcode asset catalog) or selected from the device photo library; do not use Supabase Storage for local images.
 - **Why Supabase initially:** free/near-free at family scale, no server to manage,
   built-in cron support for scheduled polling, Swift client SDK available. A custom
@@ -58,7 +59,7 @@ Minimal v1 schema — expected to evolve:
 
 ## 6. Core Features (v1)
 
-- Parent sign-in (Supabase Auth)
+- Parent sign-in (Stytch with Google as the initial identity provider)
 - Add / edit / delete events manually (kid, time, location, driver)
 - Weekly view, color-coded per kid
 - Data synced across both parents' devices in real time (Supabase realtime
@@ -97,8 +98,9 @@ Minimal v1 schema — expected to evolve:
 | Layer | Choice | Why |
 |---|---|---|
 | iOS app | Swift + SwiftUI | Native EventKit/Siri/push access |
-| Backend logic | TypeScript (Supabase Edge Functions, Deno-based) | Best SDK support for Gmail, Calendar, Anthropic API; fastest iteration for prompt-heavy logic |
-| Database | Postgres (via Supabase) | Managed, free tier, realtime subscriptions |
+| Backend logic | TypeScript + Fastify | Strong Stytch, Gmail, Calendar, and Anthropic SDKs; fast iteration for prompt-heavy logic |
+| Identity | Stytch (Google OAuth initially) behind an `IdentityProvider` seam | Managed session/JWT security without coupling FamJam authorization to an identity vendor |
+| Database | PostgreSQL (provider-neutral repository adapter) | Scalable relational storage; can be hosted by Supabase or another PostgreSQL provider |
 | LLM | Claude (Anthropic API) | Email parsing, voice-text parsing |
 | Local dev | Supabase CLI + Docker; local image files | Full backend stack runs locally; image assets stay in the app bundle/device rather than Supabase Storage |
 | Hosting | Supabase free tier (serverless) | $0–10/month at family scale; main variable cost is LLM API usage, expected to be low |
@@ -106,7 +108,7 @@ Minimal v1 schema — expected to evolve:
 ## 9. Build Phases
 
 **Phase 1 — Core app**
-- Supabase project + local Docker dev environment
+- PostgreSQL + local TypeScript API development environment
 - Local image assets in the Xcode asset catalog (no Supabase Storage)
 - Data model (kids, events)
 - SwiftUI app: parent sign-in, add/edit events, weekly list view

@@ -1,0 +1,133 @@
+import { describe, expect, it } from "vitest";
+import { buildApp } from "../src/app.js";
+import { InMemoryFamJamRepository } from "../src/in-memory-repository.js";
+import type { IdentityProvider } from "../src/identity-provider.js";
+
+const identityProvider: IdentityProvider = {
+  async verifySession(token) {
+    if (token === "parent-token") return { subject: "parent-subject", displayName: "Alex" };
+    if (token === "kid-token") return { subject: "kid-subject", displayName: "Emma" };
+    throw new Error("invalid session");
+  },
+};
+
+function repository() {
+  return new InMemoryFamJamRepository({
+    accounts: [
+      { identitySubject: "parent-subject", familyID: "family-1", memberID: "parent-1", role: "parent" },
+      { identitySubject: "kid-subject", familyID: "family-1", memberID: "kid-1", role: "kid" },
+    ],
+    members: [
+      { id: "parent-1", familyID: "family-1", name: "Alex", role: "parent", colorTag: "blue" },
+      { id: "kid-1", familyID: "family-1", name: "Emma", role: "kid", colorTag: "purple" },
+    ],
+    events: [{
+      id: "00000000-0000-4000-8000-000000000001",
+      familyID: "family-1",
+      title: "Soccer practice",
+      kidID: "kid-1",
+      participantIDs: ["kid-1"],
+      startTime: "2026-08-23T16:00:00Z",
+      endTime: "2026-08-23T17:00:00Z",
+      location: null,
+      driver: null,
+      source: "manual",
+      status: "confirmed",
+    }],
+  });
+}
+
+describe("FamJam API", () => {
+  it("requires a verified bearer session", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+    const response = await app.inject({ method: "GET", url: "/v1/events" });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("returns only a kid's own events", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer kid-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toHaveLength(1);
+    await app.close();
+  });
+
+  it("blocks kid accounts from writing events", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+    const response = await app.inject({
+      method: "PUT",
+      url: "/v1/events/00000000-0000-4000-8000-000000000002",
+      headers: { authorization: "Bearer kid-token" },
+      payload: {
+        id: "00000000-0000-4000-8000-000000000002",
+        title: "Work meeting",
+        kidID: "parent-1",
+        participantIDs: ["parent-1"],
+        startTime: "2026-08-23T16:30:00Z",
+        endTime: "2026-08-23T17:30:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed"
+      },
+    });
+    expect(response.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("rejects participants outside the authenticated family", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+    const response = await app.inject({
+      method: "PUT",
+      url: "/v1/events/00000000-0000-4000-8000-000000000003",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: "00000000-0000-4000-8000-000000000003",
+        title: "Unknown participant event",
+        kidID: null,
+        participantIDs: ["not-in-this-family"],
+        startTime: "2026-08-23T18:00:00Z",
+        endTime: "2026-08-23T19:00:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed"
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toBe("unknown_participant");
+    await app.close();
+  });
+
+  it("reports participant conflicts when a parent writes an event", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+    const response = await app.inject({
+      method: "PUT",
+      url: "/v1/events/00000000-0000-4000-8000-000000000002",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: "00000000-0000-4000-8000-000000000002",
+        title: "Doctor appointment",
+        kidID: "kid-1",
+        participantIDs: ["kid-1"],
+        startTime: "2026-08-23T16:30:00Z",
+        endTime: "2026-08-23T17:30:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed"
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().conflicts[0]).toMatchObject({
+      kind: "overlapping_participant",
+      memberID: "kid-1",
+    });
+    await app.close();
+  });
+});

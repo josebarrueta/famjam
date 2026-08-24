@@ -8,8 +8,8 @@ sign-in and realtime sync.
 ## Repository layout
 
 - `clients/ios/` — iOS app and its testable Swift domain module.
-- `server/` — optional backend implementations; `supabase/` is the initial planned
-  adapter, not an iOS dependency.
+- `server/api/` — scalable TypeScript/Fastify API with PostgreSQL and Stytch.
+- `server/supabase/` — optional Supabase-specific infrastructure, not an iOS dependency.
 - `.github/workflows/` — CI workflows.
 - `family-app-architecture.md` — product architecture and delivery phases.
 
@@ -50,5 +50,5 @@ alerts remain local to each device for now.
 ## Continuous integration
 
 The iOS workflow runs the package build and test suite on GitHub-hosted macOS. The
-backend gets its own workflow when `server/supabase/` contains migrations or Edge
-Functions, so iOS changes do not require backend credentials or tooling.
+API workflow independently runs TypeScript tests, typechecking, and builds. Neither
+workflow requires production credentials.

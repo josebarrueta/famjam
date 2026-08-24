@@ -43,21 +43,17 @@ Family-member fields are `id`, `name`, `role` (`parent` or `kid`), optional
 
 ## Authentication
 
-- `POST /v1/sessions` with `{ "email": "…", "password": "…" }` → session JSON.
-- `DELETE /v1/sessions` with the bearer token → empty 2xx response.
+The client authenticates directly with the configured identity provider. For the
+reference implementation, the Stytch iOS SDK performs Google OAuth and returns a
+Stytch session JWT. FamJam API requests include:
 
-Session response:
-
-```json
-{
-  "accountID": "account-1",
-  "displayName": "Alex",
-  "role": "parent",
-  "accessToken": "opaque-token"
-}
+```http
+Authorization: Bearer <stytch-session-jwt>
 ```
 
-Authenticated event and family-member requests include
-`Authorization: Bearer <accessToken>`. The server must authorize parent versus kid
-access; the iOS client also hides editing controls for kid sessions, but server-side
-authorization remains mandatory.
+The TypeScript backend verifies that JWT through the `IdentityProvider` seam, then
+loads the associated FamJam account to determine its family and `parent`/`kid`
+role. The server must authorize every operation; client-side read-only controls are
+not a security boundary.
+
+No Stytch project secret is ever sent to the iOS app.
