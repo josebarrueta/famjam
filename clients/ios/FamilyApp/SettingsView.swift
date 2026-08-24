@@ -2,7 +2,17 @@ import SwiftUI
 import FamilyCore
 
 struct SettingsView: View {
+    let allowsSignOut: Bool
+    let onSignOut: SignOutAction
     private let preferences = ConflictAlertPreferences()
+
+    init(
+        allowsSignOut: Bool = false,
+        onSignOut: SignOutAction = SignOutAction({})
+    ) {
+        self.allowsSignOut = allowsSignOut
+        self.onSignOut = onSignOut
+    }
     @State private var conflictAlertsEnabled = true
 
     var body: some View {
@@ -20,7 +30,15 @@ struct SettingsView: View {
 
                 Section("About") {
                     LabeledContent("App", value: "FamJam")
-                    LabeledContent("Data", value: "Stored on this device")
+                    LabeledContent("Data", value: allowsSignOut ? "Synced" : "Stored on this device")
+                }
+
+                if allowsSignOut {
+                    Section("Account") {
+                        Button("Sign Out", role: .destructive) {
+                            onSignOut.perform()
+                        }
+                    }
                 }
             }
             .navigationTitle("Settings")

@@ -43,6 +43,21 @@ Family-member fields are `id`, `name`, `role` (`parent` or `kid`), optional
 
 ## Authentication
 
-Authentication headers and session endpoints will be added with the remote
-authentication adapter. Until then, this adapter is suitable only for local or
-otherwise protected development servers.
+- `POST /v1/sessions` with `{ "email": "…", "password": "…" }` → session JSON.
+- `DELETE /v1/sessions` with the bearer token → empty 2xx response.
+
+Session response:
+
+```json
+{
+  "accountID": "account-1",
+  "displayName": "Alex",
+  "role": "parent",
+  "accessToken": "opaque-token"
+}
+```
+
+Authenticated event and family-member requests include
+`Authorization: Bearer <accessToken>`. The server must authorize parent versus kid
+access; the iOS client also hides editing controls for kid sessions, but server-side
+authorization remains mandatory.

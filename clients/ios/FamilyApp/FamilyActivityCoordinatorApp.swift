@@ -6,6 +6,8 @@ struct FamilyActivityCoordinatorApp: App {
     private let eventStore: any EventStore
     private let memberStore: any FamilyMemberStore
     private let notificationStore: any ConflictNotificationStore
+    private let authentication: any Authentication
+    private let allowsSignOut: Bool
 
     init() {
         let configuration: AppConfiguration
@@ -15,9 +17,11 @@ struct FamilyActivityCoordinatorApp: App {
             fatalError("Invalid FamJam configuration: \(error)")
         }
 
+        allowsSignOut = configuration.dataMode == .remote
         switch configuration.dataMode {
         case .local:
             AppStorage.resetForUnifiedFamilyMembersIfNeeded()
+            authentication = LocalAuthentication()
             eventStore = LocalEventStore(storageURL: AppStorage.eventsURL)
             memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
         case .remote:
@@ -25,27 +29,43 @@ struct FamilyActivityCoordinatorApp: App {
                 fatalError("Remote mode requires a base URL")
             }
             let transport = URLSessionHTTPTransport()
-            eventStore = RemoteEventStore(baseURL: baseURL, transport: transport)
-            memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: transport)
+            let remoteAuthentication = RemoteAuthentication(baseURL: baseURL, transport: transport)
+            let authenticatedTransport = AuthenticatedHTTPTransport(
+                transport: transport,
+                authentication: remoteAuthentication
+            )
+            authentication = remoteAuthentication
+            eventStore = RemoteEventStore(baseURL: baseURL, transport: authenticatedTransport)
+            memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: authenticatedTransport)
         }
         notificationStore = LocalConflictNotificationStore(storageURL: AppStorage.notificationsURL)
     }
 
     var body: some Scene {
         WindowGroup {
-            TabView {
-                WeeklyScheduleView(eventStore: eventStore, memberStore: memberStore, notificationStore: notificationStore)
-                    .tabItem {
-                        Label("Schedule", systemImage: "calendar")
+            SessionGateView(authentication: authentication) { session, signOut in
+                TabView {
+                    WeeklyScheduleView(
+                        eventStore: eventStore,
+                        memberStore: memberStore,
+                        notificationStore: notificationStore,
+                        allowsEditing: session.role == .parent
+                    )
+                    .tabItem { Label("Schedule", systemImage: "calendar") }
+                    if session.role == .parent {
+                        FamilyMembersView(memberStore: memberStore, eventStore: eventStore)
+                            .tabItem { Label("Family", systemImage: "person.2") }
+                        NotificationsView(notificationStore: notificationStore)
+                            .tabItem { Label("Alerts", systemImage: "bell") }
                     }
-                FamilyMembersView(memberStore: memberStore, eventStore: eventStore)
-                    .tabItem { Label("Family", systemImage: "person.2") }
-                NotificationsView(notificationStore: notificationStore)
-                    .tabItem { Label("Alerts", systemImage: "bell") }
-                SettingsView()
+                    SettingsView(
+                        allowsSignOut: allowsSignOut,
+                        onSignOut: signOut
+                    )
                     .tabItem { Label("Settings", systemImage: "gearshape") }
+                }
+                .tint(AppTheme.coral)
             }
-            .tint(AppTheme.coral)
         }
     }
 }

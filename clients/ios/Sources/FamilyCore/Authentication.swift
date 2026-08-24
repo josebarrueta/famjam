@@ -9,15 +9,22 @@ public struct AuthSession: Codable, Equatable, Sendable {
     public let accountID: String
     public let displayName: String
     public let role: AccountRole
+    public let accessToken: String?
 
-    public init(accountID: String, displayName: String, role: AccountRole) {
+    public init(
+        accountID: String,
+        displayName: String,
+        role: AccountRole,
+        accessToken: String? = nil
+    ) {
         self.accountID = accountID
         self.displayName = displayName
         self.role = role
+        self.accessToken = accessToken
     }
 }
 
-public struct SignInCredentials: Sendable {
+public struct SignInCredentials: Codable, Sendable {
     public let email: String
     public let password: String
 

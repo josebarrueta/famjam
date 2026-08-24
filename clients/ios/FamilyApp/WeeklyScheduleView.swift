@@ -3,6 +3,7 @@ import FamilyCore
 
 struct WeeklyScheduleView: View {
     @StateObject private var viewModel: WeeklyScheduleViewModel
+    private let allowsEditing: Bool
     @State private var weekStart = Calendar.autoupdatingCurrent.dateInterval(
         of: .weekOfYear,
         for: .now
@@ -11,7 +12,13 @@ struct WeeklyScheduleView: View {
     @State private var editingEvent: FamilyEvent?
     @State private var selectedParticipantID: KidID?
 
-    init(eventStore: any EventStore, memberStore: any FamilyMemberStore, notificationStore: any ConflictNotificationStore) {
+    init(
+        eventStore: any EventStore,
+        memberStore: any FamilyMemberStore,
+        notificationStore: any ConflictNotificationStore,
+        allowsEditing: Bool = true
+    ) {
+        self.allowsEditing = allowsEditing
         _viewModel = StateObject(
             wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore, memberStore: memberStore, notificationStore: notificationStore)
         )
@@ -42,7 +49,9 @@ struct WeeklyScheduleView: View {
                                     )
                                         .contentShape(Rectangle())
                                         .onTapGesture {
-                                            editingEvent = event
+                                            if allowsEditing {
+                                                editingEvent = event
+                                            }
                                         }
                                 }
                             }
@@ -78,10 +87,12 @@ struct WeeklyScheduleView: View {
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                     }
-                    Button {
-                        isAddingEvent = true
-                    } label: {
-                        Image(systemName: "plus")
+                    if allowsEditing {
+                        Button {
+                            isAddingEvent = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
             }

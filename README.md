@@ -35,7 +35,7 @@ FamJam defaults to local mode and requires no account or backend:
 FAMJAM_DATA_MODE=local
 ```
 
-A future remote adapter is selected without changing app features or domain code:
+The built-in HTTP adapters can be selected without changing app features or domain code:
 
 ```bash
 FAMJAM_DATA_MODE=remote
@@ -43,8 +43,9 @@ FAMJAM_REMOTE_BASE_URL=https://api.example.com
 ```
 
 Remote mode configuration is validated by `AppConfiguration`. Authentication,
-events, family members, and conflict notifications use vendor-neutral interfaces;
-a Supabase or custom-server adapter can fill those seams.
+events, and family members use vendor-neutral interfaces; a Supabase Edge Function,
+custom server, or another provider can implement `server/http-api.md`. Conflict
+alerts remain local to each device for now.
 
 ## Continuous integration
 
