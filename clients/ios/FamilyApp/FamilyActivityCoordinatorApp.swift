@@ -8,9 +8,26 @@ struct FamilyActivityCoordinatorApp: App {
     private let notificationStore: any ConflictNotificationStore
 
     init() {
-        AppStorage.resetForUnifiedFamilyMembersIfNeeded()
-        eventStore = LocalEventStore(storageURL: AppStorage.eventsURL)
-        memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
+        let configuration: AppConfiguration
+        do {
+            configuration = try AppConfiguration.load()
+        } catch {
+            fatalError("Invalid FamJam configuration: \(error)")
+        }
+
+        switch configuration.dataMode {
+        case .local:
+            AppStorage.resetForUnifiedFamilyMembersIfNeeded()
+            eventStore = LocalEventStore(storageURL: AppStorage.eventsURL)
+            memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
+        case .remote:
+            guard let baseURL = configuration.remoteBaseURL else {
+                fatalError("Remote mode requires a base URL")
+            }
+            let transport = URLSessionHTTPTransport()
+            eventStore = RemoteEventStore(baseURL: baseURL, transport: transport)
+            memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: transport)
+        }
         notificationStore = LocalConflictNotificationStore(storageURL: AppStorage.notificationsURL)
     }
 
@@ -51,7 +68,7 @@ enum AppStorage {
     }
 
     static func resetForUnifiedFamilyMembersIfNeeded() {
-        let resetKey = "didResetForUnifiedFamilyMembers"
+        let resetKey = "didResetForStringMemberIDs"
         guard !UserDefaults.standard.bool(forKey: resetKey) else { return }
         try? FileManager.default.removeItem(at: storageDirectory)
         UserDefaults.standard.set(true, forKey: resetKey)
