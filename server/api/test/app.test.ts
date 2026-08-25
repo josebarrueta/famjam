@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { InMemoryFamJamRepository } from "../src/in-memory-repository.js";
 import type { IdentityProvider } from "../src/identity-provider.js";
+import type { LocationSearchProvider } from "../src/location-search-provider.js";
 
 const codeChallenge = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
 const codeVerifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
@@ -33,6 +34,15 @@ const identityProvider: IdentityProvider = {
     throw new Error("invalid session");
   },
   async revokeSession() {},
+};
+
+const locationSearchProvider: LocationSearchProvider = {
+  async search(query) {
+    return query === "123 Main" ? [{
+      id: "place-1",
+      address: "123 Main St, Springfield, IL, USA",
+    }] : [];
+  },
 };
 
 function repository() {
@@ -110,6 +120,25 @@ describe("FamJam API", () => {
     const account = await data.accountForIdentity("new-parent-subject");
     expect(account?.role).toBe("parent");
     expect(await data.membersForFamily(account!.familyID)).toHaveLength(1);
+    await app.close();
+  });
+
+  it("searches US addresses through the backend location provider", async () => {
+    const app = buildApp({
+      identityProvider,
+      repository: repository(),
+      locationSearchProvider,
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/locations/search?q=123%20Main",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([{
+      id: "place-1",
+      address: "123 Main St, Springfield, IL, USA",
+    }]);
     await app.close();
   });
 

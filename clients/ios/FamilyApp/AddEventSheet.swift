@@ -7,6 +7,7 @@ struct AddEventSheet: View {
     let members: [FamilyMember]
 
     private let existingEvent: FamilyEvent?
+    private let locationSearch: any LocationSearch
     @Environment(\.dismiss) private var dismiss
     @State private var title: String
     @State private var selectedParticipantIDs: Set<KidID>
@@ -21,11 +22,13 @@ struct AddEventSheet: View {
     @State private var dismissAfterAlert = false
     @State private var isShowingAlert = false
     @State private var isShowingDeleteConfirmation = false
+    @State private var locationSuggestions: [LocationSuggestion] = []
 
     init(
         event: FamilyEvent? = nil,
         prefill: ActivityEventPrefill? = nil,
         members: [FamilyMember],
+        locationSearch: any LocationSearch = EmptyLocationSearch(),
         onSave: @escaping (FamilyEvent) async throws -> [EventConflict],
         onDelete: ((FamilyEvent) async throws -> Void)? = nil
     ) {
@@ -33,6 +36,7 @@ struct AddEventSheet: View {
         self.onSave = onSave
         self.onDelete = onDelete
         self.members = members
+        self.locationSearch = locationSearch
         _title = State(initialValue: event?.title ?? prefill?.title ?? "")
         _selectedParticipantIDs = State(initialValue: Set(
             event?.participantIDs ?? event?.kidID.map { [$0] } ?? prefill?.participantIDs ?? []
@@ -79,10 +83,29 @@ struct AddEventSheet: View {
 
                 Section("Details") {
                     TextField("Location", text: $location)
+                    ForEach(locationSuggestions.filter { $0.address != location }) { suggestion in
+                        Button {
+                            location = suggestion.address
+                            locationSuggestions = []
+                        } label: {
+                            Label(suggestion.address, systemImage: "mappin.and.ellipse")
+                                .foregroundStyle(.primary)
+                        }
+                    }
                     TextField("Driver", text: $driver)
                 }
             }
             .navigationTitle(existingEvent == nil ? "Add Event" : "Edit Event")
+            .task(id: location) {
+                let query = location.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard query.count >= 2 else {
+                    locationSuggestions = []
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                locationSuggestions = (try? await locationSearch.suggestions(for: query)) ?? []
+            }
             .toolbar {
                 if existingEvent != nil, onDelete != nil {
                     ToolbarItem(placement: .topBarLeading) {

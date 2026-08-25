@@ -7,6 +7,7 @@ struct FamilyActivityCoordinatorApp: App {
     private let memberStore: any FamilyMemberStore
     private let notificationStore: any ConflictNotificationStore
     private let authentication: any Authentication
+    private let locationSearch: any LocationSearch
     private let allowsSignOut: Bool
 
     init() {
@@ -24,6 +25,7 @@ struct FamilyActivityCoordinatorApp: App {
             authentication = LocalAuthentication()
             eventStore = LocalEventStore(storageURL: AppStorage.eventsURL)
             memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
+            locationSearch = EmptyLocationSearch()
         case .remote:
             guard let baseURL = configuration.remoteBaseURL else {
                 fatalError("Remote mode requires a base URL")
@@ -37,6 +39,7 @@ struct FamilyActivityCoordinatorApp: App {
             authentication = remoteAuthentication
             eventStore = RemoteEventStore(baseURL: baseURL, transport: authenticatedTransport)
             memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: authenticatedTransport)
+            locationSearch = RemoteLocationSearch(baseURL: baseURL, transport: authenticatedTransport)
         }
         notificationStore = LocalConflictNotificationStore(storageURL: AppStorage.notificationsURL)
     }
@@ -49,11 +52,16 @@ struct FamilyActivityCoordinatorApp: App {
                         eventStore: eventStore,
                         memberStore: memberStore,
                         notificationStore: notificationStore,
-                        allowsEditing: session.role == .parent
+                        allowsEditing: session.role == .parent,
+                        locationSearch: locationSearch
                     )
                     .tabItem { Label("Schedule", systemImage: "calendar") }
                     if session.role == .parent {
-                        FamilyMembersView(memberStore: memberStore, eventStore: eventStore)
+                        FamilyMembersView(
+                            memberStore: memberStore,
+                            eventStore: eventStore,
+                            locationSearch: locationSearch
+                        )
                             .tabItem { Label("Family", systemImage: "person.2") }
                         NotificationsView(notificationStore: notificationStore)
                             .tabItem { Label("Alerts", systemImage: "bell") }

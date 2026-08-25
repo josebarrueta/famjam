@@ -6,8 +6,14 @@ struct FamilyMembersView: View {
     @State private var isAddingMember = false
     @State private var editingMember: FamilyMember?
     @State private var quickActivity: QuickActivitySelection?
+    private let locationSearch: any LocationSearch
 
-    init(memberStore: any FamilyMemberStore, eventStore: any EventStore) {
+    init(
+        memberStore: any FamilyMemberStore,
+        eventStore: any EventStore,
+        locationSearch: any LocationSearch = EmptyLocationSearch()
+    ) {
+        self.locationSearch = locationSearch
         _viewModel = StateObject(wrappedValue: FamilyMembersViewModel(
             memberStore: memberStore,
             eventStore: eventStore,
@@ -83,6 +89,7 @@ struct FamilyMembersView: View {
                 AddEventSheet(
                     prefill: selection.prefill,
                     members: viewModel.members,
+                    locationSearch: locationSearch,
                     onSave: viewModel.saveEvent
                 )
             }

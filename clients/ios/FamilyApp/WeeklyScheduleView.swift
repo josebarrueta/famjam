@@ -4,6 +4,7 @@ import FamilyCore
 struct WeeklyScheduleView: View {
     @StateObject private var viewModel: WeeklyScheduleViewModel
     private let allowsEditing: Bool
+    private let locationSearch: any LocationSearch
     @State private var weekStart = Calendar.autoupdatingCurrent.dateInterval(
         of: .weekOfYear,
         for: .now
@@ -16,9 +17,11 @@ struct WeeklyScheduleView: View {
         eventStore: any EventStore,
         memberStore: any FamilyMemberStore,
         notificationStore: any ConflictNotificationStore,
-        allowsEditing: Bool = true
+        allowsEditing: Bool = true,
+        locationSearch: any LocationSearch = EmptyLocationSearch()
     ) {
         self.allowsEditing = allowsEditing
+        self.locationSearch = locationSearch
         _viewModel = StateObject(
             wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore, memberStore: memberStore, notificationStore: notificationStore)
         )
@@ -105,7 +108,10 @@ struct WeeklyScheduleView: View {
                 }
             }
             .sheet(isPresented: $isAddingEvent) {
-                AddEventSheet(members: viewModel.members) { event in
+                AddEventSheet(
+                    members: viewModel.members,
+                    locationSearch: locationSearch
+                ) { event in
                     try await viewModel.addEvent(event)
                 }
             }
@@ -113,6 +119,7 @@ struct WeeklyScheduleView: View {
                 AddEventSheet(
                     event: event,
                     members: viewModel.members,
+                    locationSearch: locationSearch,
                     onSave: { event in
                         try await viewModel.addEvent(event)
                     },

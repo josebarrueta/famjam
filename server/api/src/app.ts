@@ -2,6 +2,10 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Account, EventConflict, FamilyEvent, FamilyMember } from "./domain.js";
 import type { IdentityProvider } from "./identity-provider.js";
+import {
+  EmptyLocationSearchProvider,
+  type LocationSearchProvider,
+} from "./location-search-provider.js";
 import type { FamJamRepository } from "./repository.js";
 
 declare module "fastify" {
@@ -30,6 +34,7 @@ const eventSchema = z.object({
   message: "endTime must follow startTime",
 });
 
+const locationSearchSchema = z.object({ q: z.string().trim().min(2).max(200) });
 const oauthAuthorizationSchema = z.object({ codeChallenge: z.string().min(43).max(128) });
 const oauthSessionSchema = z.object({
   oauthToken: z.string().min(1),
@@ -47,9 +52,14 @@ const memberSchema = z.object({
 interface Dependencies {
   identityProvider: IdentityProvider;
   repository: FamJamRepository;
+  locationSearchProvider?: LocationSearchProvider;
 }
 
-export function buildApp({ identityProvider, repository }: Dependencies) {
+export function buildApp({
+  identityProvider,
+  repository,
+  locationSearchProvider = new EmptyLocationSearchProvider(),
+}: Dependencies) {
   const app = Fastify({ logger: false });
   app.decorateRequest("account", null);
 
@@ -105,6 +115,12 @@ export function buildApp({ identityProvider, repository }: Dependencies) {
     if (!token) return reply.code(401).send({ error: "missing_bearer_token" });
     await identityProvider.revokeSession(token);
     return reply.code(204).send();
+  });
+
+  app.get("/v1/locations/search", async (request, reply) => {
+    const parsed = locationSearchSchema.safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_location_query" });
+    return locationSearchProvider.search(parsed.data.q);
   });
 
   app.get("/v1/events", async (request) => {

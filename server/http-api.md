@@ -12,7 +12,9 @@ JSON requests use `Content-Type: application/json`. Dates are ISO 8601 strings.
 
 Event bodies use the Swift `FamilyEvent` fields, including `id`, `title`,
 `participantIDs`, `startTime`, `endTime`, `location`, `driver`, `source`, and
-`status`. `kidID` is temporarily included for compatibility and may be null.
+`status`, and optional `recurrence`. `kidID` is temporarily included for
+compatibility and may be null. A recurrence contains `frequency` (`daily`,
+`weekly`, or `monthly`), a positive `interval`, and an ISO 8601 `endDate`.
 
 Save response:
 
@@ -31,6 +33,14 @@ Save response:
 
 Supported conflict kinds are `overlapping_participant` and
 `double_booked_driver`.
+
+## Locations
+
+- `GET /v1/locations/search?q=123%20Main` → US address suggestions.
+
+The reference backend uses Google Places with a US region restriction. The iOS
+client only knows the provider-neutral `{ "id": "…", "address": "…" }` contract.
+Manual location entry remains available when search is not configured.
 
 ## Family members
 

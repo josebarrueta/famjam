@@ -29,6 +29,11 @@ npm run dev
 All Stytch integration and configuration is backend-owned. Never add Stytch
 credentials, tokens, or SDKs to the iOS app, and never commit `.env`.
 
+US address autocomplete uses Google Places when `GOOGLE_PLACES_API_KEY` is set.
+Enable **Places API (New)** in Google Cloud and restrict the key to that API. If the
+key is omitted, manual location entry still works and autocomplete returns no
+suggestions.
+
 ## Account provisioning
 
 A first-time Google identity without an invitation is provisioned just in time as
