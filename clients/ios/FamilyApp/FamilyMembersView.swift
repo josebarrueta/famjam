@@ -5,10 +5,12 @@ struct FamilyMembersView: View {
     @StateObject private var viewModel: FamilyMembersViewModel
     @State private var isAddingMember = false
     @State private var editingMember: FamilyMember?
+    @State private var quickActivity: QuickActivitySelection?
 
     init(memberStore: any FamilyMemberStore, eventStore: any EventStore) {
         _viewModel = StateObject(wrappedValue: FamilyMembersViewModel(
             memberStore: memberStore,
+            eventStore: eventStore,
             deletionService: FamilyMemberDeletionService(memberStore: memberStore, eventStore: eventStore)
         ))
     }
@@ -23,26 +25,46 @@ struct FamilyMembersView: View {
                     if !members.isEmpty {
                         Section(role == .parent ? "Parents" : "Kids") {
                             ForEach(members) { member in
-                                HStack(spacing: 12) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color(familyColorTag: member.colorTag).opacity(0.2))
-                                            .frame(width: 42, height: 42)
-                                        Image(systemName: member.role == .parent ? "person.fill" : "face.smiling.fill")
-                                            .foregroundStyle(Color(familyColorTag: member.colorTag))
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack(spacing: 12) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color(familyColorTag: member.colorTag).opacity(0.2))
+                                                .frame(width: 42, height: 42)
+                                            Image(systemName: member.role == .parent ? "person.fill" : "face.smiling.fill")
+                                                .foregroundStyle(Color(familyColorTag: member.colorTag))
+                                        }
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(member.name)
+                                                .font(.headline)
+                                            if let grade = member.gradeOrBirthYear, !grade.isEmpty {
+                                                Text(grade)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
                                     }
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(member.name)
-                                            .font(.headline)
-                                        if let grade = member.gradeOrBirthYear, !grade.isEmpty {
-                                            Text(grade)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { editingMember = member }
+
+                                    if member.role == .kid {
+                                        ScrollView(.horizontal, showsIndicators: false) {
+                                            HStack(spacing: 10) {
+                                                ForEach(ActivityPreset.allCases) { preset in
+                                                    Button {
+                                                        quickActivity = QuickActivitySelection(
+                                                            prefill: preset.prefill(for: member.id)
+                                                        )
+                                                    } label: {
+                                                        Label(preset.title, systemImage: preset.systemImage)
+                                                    }
+                                                    .buttonStyle(.bordered)
+                                                    .tint(Color(familyColorTag: member.colorTag))
+                                                }
+                                            }
                                         }
                                     }
                                 }
-                                .contentShape(Rectangle())
-                                .onTapGesture { editingMember = member }
                             }
                         }
                     }
@@ -57,6 +79,13 @@ struct FamilyMembersView: View {
             .sheet(item: $editingMember) { member in
                 FamilyMemberEditor(member: member, onSave: viewModel.save, onDelete: viewModel.delete)
             }
+            .sheet(item: $quickActivity) { selection in
+                AddEventSheet(
+                    prefill: selection.prefill,
+                    members: viewModel.members,
+                    onSave: viewModel.saveEvent
+                )
+            }
         }
     }
 }
@@ -65,13 +94,26 @@ struct FamilyMembersView: View {
 final class FamilyMembersViewModel: ObservableObject {
     @Published private(set) var members: [FamilyMember] = []
     private let memberStore: any FamilyMemberStore
+    private let eventStore: any EventStore
     private let deletionService: FamilyMemberDeletionService
-    init(memberStore: any FamilyMemberStore, deletionService: FamilyMemberDeletionService) {
-        self.memberStore = memberStore; self.deletionService = deletionService
+    init(
+        memberStore: any FamilyMemberStore,
+        eventStore: any EventStore,
+        deletionService: FamilyMemberDeletionService
+    ) {
+        self.memberStore = memberStore
+        self.eventStore = eventStore
+        self.deletionService = deletionService
     }
     func load() async { members = (try? await memberStore.members().sorted { $0.name < $1.name }) ?? [] }
     func save(_ member: FamilyMember) async throws { try await memberStore.save(member); await load() }
     func delete(_ member: FamilyMember) async throws { try await deletionService.delete(member); await load() }
+    func saveEvent(_ event: FamilyEvent) async throws -> [EventConflict] { try await eventStore.save(event) }
+}
+
+private struct QuickActivitySelection: Identifiable {
+    let id = UUID()
+    let prefill: ActivityEventPrefill
 }
 
 private struct FamilyMemberEditor: View {

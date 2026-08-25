@@ -22,6 +22,7 @@ struct AddEventSheet: View {
 
     init(
         event: FamilyEvent? = nil,
+        prefill: ActivityEventPrefill? = nil,
         members: [FamilyMember],
         onSave: @escaping (FamilyEvent) async throws -> [EventConflict],
         onDelete: ((FamilyEvent) async throws -> Void)? = nil
@@ -30,8 +31,10 @@ struct AddEventSheet: View {
         self.onSave = onSave
         self.onDelete = onDelete
         self.members = members
-        _title = State(initialValue: event?.title ?? "")
-        _selectedParticipantIDs = State(initialValue: Set(event?.participantIDs ?? event?.kidID.map { [$0] } ?? []))
+        _title = State(initialValue: event?.title ?? prefill?.title ?? "")
+        _selectedParticipantIDs = State(initialValue: Set(
+            event?.participantIDs ?? event?.kidID.map { [$0] } ?? prefill?.participantIDs ?? []
+        ))
         _startTime = State(initialValue: event?.startTime ?? .now)
         _endTime = State(initialValue: event?.endTime ?? .now.addingTimeInterval(60 * 60))
         _location = State(initialValue: event?.location ?? "")
