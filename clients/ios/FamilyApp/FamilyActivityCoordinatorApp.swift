@@ -3,12 +3,14 @@ import FamilyCore
 
 @main
 struct FamilyActivityCoordinatorApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     private let eventStore: any EventStore
     private let memberStore: any FamilyMemberStore
     private let notificationStore: any ConflictNotificationStore
     private let authentication: any Authentication
     private let locationSearch: any LocationSearch
     private let invitationStore: (any FamilyInvitationStore)?
+    private let changeMonitor: (any FamilyChangeMonitor)?
     private let allowsSignOut: Bool
 
     init() {
@@ -28,6 +30,7 @@ struct FamilyActivityCoordinatorApp: App {
             memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
             locationSearch = EmptyLocationSearch()
             invitationStore = nil
+            changeMonitor = nil
         case .remote:
             guard let baseURL = configuration.remoteBaseURL else {
                 fatalError("Remote mode requires a base URL")
@@ -43,6 +46,10 @@ struct FamilyActivityCoordinatorApp: App {
             memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: authenticatedTransport)
             locationSearch = RemoteLocationSearch(baseURL: baseURL, transport: authenticatedTransport)
             invitationStore = RemoteFamilyInvitationStore(
+                baseURL: baseURL,
+                transport: authenticatedTransport
+            )
+            changeMonitor = RemoteFamilyChangeMonitor(
                 baseURL: baseURL,
                 transport: authenticatedTransport
             )
@@ -80,9 +87,33 @@ struct FamilyActivityCoordinatorApp: App {
                     .tabItem { Label("Settings", systemImage: "gearshape") }
                 }
                 .tint(AppTheme.coral)
+                .task { await monitorFamilyChanges() }
+                .onChange(of: scenePhase) { phase in
+                    if phase == .active {
+                        NotificationCenter.default.post(name: .familyDataDidChange, object: nil)
+                    }
+                }
             }
         }
     }
+
+    private func monitorFamilyChanges() async {
+        guard let changeMonitor else { return }
+        _ = try? await changeMonitor.hasChanges()
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            if (try? await changeMonitor.hasChanges()) == true {
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .familyDataDidChange, object: nil)
+                }
+            }
+        }
+    }
+}
+
+extension Notification.Name {
+    static let familyDataDidChange = Notification.Name("familyDataDidChange")
 }
 
 enum AppStorage {

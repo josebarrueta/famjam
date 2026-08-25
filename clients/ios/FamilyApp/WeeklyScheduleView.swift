@@ -103,9 +103,10 @@ struct WeeklyScheduleView: View {
                 }
             }
             .onAppear {
-                Task {
-                    await viewModel.loadEvents()
-                }
+                Task { await viewModel.loadEvents() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .familyDataDidChange)) { _ in
+                Task { await viewModel.loadEvents() }
             }
             .sheet(isPresented: $isAddingEvent) {
                 AddEventSheet(

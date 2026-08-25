@@ -62,8 +62,8 @@ Minimal v1 schema — expected to evolve:
 - Parent sign-in (Stytch with Google as the initial identity provider)
 - Add / edit / delete events manually (kid, time, location, driver)
 - Weekly view, color-coded per kid
-- Data synced across both parents' devices in real time (Supabase realtime
-  subscriptions)
+- Data synced across family devices through a lightweight family change cursor;
+  clients refresh automatically when the cursor advances or the app becomes active
 
 ## 7. Agentic Features (v2+)
 

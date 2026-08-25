@@ -4,6 +4,14 @@ This contract is backend-vendor neutral. A custom server, Supabase Edge Function
 or another provider can implement it. All successful responses use a 2xx status;
 JSON requests use `Content-Type: application/json`. Dates are ISO 8601 strings.
 
+## Synchronization
+
+- `GET /v1/changes` → `{ "version": 42 }` for the authenticated family.
+
+Every event or family-member mutation advances this cursor. Remote iOS sessions
+poll the small cursor every five seconds and reload visible family data only when
+it changes. The app also refreshes whenever it becomes active.
+
 ## Events
 
 - `GET /v1/events` → JSON array of events.

@@ -166,6 +166,11 @@ export function buildApp({
     return locationSearchProvider.search(parsed.data.q);
   });
 
+  app.get("/v1/changes", async (request) => {
+    const account = requiredAccount(request);
+    return { version: await repository.familyChangeVersion(account.familyID) };
+  });
+
   app.get("/v1/events", async (request) => {
     const account = requiredAccount(request);
     const events = await repository.eventsForFamily(account.familyID);
@@ -200,6 +205,7 @@ export function buildApp({
     const existing = await repository.eventsForFamily(account.familyID);
     const conflicts = detectConflicts(event, existing.filter((candidate) => candidate.id !== event.id));
     await repository.saveEvent(event);
+    await repository.markFamilyChanged(account.familyID);
     return { conflicts };
   });
 
@@ -207,6 +213,7 @@ export function buildApp({
     const account = await requireParent(request, reply);
     if (!account) return;
     await repository.deleteEvent(account.familyID, (request.params as { id: string }).id);
+    await repository.markFamilyChanged(account.familyID);
     return reply.code(204).send();
   });
 
@@ -229,6 +236,7 @@ export function buildApp({
       ...(gradeOrBirthYear !== undefined ? { gradeOrBirthYear } : {}),
     };
     await repository.saveMember(member);
+    await repository.markFamilyChanged(account.familyID);
     return reply.code(204).send();
   });
 
@@ -241,6 +249,7 @@ export function buildApp({
       return reply.code(409).send({ error: "member_has_scheduled_events" });
     }
     await repository.deleteMember(account.familyID, memberID);
+    await repository.markFamilyChanged(account.familyID);
     return reply.code(204).send();
   });
 

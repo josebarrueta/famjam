@@ -168,6 +168,43 @@ describe("FamJam API", () => {
     await app.close();
   });
 
+  it("advances the family change cursor after a mutation", async () => {
+    const data = repository();
+    const app = buildApp({ identityProvider, repository: data });
+    const before = await app.inject({
+      method: "GET",
+      url: "/v1/changes",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const write = await app.inject({
+      method: "PUT",
+      url: "/v1/events/00000000-0000-4000-8000-000000000005",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: "00000000-0000-4000-8000-000000000005",
+        title: "Piano lesson",
+        kidID: "kid-1",
+        participantIDs: ["kid-1"],
+        startTime: "2026-08-25T18:00:00Z",
+        endTime: "2026-08-25T19:00:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed"
+      },
+    });
+    const after = await app.inject({
+      method: "GET",
+      url: "/v1/changes",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(before.json()).toEqual({ version: 0 });
+    expect(write.statusCode).toBe(200);
+    expect(after.json()).toEqual({ version: 1 });
+    await app.close();
+  });
+
   it("requires a verified bearer session", async () => {
     const app = buildApp({ identityProvider, repository: repository() });
     const response = await app.inject({ method: "GET", url: "/v1/events" });

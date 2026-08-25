@@ -95,6 +95,9 @@ struct FamilyMembersView: View {
                 }
             }
             .task { await viewModel.load() }
+            .onReceive(NotificationCenter.default.publisher(for: .familyDataDidChange)) { _ in
+                Task { await viewModel.load() }
+            }
             .sheet(isPresented: $isAddingMember) { FamilyMemberEditor(onSave: viewModel.save) }
             .sheet(item: $editingMember) { member in
                 FamilyMemberEditor(member: member, onSave: viewModel.save, onDelete: viewModel.delete)

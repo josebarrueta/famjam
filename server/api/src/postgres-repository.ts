@@ -118,6 +118,12 @@ export class PostgresFamJamRepository implements FamJamRepository {
         "UPDATE family_invitations SET consumed_at = now() WHERE code_hash = $1",
         [codeHash],
       );
+      await client.query(
+        `INSERT INTO family_change_versions (family_id, version) VALUES ($1, 1)
+         ON CONFLICT (family_id) DO UPDATE
+         SET version = family_change_versions.version + 1, updated_at = now()`,
+        [invitation.family_id],
+      );
       await client.query("COMMIT");
       return {
         identitySubject: subject,
@@ -131,6 +137,23 @@ export class PostgresFamJamRepository implements FamJamRepository {
     } finally {
       client.release();
     }
+  }
+
+  async familyChangeVersion(familyID: string): Promise<number> {
+    const result = await this.pool.query<{ version: string }>(
+      "SELECT version::text FROM family_change_versions WHERE family_id = $1",
+      [familyID],
+    );
+    return Number(result.rows[0]?.version ?? 0);
+  }
+
+  async markFamilyChanged(familyID: string): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO family_change_versions (family_id, version) VALUES ($1, 1)
+       ON CONFLICT (family_id) DO UPDATE
+       SET version = family_change_versions.version + 1, updated_at = now()`,
+      [familyID],
+    );
   }
 
   async eventsForFamily(familyID: string): Promise<FamilyEvent[]> {

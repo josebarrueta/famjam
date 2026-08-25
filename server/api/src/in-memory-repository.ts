@@ -13,6 +13,7 @@ export class InMemoryFamJamRepository implements FamJamRepository {
   private readonly events: FamilyEvent[];
   private readonly members: FamilyMember[];
   private readonly invitations: FamilyInvitation[] = [];
+  private readonly changeVersions = new Map<string, number>();
 
   constructor(seed: SeedData = {}) {
     this.accounts = [...(seed.accounts ?? [])];
@@ -77,7 +78,16 @@ export class InMemoryFamJamRepository implements FamJamRepository {
       colorTag: "blue",
     });
     this.accounts.push(account);
+    await this.markFamilyChanged(invitation.familyID);
     return account;
+  }
+
+  async familyChangeVersion(familyID: string): Promise<number> {
+    return this.changeVersions.get(familyID) ?? 0;
+  }
+
+  async markFamilyChanged(familyID: string): Promise<void> {
+    this.changeVersions.set(familyID, (this.changeVersions.get(familyID) ?? 0) + 1);
   }
 
   async eventsForFamily(familyID: string): Promise<FamilyEvent[]> {
