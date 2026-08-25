@@ -21,7 +21,11 @@ function provider() {
         expect(token).toBe("oauth-token");
         expect(session_duration_minutes).toBe(10_080);
         expect(code_verifier).toBe(codeVerifier);
-        return { user_id: "user-test-123", session_token: "stytch-session-token" };
+        return {
+          user_id: "user-test-123",
+          session_token: "stytch-session-token",
+          user: { name: { first_name: "Sam", last_name: "Rivera" } },
+        };
       },
     },
   });
@@ -40,7 +44,7 @@ describe("StytchIdentityProvider", () => {
   it("exchanges an OAuth token for a server-created Stytch session", async () => {
     const issued = await provider().authenticateOAuthToken("oauth-token", codeVerifier);
     expect(issued).toEqual({
-      identity: { subject: "user-test-123", displayName: "user-test-123" },
+      identity: { subject: "user-test-123", displayName: "Sam Rivera" },
       accessToken: "stytch-session-token",
     });
   });

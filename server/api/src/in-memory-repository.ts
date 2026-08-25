@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Account, FamilyEvent, FamilyMember } from "./domain.js";
 import type { FamJamRepository } from "./repository.js";
 
@@ -20,6 +21,28 @@ export class InMemoryFamJamRepository implements FamJamRepository {
 
   async accountForIdentity(subject: string): Promise<Account | null> {
     return this.accounts.find((account) => account.identitySubject === subject) ?? null;
+  }
+
+  async provisionParentAccount(subject: string, displayName: string): Promise<Account> {
+    const existing = await this.accountForIdentity(subject);
+    if (existing) return existing;
+    const familyID = `family-${randomUUID()}`;
+    const memberID = `parent-${randomUUID()}`;
+    const account: Account = {
+      identitySubject: subject,
+      familyID,
+      memberID,
+      role: "parent",
+    };
+    this.members.push({
+      id: memberID,
+      familyID,
+      name: displayName,
+      role: "parent",
+      colorTag: "blue",
+    });
+    this.accounts.push(account);
+    return account;
   }
 
   async eventsForFamily(familyID: string): Promise<FamilyEvent[]> {

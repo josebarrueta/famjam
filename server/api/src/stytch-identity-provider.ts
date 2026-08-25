@@ -17,6 +17,9 @@ export interface StytchOAuthClient {
   }): Promise<{
     user_id: string;
     session_token: string;
+    user?: {
+      name?: { first_name?: string; last_name?: string };
+    };
   }>;
 }
 
@@ -46,8 +49,11 @@ export class StytchIdentityProvider implements IdentityProvider {
       session_duration_minutes: 10_080,
       code_verifier: codeVerifier,
     });
+    const providerName = [result.user?.name?.first_name, result.user?.name?.last_name]
+      .filter((part): part is string => Boolean(part))
+      .join(" ");
     return {
-      identity: identity(result.user_id),
+      identity: identity(result.user_id, providerName || result.user_id),
       accessToken: result.session_token,
     };
   }
@@ -83,6 +89,6 @@ export class StytchIdentityProvider implements IdentityProvider {
   }
 }
 
-function identity(subject: string): Identity {
-  return { subject, displayName: subject };
+function identity(subject: string, displayName: string = subject): Identity {
+  return { subject, displayName };
 }

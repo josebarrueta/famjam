@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Pool, type PoolConfig } from "pg";
 import type { Account, AccountRole, FamilyEvent, FamilyMember } from "./domain.js";
 import type { FamJamRepository } from "./repository.js";
@@ -17,12 +18,45 @@ export class PostgresFamJamRepository implements FamJamRepository {
       [subject],
     );
     const row = result.rows[0];
-    return row ? {
-      identitySubject: row.identity_subject,
-      familyID: row.family_id,
-      memberID: row.member_id,
-      role: row.role,
-    } : null;
+    return row ? accountFromRow(row) : null;
+  }
+
+  async provisionParentAccount(subject: string, displayName: string): Promise<Account> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [subject]);
+      const existing = await client.query<AccountRow>(
+        `SELECT identity_subject, family_id, member_id, role
+         FROM accounts WHERE identity_subject = $1`,
+        [subject],
+      );
+      const existingRow = existing.rows[0];
+      if (existingRow) {
+        await client.query("COMMIT");
+        return accountFromRow(existingRow);
+      }
+
+      const familyID = `family-${randomUUID()}`;
+      const memberID = `parent-${randomUUID()}`;
+      await client.query(
+        `INSERT INTO family_members (family_id, id, name, role, color_tag)
+         VALUES ($1, $2, $3, 'parent', 'blue')`,
+        [familyID, memberID, displayName],
+      );
+      await client.query(
+        `INSERT INTO accounts (identity_subject, family_id, member_id, role)
+         VALUES ($1, $2, $3, 'parent')`,
+        [subject, familyID, memberID],
+      );
+      await client.query("COMMIT");
+      return { identitySubject: subject, familyID, memberID, role: "parent" };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async eventsForFamily(familyID: string): Promise<FamilyEvent[]> {
@@ -125,6 +159,15 @@ interface MemberRow {
   role: AccountRole;
   grade_or_birth_year: string | null;
   color_tag: string;
+}
+
+function accountFromRow(row: AccountRow): Account {
+  return {
+    identitySubject: row.identity_subject,
+    familyID: row.family_id,
+    memberID: row.member_id,
+    role: row.role,
+  };
 }
 
 function eventFromRow(row: EventRow): FamilyEvent {

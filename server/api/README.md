@@ -29,21 +29,12 @@ npm run dev
 All Stytch integration and configuration is backend-owned. Never add Stytch
 credentials, tokens, or SDKs to the iOS app, and never commit `.env`.
 
-## Provisioning the first parent
+## Account provisioning
 
-After a user authenticates with Google through Stytch, insert a family member and
-map the Stytch `user_id` to it in one transaction:
-
-```sql
-BEGIN;
-INSERT INTO family_members (family_id, id, name, role, color_tag)
-VALUES ('my-family', 'parent-1', 'Alex', 'parent', 'blue');
-INSERT INTO accounts (identity_subject, family_id, member_id, role)
-VALUES ('user-test-from-stytch', 'my-family', 'parent-1', 'parent');
-COMMIT;
-```
-
-Automated family onboarding/invitations will replace this bootstrap step later.
+A first-time Google identity without an invitation is provisioned just in time as
+the parent of a new family. Provisioning creates the member and identity mapping
+in one transaction and is idempotent across retries. Future family invitations
+will provision additional parents or kids into an existing family instead.
 
 ## Architecture
 

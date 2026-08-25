@@ -12,11 +12,20 @@ const identityProvider: IdentityProvider = {
     return "https://identity.example/google";
   },
   async authenticateOAuthToken(token, verifier) {
-    if (token !== "oauth-token" || verifier !== codeVerifier) throw new Error("invalid OAuth token");
-    return {
-      identity: { subject: "parent-subject", displayName: "Alex" },
-      accessToken: "parent-token",
-    };
+    if (verifier !== codeVerifier) throw new Error("invalid OAuth token");
+    if (token === "oauth-token") {
+      return {
+        identity: { subject: "parent-subject", displayName: "Alex" },
+        accessToken: "parent-token",
+      };
+    }
+    if (token === "new-oauth-token") {
+      return {
+        identity: { subject: "new-parent-subject", displayName: "Sam Rivera" },
+        accessToken: "new-parent-token",
+      };
+    }
+    throw new Error("invalid OAuth token");
   },
   async verifySession(token) {
     if (token === "parent-token") return { subject: "parent-subject", displayName: "Alex" };
@@ -75,6 +84,32 @@ describe("FamJam API", () => {
       role: "parent",
       accessToken: "parent-token",
     });
+    await app.close();
+  });
+
+  it("JIT provisions a new Google identity as an idempotent parent account", async () => {
+    const data = repository();
+    const app = buildApp({ identityProvider, repository: data });
+
+    const signUp = () => app.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: { oauthToken: "new-oauth-token", codeVerifier },
+    });
+    const first = await signUp();
+    const retry = await signUp();
+
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({
+      displayName: "Sam Rivera",
+      role: "parent",
+      accessToken: "new-parent-token",
+    });
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json().accountID).toBe(first.json().accountID);
+    const account = await data.accountForIdentity("new-parent-subject");
+    expect(account?.role).toBe("parent");
+    expect(await data.membersForFamily(account!.familyID)).toHaveLength(1);
     await app.close();
   });
 

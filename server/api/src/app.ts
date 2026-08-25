@@ -77,8 +77,11 @@ export function buildApp({ identityProvider, repository }: Dependencies) {
         parsed.data.oauthToken,
         parsed.data.codeVerifier,
       );
-      const account = await repository.accountForIdentity(issued.identity.subject);
-      if (!account) return reply.code(403).send({ error: "account_not_provisioned" });
+      const existingAccount = await repository.accountForIdentity(issued.identity.subject);
+      const account = existingAccount ?? await repository.provisionParentAccount(
+        issued.identity.subject,
+        issued.identity.displayName,
+      );
       const members = await repository.membersForFamily(account.familyID);
       const member = members.find((candidate) => candidate.id === account.memberID);
       return {

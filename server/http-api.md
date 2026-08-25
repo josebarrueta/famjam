@@ -53,7 +53,9 @@ uses FamJam endpoints and has no Stytch SDK or Stytch configuration.
 3. Google/Stytch redirects to `famjam://oauth-callback?stytch_token_type=oauth&token=…`.
 4. `POST /v1/sessions` with `{ "oauthToken": "…", "codeVerifier": "…" }`
    exchanges the one-time token through the backend's `IdentityProvider` adapter.
-5. The backend returns the FamJam session contract:
+5. If the identity is new and has no invitation, the backend atomically provisions
+   it as a parent in a new family. Provisioning is idempotent across retries.
+6. The backend returns the FamJam session contract:
 
 ```json
 {
