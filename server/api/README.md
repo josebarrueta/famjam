@@ -1,7 +1,8 @@
 # FamJam TypeScript API
 
 Fastify reference backend for `../http-api.md`. It uses PostgreSQL for scalable,
-shared persistence and Stytch B2C for Google-capable identity verification. FamJam
+shared persistence, Redis for shared caching, and Stytch B2C for Google-capable
+identity verification. FamJam
 roles and family membership remain in PostgreSQL, so identity providers stay
 replaceable.
 
@@ -15,8 +16,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The compose stack starts PostgreSQL, applies the initial schema to a fresh volume,
-and exposes the API at `http://localhost:3000`. For development outside Docker:
+The compose stack starts PostgreSQL and Redis, applies the schema to a fresh
+PostgreSQL volume, and exposes the API at `http://localhost:3000`. For development outside Docker:
 
 ```bash
 npm install
@@ -28,6 +29,10 @@ npm run dev
 
 All Stytch integration and configuration is backend-owned. Never add Stytch
 credentials, tokens, or SDKs to the iOS app, and never commit `.env`.
+
+Verified Stytch identities are cached for 60 seconds and evicted on sign-out.
+Normalized Google Places searches are cached for 30 minutes using hashed keys.
+Redis is used when `REDIS_URL` is set; otherwise a process-local cache is used.
 
 US address autocomplete uses Google Places when `GOOGLE_PLACES_API_KEY` is set.
 Enable **Places API (New)** in Google Cloud and restrict the key to that API. If the

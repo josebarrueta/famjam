@@ -101,6 +101,7 @@ Minimal v1 schema — expected to evolve:
 | Backend logic | TypeScript + Fastify | Strong Stytch, Gmail, Calendar, and Anthropic SDKs; fast iteration for prompt-heavy logic |
 | Identity | Stytch (Google OAuth initially) behind an `IdentityProvider` seam | Managed session/JWT security without coupling FamJam authorization to an identity vendor |
 | Database | PostgreSQL (provider-neutral repository adapter) | Scalable relational storage; can be hosted by Supabase or another PostgreSQL provider |
+| Cache | Redis behind a provider-neutral cache seam | Shared short-lived identity and Places caching across API instances; correctness falls back to source providers |
 | LLM | Claude (Anthropic API) | Email parsing, voice-text parsing |
 | Local dev | Supabase CLI + Docker; local image files | Full backend stack runs locally; image assets stay in the app bundle/device rather than Supabase Storage |
 | Hosting | Supabase free tier (serverless) | $0–10/month at family scale; main variable cost is LLM API usage, expected to be low |
