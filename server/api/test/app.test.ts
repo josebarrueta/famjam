@@ -3,6 +3,7 @@ import { buildApp } from "../src/app.js";
 import { InMemoryFamJamRepository } from "../src/in-memory-repository.js";
 import type { IdentityProvider } from "../src/identity-provider.js";
 import type { LocationSearchProvider } from "../src/location-search-provider.js";
+import type { PushNotificationProvider } from "../src/push-notification-provider.js";
 
 const codeChallenge = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
 const codeVerifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
@@ -202,6 +203,47 @@ describe("FamJam API", () => {
     expect(before.json()).toEqual({ version: 0 });
     expect(write.statusCode).toBe(200);
     expect(after.json()).toEqual({ version: 1 });
+    await app.close();
+  });
+
+  it("registers a device and pushes event changes to the family", async () => {
+    const pushes: Array<{ tokens: string[]; title: string }> = [];
+    const pushNotificationProvider: PushNotificationProvider = {
+      async send(tokens, notification) {
+        pushes.push({ tokens, title: notification.title });
+      },
+    };
+    const app = buildApp({
+      identityProvider,
+      repository: repository(),
+      pushNotificationProvider,
+    });
+    const registration = await app.inject({
+      method: "PUT",
+      url: "/v1/devices/device-token-1",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const write = await app.inject({
+      method: "PUT",
+      url: "/v1/events/00000000-0000-4000-8000-000000000006",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: "00000000-0000-4000-8000-000000000006",
+        title: "Band practice",
+        kidID: "kid-1",
+        participantIDs: ["kid-1"],
+        startTime: "2026-08-26T18:00:00Z",
+        endTime: "2026-08-26T19:00:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed"
+      },
+    });
+
+    expect(registration.statusCode).toBe(204);
+    expect(write.statusCode).toBe(200);
+    expect(pushes).toEqual([{ tokens: ["device-token-1"], title: "Band practice" }]);
     await app.close();
   });
 

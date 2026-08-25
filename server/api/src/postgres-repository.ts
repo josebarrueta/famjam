@@ -156,6 +156,30 @@ export class PostgresFamJamRepository implements FamJamRepository {
     );
   }
 
+  async saveDeviceToken(familyID: string, memberID: string, token: string): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO device_tokens (token, family_id, member_id) VALUES ($1, $2, $3)
+       ON CONFLICT (token) DO UPDATE SET
+       family_id = EXCLUDED.family_id, member_id = EXCLUDED.member_id, updated_at = now()`,
+      [token, familyID, memberID],
+    );
+  }
+
+  async deleteDeviceToken(memberID: string, token: string): Promise<void> {
+    await this.pool.query(
+      "DELETE FROM device_tokens WHERE token = $1 AND member_id = $2",
+      [token, memberID],
+    );
+  }
+
+  async deviceTokensForFamily(familyID: string): Promise<string[]> {
+    const result = await this.pool.query<{ token: string }>(
+      "SELECT token FROM device_tokens WHERE family_id = $1",
+      [familyID],
+    );
+    return result.rows.map((row) => row.token);
+  }
+
   async eventsForFamily(familyID: string): Promise<FamilyEvent[]> {
     const result = await this.pool.query<EventRow>(
       `SELECT family_id, id::text, title, kid_id, participant_ids, start_time,

@@ -7,6 +7,10 @@ import {
   EmptyLocationSearchProvider,
   type LocationSearchProvider,
 } from "./location-search-provider.js";
+import {
+  NoopPushNotificationProvider,
+  type PushNotificationProvider,
+} from "./push-notification-provider.js";
 import type { FamJamRepository } from "./repository.js";
 
 declare module "fastify" {
@@ -56,12 +60,14 @@ interface Dependencies {
   identityProvider: IdentityProvider;
   repository: FamJamRepository;
   locationSearchProvider?: LocationSearchProvider;
+  pushNotificationProvider?: PushNotificationProvider;
 }
 
 export function buildApp({
   identityProvider,
   repository,
   locationSearchProvider = new EmptyLocationSearchProvider(),
+  pushNotificationProvider = new NoopPushNotificationProvider(),
 }: Dependencies) {
   const app = Fastify({ logger: false });
   app.decorateRequest("account", null);
@@ -166,6 +172,25 @@ export function buildApp({
     return locationSearchProvider.search(parsed.data.q);
   });
 
+  app.put("/v1/devices/:token", async (request, reply) => {
+    const account = requiredAccount(request);
+    const token = (request.params as { token: string }).token;
+    if (token.length < 10 || token.length > 256) {
+      return reply.code(400).send({ error: "invalid_device_token" });
+    }
+    await repository.saveDeviceToken(account.familyID, account.memberID, token);
+    return reply.code(204).send();
+  });
+
+  app.delete("/v1/devices/:token", async (request, reply) => {
+    const account = requiredAccount(request);
+    await repository.deleteDeviceToken(
+      account.memberID,
+      (request.params as { token: string }).token,
+    );
+    return reply.code(204).send();
+  });
+
   app.get("/v1/changes", async (request) => {
     const account = requiredAccount(request);
     return { version: await repository.familyChangeVersion(account.familyID) };
@@ -206,6 +231,18 @@ export function buildApp({
     const conflicts = detectConflicts(event, existing.filter((candidate) => candidate.id !== event.id));
     await repository.saveEvent(event);
     await repository.markFamilyChanged(account.familyID);
+    const deviceTokens = await repository.deviceTokensForFamily(account.familyID);
+    try {
+      await pushNotificationProvider.send(deviceTokens, {
+        title: event.title,
+        body: conflicts.length > 0
+          ? "Schedule conflict detected. Open FamJam to review."
+          : "Your family schedule was updated.",
+        data: { eventID: event.id },
+      });
+    } catch {
+      // Saving the source-of-truth event must not fail because APNs is unavailable.
+    }
     return { conflicts };
   });
 

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { APNSPushNotificationProvider } from "./apns-push-notification-provider.js";
 import { buildApp } from "./app.js";
 import { InMemoryCache, type Cache } from "./cache.js";
 import { CachedIdentityProvider } from "./cached-identity-provider.js";
@@ -9,6 +10,7 @@ import {
   type LocationSearchProvider,
 } from "./location-search-provider.js";
 import { PostgresFamJamRepository } from "./postgres-repository.js";
+import { NoopPushNotificationProvider } from "./push-notification-provider.js";
 import { RedisCache } from "./redis-cache.js";
 import { StytchIdentityProvider } from "./stytch-identity-provider.js";
 
@@ -31,6 +33,8 @@ const app = buildApp({
   identityProvider,
   repository: PostgresFamJamRepository.fromConnectionString(databaseURL),
   locationSearchProvider: new CachedLocationSearchProvider(locationProvider, cache),
+  pushNotificationProvider: APNSPushNotificationProvider.fromEnvironment()
+    ?? new NoopPushNotificationProvider(),
 });
 app.addHook("onClose", async () => { await cache.close?.(); });
 

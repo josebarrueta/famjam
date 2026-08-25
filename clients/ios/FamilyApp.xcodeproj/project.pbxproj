@@ -17,6 +17,7 @@
 		A1000000000000000000000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* Assets.xcassets */; };
 		A1000000000000000000000B /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* AppTheme.swift */; };
 		A1000000000000000000000C /* SessionGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* SessionGateView.swift */; };
+		A1000000000000000000000D /* PushNotificationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001C /* PushNotificationDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +32,7 @@
 		A10000000000000000000019 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000000000000000000001A /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		A1000000000000000000001B /* SessionGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGateView.swift; sourceTree = "<group>"; };
+		A1000000000000000000001C /* PushNotificationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +69,7 @@
 				A10000000000000000000019 /* Assets.xcassets */,
 				A1000000000000000000001A /* AppTheme.swift */,
 				A1000000000000000000001B /* SessionGateView.swift */,
+				A1000000000000000000001C /* PushNotificationDelegate.swift */,
 			);
 			path = FamilyApp;
 			sourceTree = "<group>";
@@ -173,6 +176,7 @@
 				A10000000000000000000009 /* SettingsView.swift in Sources */,
 				A1000000000000000000000B /* AppTheme.swift in Sources */,
 				A1000000000000000000000C /* SessionGateView.swift in Sources */,
+				A1000000000000000000000D /* PushNotificationDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -225,7 +229,9 @@
 		A10000000000000000000082 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = FamilyApp/FamilyApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -248,7 +254,9 @@
 		A10000000000000000000083 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = FamilyApp/FamilyApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";

@@ -39,6 +39,14 @@ Enable **Places API (New)** in Google Cloud and restrict the key to that API. If
 key is omitted, manual location entry still works and autocomplete returns no
 suggestions.
 
+## Push notifications
+
+Set `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_PRIVATE_KEY`, and
+`APNS_ENV` to enable Apple Push Notification service delivery. The `.p8` private
+key stays backend-only; encode line breaks as `\\n` when the deployment platform
+requires a single-line secret. Without these values, device registration remains
+available but delivery uses the no-op adapter.
+
 ## Account provisioning
 
 A first-time Google identity without an invitation is provisioned just in time as

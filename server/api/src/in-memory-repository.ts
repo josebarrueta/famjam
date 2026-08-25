@@ -14,6 +14,7 @@ export class InMemoryFamJamRepository implements FamJamRepository {
   private readonly members: FamilyMember[];
   private readonly invitations: FamilyInvitation[] = [];
   private readonly changeVersions = new Map<string, number>();
+  private readonly devices = new Map<string, { familyID: string; memberID: string }>();
 
   constructor(seed: SeedData = {}) {
     this.accounts = [...(seed.accounts ?? [])];
@@ -88,6 +89,20 @@ export class InMemoryFamJamRepository implements FamJamRepository {
 
   async markFamilyChanged(familyID: string): Promise<void> {
     this.changeVersions.set(familyID, (this.changeVersions.get(familyID) ?? 0) + 1);
+  }
+
+  async saveDeviceToken(familyID: string, memberID: string, token: string): Promise<void> {
+    this.devices.set(token, { familyID, memberID });
+  }
+
+  async deleteDeviceToken(memberID: string, token: string): Promise<void> {
+    if (this.devices.get(token)?.memberID === memberID) this.devices.delete(token);
+  }
+
+  async deviceTokensForFamily(familyID: string): Promise<string[]> {
+    return [...this.devices.entries()]
+      .filter(([, device]) => device.familyID === familyID)
+      .map(([token]) => token);
   }
 
   async eventsForFamily(familyID: string): Promise<FamilyEvent[]> {

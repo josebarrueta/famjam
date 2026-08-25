@@ -4,6 +4,15 @@ This contract is backend-vendor neutral. A custom server, Supabase Edge Function
 or another provider can implement it. All successful responses use a 2xx status;
 JSON requests use `Content-Type: application/json`. Dates are ISO 8601 strings.
 
+## Push notifications
+
+- `PUT /v1/devices/{apnsToken}` registers or transfers the authenticated device.
+- `DELETE /v1/devices/{apnsToken}` removes that member's device.
+
+Event creates and updates send family-scoped APNs alerts. Conflict writes use a
+conflict-specific message. Device registration is optional, and APNs failures never
+roll back the source-of-truth event.
+
 ## Synchronization
 
 - `GET /v1/changes` → `{ "version": 42 }` for the authenticated family.

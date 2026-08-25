@@ -7,6 +7,9 @@ export interface FamJamRepository {
   consumeInvitation(codeHash: string, subject: string, displayName: string): Promise<Account | null>;
   familyChangeVersion(familyID: string): Promise<number>;
   markFamilyChanged(familyID: string): Promise<void>;
+  saveDeviceToken(familyID: string, memberID: string, token: string): Promise<void>;
+  deleteDeviceToken(memberID: string, token: string): Promise<void>;
+  deviceTokensForFamily(familyID: string): Promise<string[]>;
   eventsForFamily(familyID: string): Promise<FamilyEvent[]>;
   saveEvent(event: FamilyEvent): Promise<void>;
   deleteEvent(familyID: string, eventID: string): Promise<void>;

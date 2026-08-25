@@ -1,8 +1,11 @@
 import SwiftUI
+import UIKit
+import UserNotifications
 import FamilyCore
 
 @main
 struct FamilyActivityCoordinatorApp: App {
+    @UIApplicationDelegateAdaptor(PushNotificationDelegate.self) private var pushNotificationDelegate
     @Environment(\.scenePhase) private var scenePhase
     private let eventStore: any EventStore
     private let memberStore: any FamilyMemberStore
@@ -11,6 +14,7 @@ struct FamilyActivityCoordinatorApp: App {
     private let locationSearch: any LocationSearch
     private let invitationStore: (any FamilyInvitationStore)?
     private let changeMonitor: (any FamilyChangeMonitor)?
+    private let deviceRegistrationStore: (any DeviceRegistrationStore)?
     private let allowsSignOut: Bool
 
     init() {
@@ -31,6 +35,7 @@ struct FamilyActivityCoordinatorApp: App {
             locationSearch = EmptyLocationSearch()
             invitationStore = nil
             changeMonitor = nil
+            deviceRegistrationStore = nil
         case .remote:
             guard let baseURL = configuration.remoteBaseURL else {
                 fatalError("Remote mode requires a base URL")
@@ -50,6 +55,10 @@ struct FamilyActivityCoordinatorApp: App {
                 transport: authenticatedTransport
             )
             changeMonitor = RemoteFamilyChangeMonitor(
+                baseURL: baseURL,
+                transport: authenticatedTransport
+            )
+            deviceRegistrationStore = RemoteDeviceRegistrationStore(
                 baseURL: baseURL,
                 transport: authenticatedTransport
             )
@@ -88,12 +97,28 @@ struct FamilyActivityCoordinatorApp: App {
                 }
                 .tint(AppTheme.coral)
                 .task { await monitorFamilyChanges() }
+                .task { await requestPushNotifications() }
+                .onReceive(NotificationCenter.default.publisher(for: .didRegisterDeviceToken)) { notification in
+                    guard let token = notification.object as? String else { return }
+                    Task { try? await deviceRegistrationStore?.register(token: token) }
+                }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
                         NotificationCenter.default.post(name: .familyDataDidChange, object: nil)
                     }
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func requestPushNotifications() async {
+        guard deviceRegistrationStore != nil else { return }
+        let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .badge, .sound]
+        )) == true
+        if granted {
+            UIApplication.shared.registerForRemoteNotifications()
         }
     }
 
