@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Account, FamilyEvent, FamilyMember } from "./domain.js";
+import type { Account, FamilyEvent, FamilyInvitation, FamilyMember } from "./domain.js";
 import type { FamJamRepository } from "./repository.js";
 
 interface SeedData {
@@ -12,6 +12,7 @@ export class InMemoryFamJamRepository implements FamJamRepository {
   private readonly accounts: Account[];
   private readonly events: FamilyEvent[];
   private readonly members: FamilyMember[];
+  private readonly invitations: FamilyInvitation[] = [];
 
   constructor(seed: SeedData = {}) {
     this.accounts = [...(seed.accounts ?? [])];
@@ -39,6 +40,40 @@ export class InMemoryFamJamRepository implements FamJamRepository {
       familyID,
       name: displayName,
       role: "parent",
+      colorTag: "blue",
+    });
+    this.accounts.push(account);
+    return account;
+  }
+
+  async saveInvitation(invitation: FamilyInvitation): Promise<void> {
+    this.invitations.push(invitation);
+  }
+
+  async consumeInvitation(
+    codeHash: string,
+    subject: string,
+    displayName: string,
+  ): Promise<Account | null> {
+    const existing = await this.accountForIdentity(subject);
+    if (existing) return existing;
+    const index = this.invitations.findIndex((invitation) =>
+      invitation.codeHash === codeHash && new Date(invitation.expiresAt) > new Date()
+    );
+    if (index < 0) return null;
+    const invitation = this.invitations.splice(index, 1)[0]!;
+    const memberID = `${invitation.role}-${randomUUID()}`;
+    const account: Account = {
+      identitySubject: subject,
+      familyID: invitation.familyID,
+      memberID,
+      role: invitation.role,
+    };
+    this.members.push({
+      id: memberID,
+      familyID: invitation.familyID,
+      name: displayName,
+      role: invitation.role,
       colorTag: "blue",
     });
     this.accounts.push(account);

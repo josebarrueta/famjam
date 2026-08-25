@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Account, EventConflict, FamilyEvent, FamilyMember } from "./domain.js";
@@ -39,7 +40,9 @@ const oauthAuthorizationSchema = z.object({ codeChallenge: z.string().min(43).ma
 const oauthSessionSchema = z.object({
   oauthToken: z.string().min(1),
   codeVerifier: z.string().min(43).max(128),
+  invitationCode: z.string().min(20).optional(),
 });
+const invitationSchema = z.object({ role: z.enum(["parent", "kid"]) });
 
 const memberSchema = z.object({
   id: z.string().min(1),
@@ -93,10 +96,20 @@ export function buildApp({
         parsed.data.codeVerifier,
       );
       const existingAccount = await repository.accountForIdentity(issued.identity.subject);
-      const account = existingAccount ?? await repository.provisionParentAccount(
-        issued.identity.subject,
-        issued.identity.displayName,
-      );
+      const account = existingAccount ?? (parsed.data.invitationCode
+        ? await repository.consumeInvitation(
+          invitationHash(parsed.data.invitationCode),
+          issued.identity.subject,
+          issued.identity.displayName,
+        )
+        : await repository.provisionParentAccount(
+          issued.identity.subject,
+          issued.identity.displayName,
+        ));
+      if (!account) {
+        await identityProvider.revokeSession(issued.accessToken);
+        return reply.code(403).send({ error: "invalid_invitation" });
+      }
       const members = await repository.membersForFamily(account.familyID);
       const member = members.find((candidate) => candidate.id === account.memberID);
       return {
@@ -115,6 +128,22 @@ export function buildApp({
     if (!token) return reply.code(401).send({ error: "missing_bearer_token" });
     await identityProvider.revokeSession(token);
     return reply.code(204).send();
+  });
+
+  app.post("/v1/invitations", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    const parsed = invitationSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_invitation" });
+    const code = randomBytes(24).toString("base64url");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    await repository.saveInvitation({
+      codeHash: invitationHash(code),
+      familyID: account.familyID,
+      role: parsed.data.role,
+      expiresAt,
+    });
+    return reply.code(201).send({ code, role: parsed.data.role, expiresAt });
   });
 
   app.get("/v1/locations/search", async (request, reply) => {
@@ -202,6 +231,10 @@ export function buildApp({
   });
 
   return app;
+}
+
+function invitationHash(code: string): string {
+  return createHash("sha256").update(code).digest("hex");
 }
 
 function bearerToken(authorization: string | undefined): string | null {

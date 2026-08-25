@@ -9,6 +9,7 @@ public actor RemoteAuthentication: Authentication {
     private struct OAuthTokenExchange: Encodable {
         let oauthToken: String
         let codeVerifier: String
+        let invitationCode: String?
     }
 
     private let authorizationURL: URL
@@ -44,7 +45,7 @@ public actor RemoteAuthentication: Authentication {
         session
     }
 
-    public func signIn() async throws -> AuthSession {
+    public func signIn(invitationCode: String?) async throws -> AuthSession {
         let codeVerifier = UUID().uuidString + UUID().uuidString
         let digest = SHA256.hash(data: Data(codeVerifier.utf8))
         let codeChallenge = Data(digest).base64EncodedString()
@@ -72,7 +73,8 @@ public actor RemoteAuthentication: Authentication {
             headers: ["Content-Type": "application/json"],
             body: try JSONEncoder().encode(OAuthTokenExchange(
                 oauthToken: oauthToken,
-                codeVerifier: codeVerifier
+                codeVerifier: codeVerifier,
+                invitationCode: invitationCode
             ))
         ))
         try response.requireSuccess()

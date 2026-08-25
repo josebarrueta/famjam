@@ -6,6 +6,13 @@ export interface Identity {
   email?: string;
 }
 
+export interface FamilyInvitation {
+  codeHash: string;
+  familyID: string;
+  role: AccountRole;
+  expiresAt: string;
+}
+
 export interface Account {
   identitySubject: string;
   familyID: string;

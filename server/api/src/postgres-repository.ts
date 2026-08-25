@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { Pool, type PoolConfig } from "pg";
-import type { Account, AccountRole, EventRecurrence, FamilyEvent, FamilyMember } from "./domain.js";
+import type {
+  Account,
+  AccountRole,
+  EventRecurrence,
+  FamilyEvent,
+  FamilyInvitation,
+  FamilyMember,
+} from "./domain.js";
 import type { FamJamRepository } from "./repository.js";
 
 export class PostgresFamJamRepository implements FamJamRepository {
@@ -51,6 +58,73 @@ export class PostgresFamJamRepository implements FamJamRepository {
       );
       await client.query("COMMIT");
       return { identitySubject: subject, familyID, memberID, role: "parent" };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async saveInvitation(invitation: FamilyInvitation): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO family_invitations (code_hash, family_id, role, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [invitation.codeHash, invitation.familyID, invitation.role, invitation.expiresAt],
+    );
+  }
+
+  async consumeInvitation(
+    codeHash: string,
+    subject: string,
+    displayName: string,
+  ): Promise<Account | null> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [subject]);
+      const existing = await client.query<AccountRow>(
+        `SELECT identity_subject, family_id, member_id, role
+         FROM accounts WHERE identity_subject = $1`,
+        [subject],
+      );
+      if (existing.rows[0]) {
+        await client.query("COMMIT");
+        return accountFromRow(existing.rows[0]);
+      }
+      const invitationResult = await client.query<InvitationRow>(
+        `SELECT family_id, role FROM family_invitations
+         WHERE code_hash = $1 AND consumed_at IS NULL AND expires_at > now()
+         FOR UPDATE`,
+        [codeHash],
+      );
+      const invitation = invitationResult.rows[0];
+      if (!invitation) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+      const memberID = `${invitation.role}-${randomUUID()}`;
+      await client.query(
+        `INSERT INTO family_members (family_id, id, name, role, color_tag)
+         VALUES ($1, $2, $3, $4, 'blue')`,
+        [invitation.family_id, memberID, displayName, invitation.role],
+      );
+      await client.query(
+        `INSERT INTO accounts (identity_subject, family_id, member_id, role)
+         VALUES ($1, $2, $3, $4)`,
+        [subject, invitation.family_id, memberID, invitation.role],
+      );
+      await client.query(
+        "UPDATE family_invitations SET consumed_at = now() WHERE code_hash = $1",
+        [codeHash],
+      );
+      await client.query("COMMIT");
+      return {
+        identitySubject: subject,
+        familyID: invitation.family_id,
+        memberID,
+        role: invitation.role,
+      };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -136,6 +210,11 @@ interface AccountRow {
   identity_subject: string;
   family_id: string;
   member_id: string;
+  role: AccountRole;
+}
+
+interface InvitationRow {
+  family_id: string;
   role: AccountRole;
 }
 

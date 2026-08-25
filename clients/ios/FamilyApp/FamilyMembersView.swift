@@ -11,12 +11,14 @@ struct FamilyMembersView: View {
     init(
         memberStore: any FamilyMemberStore,
         eventStore: any EventStore,
-        locationSearch: any LocationSearch = EmptyLocationSearch()
+        locationSearch: any LocationSearch = EmptyLocationSearch(),
+        invitationStore: (any FamilyInvitationStore)? = nil
     ) {
         self.locationSearch = locationSearch
         _viewModel = StateObject(wrappedValue: FamilyMembersViewModel(
             memberStore: memberStore,
             eventStore: eventStore,
+            invitationStore: invitationStore,
             deletionService: FamilyMemberDeletionService(memberStore: memberStore, eventStore: eventStore)
         ))
     }
@@ -79,11 +81,26 @@ struct FamilyMembersView: View {
             .scrollContentBackground(.hidden)
             .background(AppTheme.background)
             .navigationTitle("Family")
-            .toolbar { Button { isAddingMember = true } label: { Image(systemName: "plus") } }
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if viewModel.canInvite {
+                        Menu {
+                            Button("Invite a parent") { Task { await viewModel.invite(role: .parent) } }
+                            Button("Invite a kid") { Task { await viewModel.invite(role: .kid) } }
+                        } label: {
+                            Image(systemName: "person.badge.plus")
+                        }
+                    }
+                    Button { isAddingMember = true } label: { Image(systemName: "plus") }
+                }
+            }
             .task { await viewModel.load() }
             .sheet(isPresented: $isAddingMember) { FamilyMemberEditor(onSave: viewModel.save) }
             .sheet(item: $editingMember) { member in
                 FamilyMemberEditor(member: member, onSave: viewModel.save, onDelete: viewModel.delete)
+            }
+            .sheet(item: $viewModel.invitation) { invitation in
+                InvitationSheet(invitation: invitation)
             }
             .sheet(item: $quickActivity) { selection in
                 AddEventSheet(
@@ -100,22 +117,60 @@ struct FamilyMembersView: View {
 @MainActor
 final class FamilyMembersViewModel: ObservableObject {
     @Published private(set) var members: [FamilyMember] = []
+    @Published var invitation: FamilyInvitation?
     private let memberStore: any FamilyMemberStore
     private let eventStore: any EventStore
+    private let invitationStore: (any FamilyInvitationStore)?
     private let deletionService: FamilyMemberDeletionService
     init(
         memberStore: any FamilyMemberStore,
         eventStore: any EventStore,
+        invitationStore: (any FamilyInvitationStore)?,
         deletionService: FamilyMemberDeletionService
     ) {
         self.memberStore = memberStore
         self.eventStore = eventStore
+        self.invitationStore = invitationStore
         self.deletionService = deletionService
     }
     func load() async { members = (try? await memberStore.members().sorted { $0.name < $1.name }) ?? [] }
     func save(_ member: FamilyMember) async throws { try await memberStore.save(member); await load() }
     func delete(_ member: FamilyMember) async throws { try await deletionService.delete(member); await load() }
+    var canInvite: Bool { invitationStore != nil }
     func saveEvent(_ event: FamilyEvent) async throws -> [EventConflict] { try await eventStore.save(event) }
+    func invite(role: FamilyMemberRole) async {
+        invitation = try? await invitationStore?.create(role: role)
+    }
+}
+
+private struct InvitationSheet: View {
+    let invitation: FamilyInvitation
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Image(systemName: "person.2.badge.plus")
+                    .font(.system(size: 54))
+                    .foregroundStyle(AppTheme.purple)
+                Text("Invite a \(invitation.role.rawValue)")
+                    .font(.title.bold())
+                Text(invitation.code)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                ShareLink(item: invitation.shareURL) {
+                    Label("Share invitation", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.borderedProminent)
+                Text("Expires \(invitation.expiresAt.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(24)
+            .navigationTitle("Family Invitation")
+            .toolbar { Button("Done") { dismiss() } }
+        }
+    }
 }
 
 private struct QuickActivitySelection: Identifiable {

@@ -142,6 +142,32 @@ describe("FamJam API", () => {
     await app.close();
   });
 
+  it("lets a parent invite a kid into the same family", async () => {
+    const data = repository();
+    const app = buildApp({ identityProvider, repository: data });
+    const invitation = await app.inject({
+      method: "POST",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+      payload: { role: "kid" },
+    });
+    expect(invitation.statusCode).toBe(201);
+    const invitationCode = invitation.json().code as string;
+
+    const session = await app.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: { oauthToken: "new-oauth-token", codeVerifier, invitationCode },
+    });
+
+    expect(session.statusCode).toBe(200);
+    expect(session.json()).toMatchObject({ displayName: "Sam Rivera", role: "kid" });
+    const account = await data.accountForIdentity("new-parent-subject");
+    expect(account?.familyID).toBe("family-1");
+    expect(account?.role).toBe("kid");
+    await app.close();
+  });
+
   it("requires a verified bearer session", async () => {
     const app = buildApp({ identityProvider, repository: repository() });
     const response = await app.inject({ method: "GET", url: "/v1/events" });

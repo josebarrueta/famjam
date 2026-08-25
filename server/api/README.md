@@ -38,8 +38,9 @@ suggestions.
 
 A first-time Google identity without an invitation is provisioned just in time as
 the parent of a new family. Provisioning creates the member and identity mapping
-in one transaction and is idempotent across retries. Future family invitations
-will provision additional parents or kids into an existing family instead.
+in one transaction and is idempotent across retries. Parents can create single-use, seven-day invitations for another parent or kid.
+Redeeming an invitation during Google sign-in atomically provisions the new member
+into the inviter's family; family IDs and invited roles are never client-selected.
 
 ## Architecture
 

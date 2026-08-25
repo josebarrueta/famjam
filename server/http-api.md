@@ -34,6 +34,16 @@ Save response:
 Supported conflict kinds are `overlapping_participant` and
 `double_booked_driver`.
 
+## Family invitations
+
+- `POST /v1/invitations` with `{ "role": "parent" | "kid" }` creates a
+  single-use, seven-day invitation. Parent authorization is required.
+- `POST /v1/sessions` may include `invitationCode` with the OAuth exchange.
+
+Invitation codes are stored as SHA-256 hashes. Successful redemption atomically
+creates the invited member and account in the inviter's family. The client never
+chooses a family ID or overrides the invitation's role.
+
 ## Locations
 
 - `GET /v1/locations/search?q=123%20Main` → US address suggestions.

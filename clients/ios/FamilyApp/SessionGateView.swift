@@ -27,6 +27,7 @@ struct SessionGateView<Content: View>: View {
             }
         }
         .task { await viewModel.restoreSession() }
+        .onOpenURL { viewModel.acceptInvitationURL($0) }
     }
 }
 
@@ -35,6 +36,7 @@ final class SessionGateViewModel: ObservableObject {
     @Published private(set) var session: AuthSession?
     @Published private(set) var isLoading = true
     @Published private(set) var errorMessage: String?
+    @Published var invitationCode = ""
     private let authentication: any Authentication
 
     init(authentication: any Authentication) {
@@ -55,11 +57,18 @@ final class SessionGateViewModel: ObservableObject {
         }
     }
 
-    func signIn() async {
+    func acceptInvitationURL(_ url: URL) {
+        guard url.scheme == "famjam", url.host == "invite",
+              let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "code" })?.value else { return }
+        invitationCode = code
+    }
+
+    func signIn(invitationCode: String?) async {
         isLoading = true
         defer { isLoading = false }
         do {
-            session = try await authentication.signIn()
+            session = try await authentication.signIn(invitationCode: invitationCode)
             errorMessage = nil
         } catch {
             errorMessage = "We couldn't sign you in with Google. Please try again."
@@ -93,8 +102,13 @@ private struct SignInView: View {
                     Text("Sign in to rally your family's week.")
                         .foregroundStyle(.secondary)
                 }
+                TextField("Invitation code (optional)", text: $viewModel.invitationCode)
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                 Button {
-                    Task { await viewModel.signIn() }
+                    let code = viewModel.invitationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                    Task { await viewModel.signIn(invitationCode: code.isEmpty ? nil : code) }
                 } label: {
                     Label("Continue with Google", systemImage: "person.crop.circle.badge.checkmark")
                         .frame(maxWidth: .infinity)

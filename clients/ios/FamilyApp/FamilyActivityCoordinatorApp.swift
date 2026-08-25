@@ -8,6 +8,7 @@ struct FamilyActivityCoordinatorApp: App {
     private let notificationStore: any ConflictNotificationStore
     private let authentication: any Authentication
     private let locationSearch: any LocationSearch
+    private let invitationStore: (any FamilyInvitationStore)?
     private let allowsSignOut: Bool
 
     init() {
@@ -26,6 +27,7 @@ struct FamilyActivityCoordinatorApp: App {
             eventStore = LocalEventStore(storageURL: AppStorage.eventsURL)
             memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
             locationSearch = EmptyLocationSearch()
+            invitationStore = nil
         case .remote:
             guard let baseURL = configuration.remoteBaseURL else {
                 fatalError("Remote mode requires a base URL")
@@ -40,6 +42,10 @@ struct FamilyActivityCoordinatorApp: App {
             eventStore = RemoteEventStore(baseURL: baseURL, transport: authenticatedTransport)
             memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: authenticatedTransport)
             locationSearch = RemoteLocationSearch(baseURL: baseURL, transport: authenticatedTransport)
+            invitationStore = RemoteFamilyInvitationStore(
+                baseURL: baseURL,
+                transport: authenticatedTransport
+            )
         }
         notificationStore = LocalConflictNotificationStore(storageURL: AppStorage.notificationsURL)
     }
@@ -60,7 +66,8 @@ struct FamilyActivityCoordinatorApp: App {
                         FamilyMembersView(
                             memberStore: memberStore,
                             eventStore: eventStore,
-                            locationSearch: locationSearch
+                            locationSearch: locationSearch,
+                            invitationStore: invitationStore
                         )
                             .tabItem { Label("Family", systemImage: "person.2") }
                         NotificationsView(notificationStore: notificationStore)
