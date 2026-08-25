@@ -86,6 +86,8 @@ uses FamJam endpoints and has no Stytch SDK or Stytch configuration.
 }
 ```
 
+`GET /v1/sessions` validates and restores a persisted client session.
+
 Authenticated requests include `Authorization: Bearer <accessToken>`. The backend
 validates the opaque Stytch session through its provider adapter, loads the FamJam
 account, and applies family and role authorization. `DELETE /v1/sessions` revokes

@@ -67,7 +67,9 @@ export function buildApp({
   app.decorateRequest("account", null);
 
   app.addHook("onRequest", async (request, reply) => {
-    if (["/health", "/v1/auth/google", "/v1/sessions"].includes(request.routeOptions.url ?? "")) return;
+    const routeURL = request.routeOptions.url ?? "";
+    if (routeURL === "/health" || routeURL === "/v1/auth/google") return;
+    if (routeURL === "/v1/sessions" && request.method === "POST") return;
     const token = bearerToken(request.headers.authorization);
     if (!token) return reply.code(401).send({ error: "missing_bearer_token" });
     try {
@@ -121,6 +123,18 @@ export function buildApp({
     } catch {
       return reply.code(401).send({ error: "invalid_oauth_token" });
     }
+  });
+
+  app.get("/v1/sessions", async (request) => {
+    const account = requiredAccount(request);
+    const members = await repository.membersForFamily(account.familyID);
+    const member = members.find((candidate) => candidate.id === account.memberID);
+    return {
+      accountID: account.memberID,
+      displayName: member?.name ?? account.memberID,
+      role: account.role,
+      accessToken: bearerToken(request.headers.authorization),
+    };
   });
 
   app.delete("/v1/sessions", async (request, reply) => {

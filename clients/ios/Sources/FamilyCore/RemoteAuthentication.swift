@@ -16,17 +16,20 @@ public actor RemoteAuthentication: Authentication {
     private let sessionsURL: URL
     private let transport: any HTTPTransport
     private let webSession: any OAuthWebSession
+    private let sessionStore: any AuthSessionStore
     private var session: AuthSession?
 
     public init(
         baseURL: URL,
         transport: any HTTPTransport,
-        webSession: any OAuthWebSession
+        webSession: any OAuthWebSession,
+        sessionStore: any AuthSessionStore
     ) {
         authorizationURL = baseURL.appending(path: "v1/auth/google")
         sessionsURL = baseURL.appending(path: "v1/sessions")
         self.transport = transport
         self.webSession = webSession
+        self.sessionStore = sessionStore
     }
 
     @MainActor
@@ -37,12 +40,30 @@ public actor RemoteAuthentication: Authentication {
         self.init(
             baseURL: baseURL,
             transport: transport,
-            webSession: SystemOAuthWebSession()
+            webSession: SystemOAuthWebSession(),
+            sessionStore: KeychainAuthSessionStore()
         )
     }
 
     public func currentSession() async throws -> AuthSession? {
-        session
+        if let session { return session }
+        guard let stored = try await sessionStore.load(), let token = stored.accessToken else {
+            return nil
+        }
+        let response = try await transport.send(HTTPRequest(
+            method: .get,
+            url: sessionsURL,
+            headers: ["Authorization": "Bearer \(token)"]
+        ))
+        if response.statusCode == 401 || response.statusCode == 403 {
+            try await sessionStore.delete()
+            return nil
+        }
+        try response.requireSuccess()
+        let validated = try JSONDecoder().decode(AuthSession.self, from: response.body)
+        try await sessionStore.save(validated)
+        session = validated
+        return validated
     }
 
     public func signIn(invitationCode: String?) async throws -> AuthSession {
@@ -79,19 +100,24 @@ public actor RemoteAuthentication: Authentication {
         ))
         try response.requireSuccess()
         let authenticatedSession = try JSONDecoder().decode(AuthSession.self, from: response.body)
+        try await sessionStore.save(authenticatedSession)
         session = authenticatedSession
         return authenticatedSession
     }
 
     public func signOut() async throws {
-        guard let session else { return }
-        let headers = session.accessToken.map { ["Authorization": "Bearer \($0)"] } ?? [:]
+        guard let activeSession = try await currentSession() else {
+            try await sessionStore.delete()
+            return
+        }
+        let headers = activeSession.accessToken.map { ["Authorization": "Bearer \($0)"] } ?? [:]
         let response = try await transport.send(HTTPRequest(
             method: .delete,
             url: sessionsURL,
             headers: headers
         ))
         try response.requireSuccess()
+        try await sessionStore.delete()
         self.session = nil
     }
 }

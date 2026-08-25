@@ -12,26 +12,35 @@ final class RemoteAuthenticationTests: XCTestCase {
             accessToken: "secret-token"
         )
         let transport = AuthenticationHTTPTransport(responses: [
+            HTTPResponse(statusCode: 200, body: try JSONEncoder().encode(expectedSession)),
             HTTPResponse(statusCode: 200, body: try JSONEncoder().encode(expectedSession))
         ])
         let webSession = StubOAuthWebSession(
             callbackURL: URL(string: "famjam://oauth-callback?stytch_token_type=oauth&token=oauth-token")!
         )
+        let sessionStore = TestAuthSessionStore()
         let authentication: any Authentication = RemoteAuthentication(
             baseURL: URL(string: "https://api.example.com")!,
             transport: transport,
-            webSession: webSession
+            webSession: webSession,
+            sessionStore: sessionStore
         )
 
         let session = try await authentication.signIn()
 
         XCTAssertEqual(session, expectedSession)
-        let currentSession = try await authentication.currentSession()
+        let restoredAuthentication: any Authentication = RemoteAuthentication(
+            baseURL: URL(string: "https://api.example.com")!,
+            transport: transport,
+            webSession: webSession,
+            sessionStore: sessionStore
+        )
+        let currentSession = try await restoredAuthentication.currentSession()
         XCTAssertEqual(currentSession, expectedSession)
         let requests = await transport.recordedRequests()
-        XCTAssertEqual(requests.map(\.method), [.post])
-        XCTAssertEqual(requests.map(\.url.path), ["/v1/sessions"])
-        let exchange = try XCTUnwrap(requests.last?.body)
+        XCTAssertEqual(requests.map(\.method), [.post, .get])
+        XCTAssertEqual(requests.map(\.url.path), ["/v1/sessions", "/v1/sessions"])
+        let exchange = try XCTUnwrap(requests.first?.body)
         let tokenExchange = try JSONDecoder().decode(OAuthTokenExchange.self, from: exchange)
         XCTAssertEqual(tokenExchange.oauthToken, "oauth-token")
         let challenge = await webSession.recordedChallenge()
@@ -66,6 +75,13 @@ private actor StubOAuthWebSession: OAuthWebSession {
     }
 
     func recordedChallenge() -> String? { challenge }
+}
+
+private actor TestAuthSessionStore: AuthSessionStore {
+    private var session: AuthSession?
+    func load() async throws -> AuthSession? { session }
+    func save(_ session: AuthSession) async throws { self.session = session }
+    func delete() async throws { session = nil }
 }
 
 private actor AuthenticationHTTPTransport: HTTPTransport {
