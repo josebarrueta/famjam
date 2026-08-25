@@ -208,6 +208,35 @@ describe("FamJam API", () => {
     await app.close();
   });
 
+  it("reports a conflict on a future recurring occurrence", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+    const response = await app.inject({
+      method: "PUT",
+      url: "/v1/events/00000000-0000-4000-8000-000000000004",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: "00000000-0000-4000-8000-000000000004",
+        title: "Recurring soccer",
+        kidID: "kid-1",
+        participantIDs: ["kid-1"],
+        startTime: "2026-08-16T16:00:00Z",
+        endTime: "2026-08-16T17:00:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed",
+        recurrence: {
+          frequency: "weekly",
+          interval: 1,
+          endDate: "2026-09-30T23:59:59Z"
+        }
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().conflicts[0]?.kind).toBe("overlapping_participant");
+    await app.close();
+  });
+
   it("stores recurrence and reports conflicts when a parent writes an event", async () => {
     const data = repository();
     const app = buildApp({ identityProvider, repository: data });

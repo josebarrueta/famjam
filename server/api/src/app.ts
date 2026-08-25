@@ -225,9 +225,17 @@ async function requireParent(request: FastifyRequest, reply: FastifyReply): Prom
 
 function detectConflicts(event: FamilyEvent, existingEvents: FamilyEvent[]): EventConflict[] {
   const conflicts: EventConflict[] = [];
+  const rangeEnd = [event, ...existingEvents].reduce((latest, candidate) => {
+    const candidateEnd = new Date(candidate.recurrence?.endDate ?? candidate.endTime);
+    return candidateEnd > latest ? candidateEnd : latest;
+  }, new Date(event.endTime));
+  const eventOccurrences = occurrenceRanges(event, rangeEnd);
   for (const existing of existingEvents) {
-    const overlaps = new Date(event.startTime) < new Date(existing.endTime)
-      && new Date(existing.startTime) < new Date(event.endTime);
+    const overlaps = eventOccurrences.some((occurrence) =>
+      occurrenceRanges(existing, rangeEnd).some((existingOccurrence) =>
+        occurrence.start < existingOccurrence.end && existingOccurrence.start < occurrence.end
+      )
+    );
     if (!overlaps) continue;
     const memberID = event.participantIDs.find((id) => existing.participantIDs.includes(id));
     if (memberID) {
@@ -247,6 +255,28 @@ function detectConflicts(event: FamilyEvent, existingEvents: FamilyEvent[]): Eve
     }
   }
   return conflicts;
+}
+
+function occurrenceRanges(event: FamilyEvent, rangeEnd: Date): Array<{ start: Date; end: Date }> {
+  const firstStart = new Date(event.startTime);
+  const duration = new Date(event.endTime).getTime() - firstStart.getTime();
+  if (!event.recurrence) return [{ start: firstStart, end: new Date(firstStart.getTime() + duration) }];
+
+  const recurrenceEnd = new Date(event.recurrence.endDate);
+  const occurrences: Array<{ start: Date; end: Date }> = [];
+  let start = firstStart;
+  while (start <= recurrenceEnd && start <= rangeEnd) {
+    occurrences.push({ start, end: new Date(start.getTime() + duration) });
+    const next = new Date(start);
+    switch (event.recurrence.frequency) {
+      case "daily": next.setUTCDate(next.getUTCDate() + event.recurrence.interval); break;
+      case "weekly": next.setUTCDate(next.getUTCDate() + 7 * event.recurrence.interval); break;
+      case "monthly": next.setUTCMonth(next.getUTCMonth() + event.recurrence.interval); break;
+    }
+    if (next <= start) break;
+    start = next;
+  }
+  return occurrences;
 }
 
 function clientEvent({ familyID: _familyID, ...event }: FamilyEvent) {

@@ -89,6 +89,37 @@ final class EventStoreTests: XCTestCase {
         ])
     }
 
+    func testReportsAConflictOnAFutureRecurringOccurrence() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
+        let kidID = KidID(rawValue: "emma")
+        let start = Date(timeIntervalSince1970: 1_735_841_600)
+        let existing = FamilyEvent(
+            title: "Doctor appointment",
+            kidID: kidID,
+            startTime: start.addingTimeInterval(7 * 24 * 60 * 60),
+            endTime: start.addingTimeInterval(7 * 24 * 60 * 60 + 3600),
+            source: .manual,
+            status: .confirmed
+        )
+        let recurring = FamilyEvent(
+            title: "Soccer practice",
+            kidID: kidID,
+            startTime: start,
+            endTime: start.addingTimeInterval(3600),
+            source: .manual,
+            status: .confirmed,
+            recurrence: EventRecurrence(
+                frequency: .weekly,
+                endDate: start.addingTimeInterval(14 * 24 * 60 * 60)
+            )
+        )
+        try await repository.save(existing)
+
+        let conflicts = try await repository.save(recurring)
+
+        XCTAssertEqual(conflicts.first?.kind, .overlappingKidActivity(kidID))
+    }
+
     func testRejectsAnEventWhoseEndTimeIsNotAfterItsStartTime() async throws {
         let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
         let event = FamilyEvent(

@@ -142,10 +142,23 @@ public actor LocalEventStore: EventStore {
     }
 
     private func conflicts(for event: FamilyEvent, against savedEvents: [FamilyEvent]) -> [EventConflict] {
-        savedEvents.compactMap { savedEvent in
-            guard event.startTime < savedEvent.endTime, savedEvent.startTime < event.endTime else {
-                return nil
+        let allEvents = [event] + savedEvents
+        let rangeStart = allEvents.map(\.startTime).min() ?? event.startTime
+        let rangeEnd = allEvents.map {
+            max($0.recurrence?.endDate ?? $0.startTime, $0.endTime)
+        }.max() ?? event.endTime
+        let range = DateInterval(start: rangeStart, end: rangeEnd.addingTimeInterval(24 * 60 * 60))
+        let eventOccurrences = EventOccurrenceExpander.occurrences(of: [event], in: range)
+
+        return savedEvents.compactMap { savedEvent in
+            let savedOccurrences = EventOccurrenceExpander.occurrences(of: [savedEvent], in: range)
+            let overlaps = eventOccurrences.contains { occurrence in
+                savedOccurrences.contains { savedOccurrence in
+                    occurrence.event.startTime < savedOccurrence.event.endTime
+                        && savedOccurrence.event.startTime < occurrence.event.endTime
+                }
             }
+            guard overlaps else { return nil }
 
             if let kidID = event.kidID, kidID == savedEvent.kidID {
                 return EventConflict(
