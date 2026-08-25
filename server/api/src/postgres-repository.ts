@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Pool, type PoolConfig } from "pg";
-import type { Account, AccountRole, FamilyEvent, FamilyMember } from "./domain.js";
+import type { Account, AccountRole, EventRecurrence, FamilyEvent, FamilyMember } from "./domain.js";
 import type { FamJamRepository } from "./repository.js";
 
 export class PostgresFamJamRepository implements FamJamRepository {
@@ -62,7 +62,7 @@ export class PostgresFamJamRepository implements FamJamRepository {
   async eventsForFamily(familyID: string): Promise<FamilyEvent[]> {
     const result = await this.pool.query<EventRow>(
       `SELECT family_id, id::text, title, kid_id, participant_ids, start_time,
-              end_time, location, driver, source, status
+              end_time, location, driver, source, status, recurrence
        FROM events WHERE family_id = $1 ORDER BY start_time`,
       [familyID],
     );
@@ -73,17 +73,18 @@ export class PostgresFamJamRepository implements FamJamRepository {
     await this.pool.query(
       `INSERT INTO events (
          family_id, id, title, kid_id, participant_ids, start_time, end_time,
-         location, driver, source, status
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         location, driver, source, status, recurrence
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (family_id, id) DO UPDATE SET
          title=EXCLUDED.title, kid_id=EXCLUDED.kid_id,
          participant_ids=EXCLUDED.participant_ids, start_time=EXCLUDED.start_time,
          end_time=EXCLUDED.end_time, location=EXCLUDED.location,
-         driver=EXCLUDED.driver, source=EXCLUDED.source, status=EXCLUDED.status`,
+         driver=EXCLUDED.driver, source=EXCLUDED.source, status=EXCLUDED.status,
+         recurrence=EXCLUDED.recurrence`,
       [
         event.familyID, event.id, event.title, event.kidID, event.participantIDs,
         event.startTime, event.endTime, event.location, event.driver,
-        event.source, event.status,
+        event.source, event.status, event.recurrence ? JSON.stringify(event.recurrence) : null,
       ],
     );
   }
@@ -150,6 +151,7 @@ interface EventRow {
   driver: string | null;
   source: FamilyEvent["source"];
   status: FamilyEvent["status"];
+  recurrence: EventRecurrence | null;
 }
 
 interface MemberRow {
@@ -183,6 +185,7 @@ function eventFromRow(row: EventRow): FamilyEvent {
     driver: row.driver,
     source: row.source,
     status: row.status,
+    recurrence: row.recurrence,
   };
 }
 

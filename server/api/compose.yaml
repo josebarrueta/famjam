@@ -9,7 +9,7 @@ services:
       - "5432:5432"
     volumes:
       - famjam-postgres:/var/lib/postgresql/data
-      - ./migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+      - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U famjam"]
       interval: 5s

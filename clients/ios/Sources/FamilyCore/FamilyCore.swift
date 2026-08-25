@@ -40,6 +40,7 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
     public var driver: String?
     public var source: EventSource
     public var status: EventStatus
+    public var recurrence: EventRecurrence?
 
     public init(
         id: UUID = UUID(),
@@ -51,7 +52,8 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
         location: String? = nil,
         driver: String? = nil,
         source: EventSource,
-        status: EventStatus
+        status: EventStatus,
+        recurrence: EventRecurrence? = nil
     ) {
         self.id = id
         self.title = title
@@ -63,6 +65,7 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
         self.driver = driver
         self.source = source
         self.status = status
+        self.recurrence = recurrence
     }
 }
 

@@ -21,6 +21,11 @@ const eventSchema = z.object({
   driver: z.string().nullable(),
   source: z.enum(["manual", "email_suggested", "voice"]),
   status: z.enum(["confirmed", "pending_review"]),
+  recurrence: z.object({
+    frequency: z.enum(["daily", "weekly", "monthly"]),
+    interval: z.number().int().positive(),
+    endDate: z.string().datetime(),
+  }).nullable().optional(),
 }).refine((event) => new Date(event.endTime) > new Date(event.startTime), {
   message: "endTime must follow startTime",
 });
@@ -127,7 +132,12 @@ export function buildApp({ identityProvider, repository }: Dependencies) {
     if (referencedMemberIDs.some((memberID) => !memberIDs.has(memberID))) {
       return reply.code(400).send({ error: "unknown_participant" });
     }
-    const event: FamilyEvent = { ...parsed.data, familyID: account.familyID };
+    const { recurrence, ...eventData } = parsed.data;
+    const event: FamilyEvent = {
+      ...eventData,
+      familyID: account.familyID,
+      ...(recurrence !== undefined ? { recurrence } : {}),
+    };
     const existing = await repository.eventsForFamily(account.familyID);
     const conflicts = detectConflicts(event, existing.filter((candidate) => candidate.id !== event.id));
     await repository.saveEvent(event);

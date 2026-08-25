@@ -22,6 +22,12 @@ export interface FamilyMember {
   colorTag: string;
 }
 
+export interface EventRecurrence {
+  frequency: "daily" | "weekly" | "monthly";
+  interval: number;
+  endDate: string;
+}
+
 export interface FamilyEvent {
   id: string;
   familyID: string;
@@ -34,6 +40,7 @@ export interface FamilyEvent {
   driver: string | null;
   source: "manual" | "email_suggested" | "voice";
   status: "confirmed" | "pending_review";
+  recurrence?: EventRecurrence | null;
 }
 
 export interface EventConflict {

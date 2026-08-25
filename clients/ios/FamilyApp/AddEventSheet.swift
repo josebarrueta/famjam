@@ -14,6 +14,8 @@ struct AddEventSheet: View {
     @State private var endTime: Date
     @State private var location: String
     @State private var driver: String
+    @State private var repeatOption: RepeatOption
+    @State private var recurrenceEndDate: Date
     @State private var isSaving = false
     @State private var alertMessage = ""
     @State private var dismissAfterAlert = false
@@ -39,6 +41,12 @@ struct AddEventSheet: View {
         _endTime = State(initialValue: event?.endTime ?? .now.addingTimeInterval(60 * 60))
         _location = State(initialValue: event?.location ?? "")
         _driver = State(initialValue: event?.driver ?? "")
+        _repeatOption = State(initialValue: RepeatOption(recurrence: event?.recurrence))
+        _recurrenceEndDate = State(initialValue: event?.recurrence?.endDate ?? Calendar.current.date(
+            byAdding: .month,
+            value: 6,
+            to: event?.startTime ?? .now
+        )!)
     }
 
     var body: some View {
@@ -54,6 +62,19 @@ struct AddEventSheet: View {
                 Section("Time") {
                     DatePicker("Starts", selection: $startTime)
                     DatePicker("Ends", selection: $endTime)
+                    Picker("Repeat", selection: $repeatOption) {
+                        ForEach(RepeatOption.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    if repeatOption != .never {
+                        DatePicker(
+                            "Repeat until",
+                            selection: $recurrenceEndDate,
+                            in: startTime...,
+                            displayedComponents: .date
+                        )
+                    }
                 }
 
                 Section("Details") {
@@ -164,7 +185,8 @@ struct AddEventSheet: View {
             location: optionalText(location),
             driver: optionalText(driver),
             source: existingEvent?.source ?? .manual,
-            status: existingEvent?.status ?? .confirmed
+            status: existingEvent?.status ?? .confirmed,
+            recurrence: repeatOption.recurrence(ending: recurrenceEndDate)
         )
     }
 
@@ -184,5 +206,46 @@ struct AddEventSheet: View {
     private func optionalText(_ value: String) -> String? {
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedValue.isEmpty ? nil : trimmedValue
+    }
+}
+
+private enum RepeatOption: String, CaseIterable, Identifiable {
+    case never
+    case daily
+    case weekly
+    case biweekly
+    case monthly
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .never: "Never"
+        case .daily: "Daily"
+        case .weekly: "Weekly"
+        case .biweekly: "Every two weeks"
+        case .monthly: "Monthly"
+        }
+    }
+
+    init(recurrence: EventRecurrence?) {
+        guard let recurrence else { self = .never; return }
+        switch (recurrence.frequency, recurrence.interval) {
+        case (.daily, 1): self = .daily
+        case (.weekly, 1): self = .weekly
+        case (.weekly, 2): self = .biweekly
+        case (.monthly, 1): self = .monthly
+        default: self = .never
+        }
+    }
+
+    func recurrence(ending endDate: Date) -> EventRecurrence? {
+        switch self {
+        case .never: nil
+        case .daily: EventRecurrence(frequency: .daily, endDate: endDate)
+        case .weekly: EventRecurrence(frequency: .weekly, endDate: endDate)
+        case .biweekly: EventRecurrence(frequency: .weekly, interval: 2, endDate: endDate)
+        case .monthly: EventRecurrence(frequency: .monthly, endDate: endDate)
+        }
     }
 }

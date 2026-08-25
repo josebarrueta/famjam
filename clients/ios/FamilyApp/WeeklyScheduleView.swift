@@ -43,14 +43,17 @@ struct WeeklyScheduleView: View {
                                 Text("No activities")
                                     .foregroundStyle(.secondary)
                             } else {
-                                ForEach(dayEvents) { event in
+                                ForEach(dayEvents) { occurrence in
                                     EventRow(
-                                        display: ScheduleEventDisplay(event: event, members: viewModel.members)
+                                        display: ScheduleEventDisplay(
+                                            event: occurrence.event,
+                                            members: viewModel.members
+                                        )
                                     )
                                         .contentShape(Rectangle())
                                         .onTapGesture {
                                             if allowsEditing {
-                                                editingEvent = event
+                                                editingEvent = occurrence.sourceEvent
                                             }
                                         }
                                 }
@@ -130,11 +133,21 @@ struct WeeklyScheduleView: View {
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) }
     }
 
-    private func events(on day: Date) -> [FamilyEvent] {
+    private var weekOccurrences: [EventOccurrence] {
+        EventOccurrenceExpander.occurrences(
+            of: viewModel.events,
+            in: DateInterval(
+                start: weekStart,
+                end: Calendar.autoupdatingCurrent.date(byAdding: .day, value: 7, to: weekStart)!
+            )
+        )
+    }
+
+    private func events(on day: Date) -> [EventOccurrence] {
         let calendar = Calendar.autoupdatingCurrent
-        return viewModel.events.filter {
-            calendar.isDate($0.startTime, inSameDayAs: day)
-                && (selectedParticipantID == nil || $0.participantIDs.contains(selectedParticipantID!))
+        return weekOccurrences.filter {
+            calendar.isDate($0.event.startTime, inSameDayAs: day)
+                && (selectedParticipantID == nil || $0.event.participantIDs.contains(selectedParticipantID!))
         }
     }
 
