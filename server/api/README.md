@@ -1,7 +1,7 @@
 # FamJam TypeScript API
 
 Fastify reference backend for `../http-api.md`. It uses PostgreSQL for scalable,
-shared persistence, Redis for shared caching, and Stytch B2C for Google-capable
+shared persistence, Redis 8.10 for shared caching and vector-search readiness, and Stytch B2C for Google-capable
 identity verification. FamJam
 roles and family membership remain in PostgreSQL, so identity providers stay
 replaceable.

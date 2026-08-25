@@ -13,6 +13,9 @@ export class RedisCache implements Cache {
 
   static async connect(url: string): Promise<RedisCache> {
     const client = createClient({ url });
+    client.on("error", () => {
+      // Command callers fall back to source providers while Redis reconnects.
+    });
     await client.connect();
     return new RedisCache(client);
   }
