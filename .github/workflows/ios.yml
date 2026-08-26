@@ -56,7 +56,8 @@ jobs:
           fi
 
   ui:
-    runs-on: macos-latest
+    # Xcode 26's hosted simulator has shown multi-minute cold-start regressions.
+    runs-on: macos-14
     timeout-minutes: 15
     defaults:
       run:
