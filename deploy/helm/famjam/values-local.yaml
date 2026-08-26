@@ -1,0 +1,14 @@
+postgres:
+  persistence:
+    mode: hostPath
+    hostPath: /var/local/famjam/postgres
+
+redis:
+  persistence:
+    mode: hostPath
+    hostPath: /var/local/famjam/redis
+
+nginx:
+  service:
+    type: NodePort
+    nodePort: 30080

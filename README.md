@@ -11,6 +11,8 @@ sign-in and realtime sync.
 - `server/api/` — scalable TypeScript/Fastify API with PostgreSQL and Stytch.
 - `server/supabase/` — optional Supabase-specific infrastructure, not an iOS dependency.
 - `.github/workflows/` — CI workflows.
+- `deploy/helm/famjam/` — Helm chart for the API, PostgreSQL, Redis, and NGINX.
+- `deploy/local/` — isolated kind-based local deployment scripts.
 - `family-app-architecture.md` — product architecture and delivery phases.
 
 ## Local development
@@ -41,6 +43,16 @@ The built-in HTTP adapters can be selected without changing app features or doma
 FAMJAM_DATA_MODE=remote
 FAMJAM_REMOTE_BASE_URL=https://api.example.com
 ```
+
+A complete backend stack can be hosted locally on Kubernetes without a registry:
+
+```bash
+brew install helm kind
+./deploy/local/deploy-local.sh
+```
+
+See [`deploy/README.md`](deploy/README.md) for persistence, credentials, inspection,
+and the later domain/TLS path.
 
 Remote mode configuration is validated by `AppConfiguration`. Authentication,
 events, and family members use vendor-neutral interfaces; a Supabase Edge Function,

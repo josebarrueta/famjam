@@ -1,0 +1,56 @@
+api:
+  image:
+    repository: famjam-api
+    tag: local
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      memory: 512Mi
+
+runtimeSecret: famjam-runtime
+
+postgres:
+  image: postgres:17-alpine
+  database: famjam
+  user: famjam
+  persistence:
+    mode: pvc
+    size: 5Gi
+    storageClass: ""
+    hostPath: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+redis:
+  image: redis:8.10.1-alpine
+  persistence:
+    mode: pvc
+    size: 2Gi
+    storageClass: ""
+    hostPath: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+nginx:
+  image: nginxinc/nginx-unprivileged:1.29-alpine
+  service:
+    type: ClusterIP
+    nodePort: null
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      memory: 128Mi

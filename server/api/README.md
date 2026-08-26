@@ -17,7 +17,9 @@ docker compose up --build
 ```
 
 The compose stack starts PostgreSQL and Redis, applies the schema to a fresh
-PostgreSQL volume, and exposes the API at `http://localhost:3000`. For development outside Docker:
+PostgreSQL volume, and exposes the API at `http://localhost:3000`. The production
+image also includes the ordered migration runner used by the Helm deployment.
+For development outside Docker:
 
 ```bash
 npm install

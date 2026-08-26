@@ -4,14 +4,24 @@ on:
   pull_request:
     paths:
       - "server/api/**"
+      - "deploy/**"
       - ".github/workflows/api.yml"
   push:
     branches: [main]
     paths:
       - "server/api/**"
+      - "deploy/**"
       - ".github/workflows/api.yml"
 
 jobs:
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/famjam --values deploy/helm/famjam/values-local.yaml
+      - run: helm template famjam deploy/helm/famjam --values deploy/helm/famjam/values-local.yaml > /tmp/famjam.yaml
+
   quality:
     runs-on: ubuntu-latest
     defaults:

@@ -29,6 +29,15 @@ services:
       timeout: 5s
       retries: 10
 
+  migrate:
+    build: .
+    command: ["/app/scripts/migrate.sh"]
+    environment:
+      DATABASE_URL: postgres://famjam:famjam@postgres:5432/famjam
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build: .
     env_file: .env
@@ -43,8 +52,8 @@ services:
       timeout: 5s
       retries: 5
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 

@@ -1,0 +1,5 @@
+FamJam is available inside the cluster at:
+  http://{{ .Release.Name }}-nginx.{{ .Release.Namespace }}.svc.cluster.local
+{{- if eq .Values.nginx.service.type "NodePort" }}
+For the local kind profile, open http://127.0.0.1:8080/health
+{{- end }}
