@@ -12,7 +12,7 @@ on:
       - ".github/workflows/api.yml"
 
 jobs:
-  test:
+  quality:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,6 +25,47 @@ jobs:
           cache: npm
           cache-dependency-path: server/api/package-lock.json
       - run: npm ci
-      - run: npm test
+      - run: npm run test:unit
       - run: npm run typecheck
       - run: npm run build
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: famjam
+          POSTGRES_PASSWORD: famjam
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U famjam -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8.10.1-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      INTEGRATION_DATABASE_URL: postgres://famjam:famjam@localhost:5432/postgres
+      INTEGRATION_REDIS_URL: redis://localhost:6379
+    defaults:
+      run:
+        working-directory: server/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/api/package-lock.json
+      - run: npm ci
+      - run: npm run test:integration

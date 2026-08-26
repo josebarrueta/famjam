@@ -63,7 +63,9 @@ const app = buildApp({
     },
   },
 });
-app.addHook("onClose", async () => { await cache.close?.(); });
+app.addHook("onClose", async () => {
+  await Promise.all([cache.close?.(), repository.close()]);
+});
 
 const port = Number(process.env.PORT ?? "3000");
 await app.listen({ port, host: process.env.HOST ?? "0.0.0.0" });

@@ -27,6 +27,19 @@ cat migrations/*.sql | psql "$DATABASE_URL" -v ON_ERROR_STOP=1
 npm run dev
 ```
 
+Unit tests do not require infrastructure. Integration tests create and migrate a
+temporary PostgreSQL database and use namespaced Redis keys:
+
+```bash
+npm run test:unit
+INTEGRATION_DATABASE_URL=postgres://famjam:famjam@localhost:5432/postgres \
+INTEGRATION_REDIS_URL=redis://localhost:6379 \
+npm run test:integration
+```
+
+GitHub Actions runs these as separate quality and service-backed integration jobs
+using PostgreSQL 17 and Redis 8.10.1.
+
 All Stytch integration and configuration is backend-owned. Never add Stytch
 credentials, tokens, or SDKs to the iOS app, and never commit `.env`.
 
