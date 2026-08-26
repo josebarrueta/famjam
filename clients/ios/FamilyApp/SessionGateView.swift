@@ -64,6 +64,11 @@ final class SessionGateViewModel: ObservableObject {
         invitationCode = code
     }
 
+    func clearInvitation() {
+        invitationCode = ""
+        errorMessage = nil
+    }
+
     func signIn(invitationCode: String?) async {
         isLoading = true
         defer { isLoading = false }
@@ -71,7 +76,9 @@ final class SessionGateViewModel: ObservableObject {
             session = try await authentication.signIn(invitationCode: invitationCode)
             errorMessage = nil
         } catch {
-            errorMessage = "We couldn't sign you in with Google. Please try again."
+            errorMessage = invitationCode == nil
+                ? "We couldn't sign you in with Google. Please try again."
+                : "This invitation may have expired or already been used. Ask a parent to resend it."
         }
     }
 }
@@ -102,16 +109,35 @@ private struct SignInView: View {
                     Text("Sign in to rally your family's week.")
                         .foregroundStyle(.secondary)
                 }
-                TextField("Invitation code (optional)", text: $viewModel.invitationCode)
-                    .textFieldStyle(.roundedBorder)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                let code = viewModel.invitationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                if code.isEmpty {
+                    TextField("Invitation code (optional)", text: $viewModel.invitationCode)
+                        .textFieldStyle(.roundedBorder)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Family invitation ready", systemImage: "person.2.badge.plus")
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.purple)
+                        Text("Continue with Google to securely join the family that invited you.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Button("Use a different invitation") { viewModel.clearInvitation() }
+                            .font(.footnote)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(AppTheme.purple.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+                }
                 Button {
-                    let code = viewModel.invitationCode.trimmingCharacters(in: .whitespacesAndNewlines)
                     Task { await viewModel.signIn(invitationCode: code.isEmpty ? nil : code) }
                 } label: {
-                    Label("Continue with Google", systemImage: "person.crop.circle.badge.checkmark")
-                        .frame(maxWidth: .infinity)
+                    Label(
+                        code.isEmpty ? "Continue with Google" : "Accept invitation with Google",
+                        systemImage: "person.crop.circle.badge.checkmark"
+                    )
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(AppTheme.coral)

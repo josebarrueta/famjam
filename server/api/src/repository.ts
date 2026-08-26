@@ -4,6 +4,14 @@ export interface FamJamRepository {
   accountForIdentity(subject: string): Promise<Account | null>;
   provisionParentAccount(subject: string, displayName: string): Promise<Account>;
   saveInvitation(invitation: FamilyInvitation): Promise<void>;
+  pendingInvitations(familyID: string): Promise<FamilyInvitation[]>;
+  cancelInvitation(familyID: string, invitationID: string): Promise<boolean>;
+  rotateInvitation(
+    familyID: string,
+    invitationID: string,
+    codeHash: string,
+    expiresAt: string,
+  ): Promise<FamilyInvitation | null>;
   consumeInvitation(codeHash: string, subject: string, displayName: string): Promise<Account | null>;
   familyChangeVersion(familyID: string): Promise<number>;
   markFamilyChanged(familyID: string): Promise<void>;

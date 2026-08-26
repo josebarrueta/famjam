@@ -32,6 +32,7 @@ const identityProvider: IdentityProvider = {
   async verifySession(token) {
     if (token === "parent-token") return { subject: "parent-subject", displayName: "Alex" };
     if (token === "kid-token") return { subject: "kid-subject", displayName: "Emma" };
+    if (token === "other-parent-token") return { subject: "other-parent-subject", displayName: "Jordan" };
     throw new Error("invalid session");
   },
   async revokeSession() {},
@@ -51,10 +52,12 @@ function repository() {
     accounts: [
       { identitySubject: "parent-subject", familyID: "family-1", memberID: "parent-1", role: "parent" },
       { identitySubject: "kid-subject", familyID: "family-1", memberID: "kid-1", role: "kid" },
+      { identitySubject: "other-parent-subject", familyID: "family-2", memberID: "parent-2", role: "parent" },
     ],
     members: [
       { id: "parent-1", familyID: "family-1", name: "Alex", role: "parent", colorTag: "blue" },
       { id: "kid-1", familyID: "family-1", name: "Emma", role: "kid", colorTag: "purple" },
+      { id: "parent-2", familyID: "family-2", name: "Jordan", role: "parent", colorTag: "green" },
     ],
     events: [{
       id: "00000000-0000-4000-8000-000000000001",
@@ -166,6 +169,117 @@ describe("FamJam API", () => {
     const account = await data.accountForIdentity("new-parent-subject");
     expect(account?.familyID).toBe("family-1");
     expect(account?.role).toBe("kid");
+    await app.close();
+  });
+
+  it("lets only parents list pending family invitations", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+      payload: { role: "kid" },
+    });
+
+    const pending = await app.inject({
+      method: "GET",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const forbidden = await app.inject({
+      method: "GET",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer kid-token" },
+    });
+
+    expect(created.statusCode).toBe(201);
+    expect(pending.statusCode).toBe(200);
+    expect(pending.json()).toEqual([{
+      id: created.json().id,
+      role: "kid",
+      expiresAt: created.json().expiresAt,
+    }]);
+    expect(forbidden.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("lets a parent cancel only a pending invitation in their family", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+      payload: { role: "parent" },
+    });
+    const id = created.json().id as string;
+
+    const otherFamily = await app.inject({
+      method: "DELETE",
+      url: `/v1/invitations/${id}`,
+      headers: { authorization: "Bearer other-parent-token" },
+    });
+    const cancelled = await app.inject({
+      method: "DELETE",
+      url: `/v1/invitations/${id}`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const repeated = await app.inject({
+      method: "DELETE",
+      url: `/v1/invitations/${id}`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const pending = await app.inject({
+      method: "GET",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(otherFamily.statusCode).toBe(404);
+    expect(cancelled.statusCode).toBe(204);
+    expect(repeated.statusCode).toBe(404);
+    expect(pending.json()).toEqual([]);
+    await app.close();
+  });
+
+  it("rotates an invitation code when a parent resends it", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+      payload: { role: "kid" },
+    });
+
+    const resent = await app.inject({
+      method: "POST",
+      url: `/v1/invitations/${created.json().id}/resend`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const oldCodeSession = await app.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: {
+        oauthToken: "new-oauth-token",
+        codeVerifier,
+        invitationCode: created.json().code,
+      },
+    });
+    const newCodeSession = await app.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: {
+        oauthToken: "new-oauth-token",
+        codeVerifier,
+        invitationCode: resent.json().code,
+      },
+    });
+
+    expect(resent.statusCode).toBe(200);
+    expect(resent.json()).toMatchObject({ id: created.json().id, role: "kid" });
+    expect(resent.json().code).not.toBe(created.json().code);
+    expect(oldCodeSession.statusCode).toBe(403);
+    expect(newCodeSession.statusCode).toBe(200);
+    expect(newCodeSession.json().role).toBe("kid");
     await app.close();
   });
 

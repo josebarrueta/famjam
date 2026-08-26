@@ -68,10 +68,59 @@ export class PostgresFamJamRepository implements FamJamRepository {
 
   async saveInvitation(invitation: FamilyInvitation): Promise<void> {
     await this.pool.query(
-      `INSERT INTO family_invitations (code_hash, family_id, role, expires_at)
-       VALUES ($1, $2, $3, $4)`,
-      [invitation.codeHash, invitation.familyID, invitation.role, invitation.expiresAt],
+      `INSERT INTO family_invitations (id, code_hash, family_id, role, expires_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [invitation.id, invitation.codeHash, invitation.familyID, invitation.role, invitation.expiresAt],
     );
+  }
+
+  async pendingInvitations(familyID: string): Promise<FamilyInvitation[]> {
+    const result = await this.pool.query<InvitationRecordRow>(
+      `SELECT id::text, code_hash, family_id, role, expires_at
+       FROM family_invitations
+       WHERE family_id = $1 AND consumed_at IS NULL AND expires_at > now()
+       ORDER BY expires_at`,
+      [familyID],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      codeHash: row.code_hash,
+      familyID: row.family_id,
+      role: row.role,
+      expiresAt: row.expires_at.toISOString(),
+    }));
+  }
+
+  async cancelInvitation(familyID: string, invitationID: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `DELETE FROM family_invitations
+       WHERE id = $1 AND family_id = $2 AND consumed_at IS NULL AND expires_at > now()`,
+      [invitationID, familyID],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async rotateInvitation(
+    familyID: string,
+    invitationID: string,
+    codeHash: string,
+    expiresAt: string,
+  ): Promise<FamilyInvitation | null> {
+    const result = await this.pool.query<InvitationRecordRow>(
+      `UPDATE family_invitations
+       SET code_hash = $3, expires_at = $4
+       WHERE id = $1 AND family_id = $2 AND consumed_at IS NULL AND expires_at > now()
+       RETURNING id::text, code_hash, family_id, role, expires_at`,
+      [invitationID, familyID, codeHash, expiresAt],
+    );
+    const row = result.rows[0];
+    return row ? {
+      id: row.id,
+      codeHash: row.code_hash,
+      familyID: row.family_id,
+      role: row.role,
+      expiresAt: row.expires_at.toISOString(),
+    } : null;
   }
 
   async consumeInvitation(
@@ -263,6 +312,12 @@ interface AccountRow {
 interface InvitationRow {
   family_id: string;
   role: AccountRole;
+}
+
+interface InvitationRecordRow extends InvitationRow {
+  id: string;
+  code_hash: string;
+  expires_at: Date;
 }
 
 interface EventRow {

@@ -28,6 +28,38 @@ struct FamilyMembersView: View {
             List {
                 FamJamHeader(title: "Your home team", subtitle: "Parents and kids, all in one place.")
                     .listRowBackground(Color.clear)
+                if !viewModel.pendingInvitations.isEmpty {
+                    Section("Pending invitations") {
+                        ForEach(viewModel.pendingInvitations) { invitation in
+                            HStack(spacing: 12) {
+                                Image(systemName: invitation.role == .parent ? "person.fill.badge.plus" : "face.smiling.fill")
+                                    .foregroundStyle(AppTheme.purple)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(invitation.role == .parent ? "Parent invitation" : "Kid invitation")
+                                        .font(.headline)
+                                    Text("Expires \(invitation.expiresAt.formatted(date: .abbreviated, time: .shortened))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Menu {
+                                    Button {
+                                        Task { await viewModel.resend(invitation) }
+                                    } label: {
+                                        Label("Resend & Share", systemImage: "paperplane")
+                                    }
+                                    Button(role: .destructive) {
+                                        Task { await viewModel.cancel(invitation) }
+                                    } label: {
+                                        Label("Cancel invitation", systemImage: "trash")
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle")
+                                }
+                            }
+                        }
+                    }
+                }
                 ForEach(FamilyMemberRole.allCases, id: \.self) { role in
                     let members = viewModel.members.filter { $0.role == role }
                     if !members.isEmpty {
@@ -120,6 +152,7 @@ struct FamilyMembersView: View {
 @MainActor
 final class FamilyMembersViewModel: ObservableObject {
     @Published private(set) var members: [FamilyMember] = []
+    @Published private(set) var pendingInvitations: [PendingFamilyInvitation] = []
     @Published var invitation: FamilyInvitation?
     private let memberStore: any FamilyMemberStore
     private let eventStore: any EventStore
@@ -136,13 +169,25 @@ final class FamilyMembersViewModel: ObservableObject {
         self.invitationStore = invitationStore
         self.deletionService = deletionService
     }
-    func load() async { members = (try? await memberStore.members().sorted { $0.name < $1.name }) ?? [] }
+    func load() async {
+        members = (try? await memberStore.members().sorted { $0.name < $1.name }) ?? []
+        pendingInvitations = (try? await invitationStore?.pending()) ?? []
+    }
     func save(_ member: FamilyMember) async throws { try await memberStore.save(member); await load() }
     func delete(_ member: FamilyMember) async throws { try await deletionService.delete(member); await load() }
     var canInvite: Bool { invitationStore != nil }
     func saveEvent(_ event: FamilyEvent) async throws -> [EventConflict] { try await eventStore.save(event) }
     func invite(role: FamilyMemberRole) async {
         invitation = try? await invitationStore?.create(role: role)
+        await load()
+    }
+    func resend(_ pendingInvitation: PendingFamilyInvitation) async {
+        invitation = try? await invitationStore?.resend(id: pendingInvitation.id)
+        await load()
+    }
+    func cancel(_ invitation: PendingFamilyInvitation) async {
+        try? await invitationStore?.cancel(id: invitation.id)
+        await load()
     }
 }
 

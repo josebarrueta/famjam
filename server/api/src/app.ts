@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Account, EventConflict, FamilyEvent, FamilyMember } from "./domain.js";
@@ -157,13 +157,54 @@ export function buildApp({
     if (!parsed.success) return reply.code(400).send({ error: "invalid_invitation" });
     const code = randomBytes(24).toString("base64url");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const id = randomUUID();
     await repository.saveInvitation({
+      id,
       codeHash: invitationHash(code),
       familyID: account.familyID,
       role: parsed.data.role,
       expiresAt,
     });
-    return reply.code(201).send({ code, role: parsed.data.role, expiresAt });
+    await repository.markFamilyChanged(account.familyID);
+    return reply.code(201).send({ id, code, role: parsed.data.role, expiresAt });
+  });
+
+  app.get("/v1/invitations", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    return (await repository.pendingInvitations(account.familyID)).map((invitation) => ({
+      id: invitation.id,
+      role: invitation.role,
+      expiresAt: invitation.expiresAt,
+    }));
+  });
+
+  app.delete("/v1/invitations/:id", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    const cancelled = await repository.cancelInvitation(
+      account.familyID,
+      (request.params as { id: string }).id,
+    );
+    if (!cancelled) return reply.code(404).send({ error: "invitation_not_found" });
+    await repository.markFamilyChanged(account.familyID);
+    return reply.code(204).send();
+  });
+
+  app.post("/v1/invitations/:id/resend", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    const code = randomBytes(24).toString("base64url");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const invitation = await repository.rotateInvitation(
+      account.familyID,
+      (request.params as { id: string }).id,
+      invitationHash(code),
+      expiresAt,
+    );
+    if (!invitation) return reply.code(404).send({ error: "invitation_not_found" });
+    await repository.markFamilyChanged(account.familyID);
+    return { id: invitation.id, code, role: invitation.role, expiresAt: invitation.expiresAt };
   });
 
   app.get("/v1/locations/search", async (request, reply) => {

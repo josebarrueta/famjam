@@ -55,6 +55,9 @@ Supported conflict kinds are `overlapping_participant` and
 
 - `POST /v1/invitations` with `{ "role": "parent" | "kid" }` creates a
   single-use, seven-day invitation. Parent authorization is required.
+- `GET /v1/invitations` lists pending invitations without exposing their hashed codes.
+- `DELETE /v1/invitations/{id}` cancels an invitation in the parent's family.
+- `POST /v1/invitations/{id}/resend` rotates its code and extends expiration by seven days.
 - `POST /v1/sessions` may include `invitationCode` with the OAuth exchange.
 
 Invitation codes are stored as SHA-256 hashes. Successful redemption atomically

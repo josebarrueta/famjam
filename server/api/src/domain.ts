@@ -7,6 +7,7 @@ export interface Identity {
 }
 
 export interface FamilyInvitation {
+  id: string;
   codeHash: string;
   familyID: string;
   role: AccountRole;

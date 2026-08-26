@@ -23,7 +23,7 @@ PostgreSQL volume, and exposes the API at `http://localhost:3000`. For developme
 npm install
 npm test
 npm run typecheck
-psql "$DATABASE_URL" -f migrations/001_initial.sql
+cat migrations/*.sql | psql "$DATABASE_URL" -v ON_ERROR_STOP=1
 npm run dev
 ```
 
@@ -51,8 +51,10 @@ available but delivery uses the no-op adapter.
 
 A first-time Google identity without an invitation is provisioned just in time as
 the parent of a new family. Provisioning creates the member and identity mapping
-in one transaction and is idempotent across retries. Parents can create single-use, seven-day invitations for another parent or kid.
-Redeeming an invitation during Google sign-in atomically provisions the new member
+in one transaction and is idempotent across retries. Parents can create, list, cancel, and securely resend single-use, seven-day
+invitations for another parent or kid. Resending rotates the code rather than
+recovering its stored hash. Redeeming an invitation during Google sign-in
+atomically provisions the new member
 into the inviter's family; family IDs and invited roles are never client-selected.
 
 ## Architecture

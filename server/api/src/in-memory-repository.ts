@@ -52,6 +52,40 @@ export class InMemoryFamJamRepository implements FamJamRepository {
     this.invitations.push(invitation);
   }
 
+  async pendingInvitations(familyID: string): Promise<FamilyInvitation[]> {
+    return this.invitations.filter((invitation) =>
+      invitation.familyID === familyID && new Date(invitation.expiresAt) > new Date()
+    );
+  }
+
+  async cancelInvitation(familyID: string, invitationID: string): Promise<boolean> {
+    const index = this.invitations.findIndex((invitation) =>
+      invitation.id === invitationID &&
+      invitation.familyID === familyID &&
+      new Date(invitation.expiresAt) > new Date()
+    );
+    if (index < 0) return false;
+    this.invitations.splice(index, 1);
+    return true;
+  }
+
+  async rotateInvitation(
+    familyID: string,
+    invitationID: string,
+    codeHash: string,
+    expiresAt: string,
+  ): Promise<FamilyInvitation | null> {
+    const invitation = this.invitations.find((candidate) =>
+      candidate.id === invitationID &&
+      candidate.familyID === familyID &&
+      new Date(candidate.expiresAt) > new Date()
+    );
+    if (!invitation) return null;
+    invitation.codeHash = codeHash;
+    invitation.expiresAt = expiresAt;
+    return invitation;
+  }
+
   async consumeInvitation(
     codeHash: string,
     subject: string,
