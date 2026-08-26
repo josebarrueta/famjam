@@ -1,5 +1,10 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import { fastifyRateLimit } from "@fastify/rate-limit";
+import Fastify, {
+  type FastifyReply,
+  type FastifyRequest,
+  type FastifyServerOptions,
+} from "fastify";
 import { z } from "zod";
 import type { Account, EventConflict, FamilyEvent, FamilyMember } from "./domain.js";
 import type { IdentityProvider } from "./identity-provider.js";
@@ -7,6 +12,7 @@ import {
   EmptyLocationSearchProvider,
   type LocationSearchProvider,
 } from "./location-search-provider.js";
+import { FamJamMetrics } from "./metrics.js";
 import {
   NoopPushNotificationProvider,
   type PushNotificationProvider,
@@ -56,11 +62,21 @@ const memberSchema = z.object({
   colorTag: z.string().min(1),
 });
 
+interface RouteRateLimit {
+  max: number;
+  timeWindow: number;
+}
+
 interface Dependencies {
   identityProvider: IdentityProvider;
   repository: FamJamRepository;
   locationSearchProvider?: LocationSearchProvider;
   pushNotificationProvider?: PushNotificationProvider;
+  readinessCheck?: () => Promise<void>;
+  rateLimits?: Partial<Record<"sessions" | "invitations" | "locations", RouteRateLimit>>;
+  metrics?: FamJamMetrics;
+  metricsBearerToken?: string;
+  logger?: FastifyServerOptions["logger"];
 }
 
 export function buildApp({
@@ -68,13 +84,65 @@ export function buildApp({
   repository,
   locationSearchProvider = new EmptyLocationSearchProvider(),
   pushNotificationProvider = new NoopPushNotificationProvider(),
+  readinessCheck = async () => {},
+  rateLimits = {},
+  metrics = new FamJamMetrics(),
+  metricsBearerToken,
+  logger = false,
 }: Dependencies) {
-  const app = Fastify({ logger: false });
+  const limits = {
+    sessions: { max: 10, timeWindow: 60_000 },
+    invitations: { max: 20, timeWindow: 60 * 60_000 },
+    locations: { max: 60, timeWindow: 60_000 },
+    ...rateLimits,
+  };
+  const app = Fastify({ logger });
+  fastifyRateLimit(
+    app,
+    { global: true, max: 120, timeWindow: 60_000 },
+    () => {},
+  );
   app.decorateRequest("account", null);
+  const requestStarts = new WeakMap<object, bigint>();
+
+  app.addHook("onRequest", async (request, reply) => {
+    requestStarts.set(request, process.hrtime.bigint());
+    reply.header("x-request-id", request.id);
+  });
+  app.addHook("onResponse", async (request, reply) => {
+    const started = requestStarts.get(request);
+    const duration = started ? Number(process.hrtime.bigint() - started) / 1_000_000_000 : 0;
+    metrics.observeRequest(
+      request.method,
+      request.routeOptions.url ?? "unknown",
+      reply.statusCode,
+      duration,
+    );
+  });
+
+  app.setErrorHandler((error, request, reply) => {
+    const suppliedStatus = typeof error === "object" && error !== null && "statusCode" in error
+      ? (error as { statusCode?: unknown }).statusCode
+      : undefined;
+    const statusCode = typeof suppliedStatus === "number" && suppliedStatus < 500
+      ? suppliedStatus
+      : 500;
+    const errorType = error instanceof Error ? error.name : "Error";
+    request.log.error({ requestId: request.id, errorType, statusCode }, "request failed");
+    return reply.code(statusCode).send({
+      error: statusCode === 500 ? "internal_server_error" : errorType,
+      requestID: request.id,
+    });
+  });
 
   app.addHook("onRequest", async (request, reply) => {
     const routeURL = request.routeOptions.url ?? "";
-    if (routeURL === "/health" || routeURL === "/v1/auth/google") return;
+    if (
+      routeURL === "/health" ||
+      routeURL === "/ready" ||
+      routeURL === "/metrics" ||
+      routeURL === "/v1/auth/google"
+    ) return;
     if (routeURL === "/v1/sessions" && request.method === "POST") return;
     const token = bearerToken(request.headers.authorization);
     if (!token) return reply.code(401).send({ error: "missing_bearer_token" });
@@ -87,7 +155,23 @@ export function buildApp({
     }
   });
 
-  app.get("/health", async () => ({ status: "ok" }));
+  app.get("/health", { config: { rateLimit: false } }, async () => ({ status: "ok" }));
+
+  app.get("/ready", { config: { rateLimit: false } }, async (_request, reply) => {
+    try {
+      await readinessCheck();
+      return { status: "ready" };
+    } catch {
+      return reply.code(503).send({ status: "unavailable" });
+    }
+  });
+
+  app.get("/metrics", { config: { rateLimit: false } }, async (request, reply) => {
+    if (metricsBearerToken && bearerToken(request.headers.authorization) !== metricsBearerToken) {
+      return reply.code(401).send({ error: "invalid_metrics_token" });
+    }
+    return reply.type(metrics.contentType).send(await metrics.render());
+  });
 
   app.get("/v1/auth/google", async (request, reply) => {
     const parsed = oauthAuthorizationSchema.safeParse(request.query);
@@ -95,7 +179,9 @@ export function buildApp({
     return reply.redirect(identityProvider.googleAuthorizationURL(parsed.data.codeChallenge));
   });
 
-  app.post("/v1/sessions", async (request, reply) => {
+  app.post("/v1/sessions", {
+    config: { rateLimit: limits.sessions },
+  }, async (request, reply) => {
     const parsed = oauthSessionSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_oauth_token" });
     try {
@@ -150,7 +236,9 @@ export function buildApp({
     return reply.code(204).send();
   });
 
-  app.post("/v1/invitations", async (request, reply) => {
+  app.post("/v1/invitations", {
+    config: { rateLimit: limits.invitations },
+  }, async (request, reply) => {
     const account = await requireParent(request, reply);
     if (!account) return;
     const parsed = invitationSchema.safeParse(request.body);
@@ -191,7 +279,9 @@ export function buildApp({
     return reply.code(204).send();
   });
 
-  app.post("/v1/invitations/:id/resend", async (request, reply) => {
+  app.post("/v1/invitations/:id/resend", {
+    config: { rateLimit: limits.invitations },
+  }, async (request, reply) => {
     const account = await requireParent(request, reply);
     if (!account) return;
     const code = randomBytes(24).toString("base64url");
@@ -207,7 +297,9 @@ export function buildApp({
     return { id: invitation.id, code, role: invitation.role, expiresAt: invitation.expiresAt };
   });
 
-  app.get("/v1/locations/search", async (request, reply) => {
+  app.get("/v1/locations/search", {
+    config: { rateLimit: limits.locations },
+  }, async (request, reply) => {
     const parsed = locationSearchSchema.safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_location_query" });
     return locationSearchProvider.search(parsed.data.q);

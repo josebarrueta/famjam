@@ -76,6 +76,73 @@ function repository() {
 }
 
 describe("FamJam API", () => {
+  it("separates dependency-free liveness from PostgreSQL readiness", async () => {
+    const ready = buildApp({
+      identityProvider,
+      repository: repository(),
+      readinessCheck: async () => {},
+    });
+    const unavailable = buildApp({
+      identityProvider,
+      repository: repository(),
+      readinessCheck: async () => { throw new Error("database unavailable"); },
+    });
+
+    expect((await ready.inject({ method: "GET", url: "/ready" })).statusCode).toBe(200);
+    expect((await unavailable.inject({ method: "GET", url: "/ready" })).statusCode).toBe(503);
+    expect((await unavailable.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
+    await ready.close();
+    await unavailable.close();
+  });
+
+  it("rate limits session exchange without throttling health checks", async () => {
+    const app = buildApp({
+      identityProvider,
+      repository: repository(),
+      rateLimits: {
+        sessions: { max: 1, timeWindow: 60_000 },
+      },
+    });
+    const exchange = () => app.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: { oauthToken: "oauth-token", codeVerifier },
+    });
+
+    expect((await exchange()).statusCode).toBe(200);
+    const throttled = await exchange();
+    expect(throttled.statusCode).toBe(429);
+    expect(throttled.headers["retry-after"]).toBeDefined();
+    expect((await app.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
+    await app.close();
+  });
+
+  it("exposes Prometheus metrics with optional bearer protection", async () => {
+    const publicApp = buildApp({ identityProvider, repository: repository() });
+    const health = await publicApp.inject({ method: "GET", url: "/health" });
+    const publicMetrics = await publicApp.inject({ method: "GET", url: "/metrics" });
+
+    expect(health.headers["x-request-id"]).toBeDefined();
+    expect(publicMetrics.statusCode).toBe(200);
+    expect(publicMetrics.body).toContain("famjam_http_requests_total");
+    expect(publicMetrics.body).toContain('route="/health"');
+
+    const protectedApp = buildApp({
+      identityProvider,
+      repository: repository(),
+      metricsBearerToken: "metrics-secret",
+    });
+    expect((await protectedApp.inject({ method: "GET", url: "/metrics" })).statusCode).toBe(401);
+    expect((await protectedApp.inject({
+      method: "GET",
+      url: "/metrics",
+      headers: { authorization: "Bearer metrics-secret" },
+    })).statusCode).toBe(200);
+    await publicApp.close();
+    await protectedApp.close();
+  });
+
   it("exposes backend-owned Google authorization and session exchange", async () => {
     const app = buildApp({ identityProvider, repository: repository() });
 

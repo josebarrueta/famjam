@@ -81,6 +81,18 @@ Manual location entry remains available when search is not configured.
 Family-member fields are `id`, `name`, `role` (`parent` or `kid`), optional
 `gradeOrBirthYear`, and `colorTag`.
 
+## Operations
+
+- `GET /health` is a dependency-free process liveness check.
+- `GET /ready` verifies PostgreSQL and returns `503` when unavailable. Redis is
+  deliberately excluded because cache failures fall through to source providers.
+- `GET /metrics` exports Prometheus metrics. Deployments can require
+  `Authorization: Bearer <METRICS_BEARER_TOKEN>`.
+
+Responses include Fastify request IDs. The API applies a global request ceiling
+and stricter limits to session exchange, invitation writes, and location search;
+limited requests return `429` and `Retry-After`.
+
 ## Authentication
 
 The FamJam backend owns the identity-provider integration. The iOS client only

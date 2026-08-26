@@ -39,6 +39,20 @@ Enable **Places API (New)** in Google Cloud and restrict the key to that API. If
 key is omitted, manual location entry still works and autocomplete returns no
 suggestions.
 
+## Production operations
+
+The API writes structured JSON request logs with request IDs, status codes, and
+response duration. Authorization and cookie headers are redacted. Configure
+verbosity with `LOG_LEVEL` (default `info`).
+
+- `/health` reports process liveness without checking dependencies.
+- `/ready` checks PostgreSQL; Redis remains an optional accelerator.
+- `/metrics` exports Prometheus request, cache, and external-provider metrics.
+
+Set a strong `METRICS_BEARER_TOKEN` in hosted environments. Session exchange,
+invitation writes, and Places search have stricter route limits under a global
+request ceiling. Rate-limited responses include `Retry-After`.
+
 ## Push notifications
 
 Set `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_PRIVATE_KEY`, and

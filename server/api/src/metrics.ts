@@ -1,0 +1,63 @@
+import { Counter, Histogram, Registry } from "@prometheus-io/client";
+
+export type CacheResult = "hit" | "miss" | "error";
+export type ProviderResult = "success" | "failure";
+
+export interface Telemetry {
+  observeCache(cache: string, result: CacheResult): void;
+  observeProvider(provider: string, result: ProviderResult, durationSeconds: number): void;
+}
+
+export class NoopTelemetry implements Telemetry {
+  observeCache(): void {}
+  observeProvider(): void {}
+}
+
+export class FamJamMetrics implements Telemetry {
+  private readonly registry = new Registry();
+  private readonly requests = new Counter({
+    name: "famjam_http_requests_total",
+    help: "FamJam HTTP requests",
+    labelNames: ["method", "route", "status"],
+    registers: [this.registry],
+  });
+  private readonly requestDuration = new Histogram({
+    name: "famjam_http_request_duration_seconds",
+    help: "FamJam HTTP request duration",
+    labelNames: ["method", "route"],
+    registers: [this.registry],
+  });
+  private readonly cacheOperations = new Counter({
+    name: "famjam_cache_operations_total",
+    help: "FamJam cache operations",
+    labelNames: ["cache", "result"],
+    registers: [this.registry],
+  });
+  private readonly providerDuration = new Histogram({
+    name: "famjam_provider_request_duration_seconds",
+    help: "External provider request duration",
+    labelNames: ["provider", "result"],
+    registers: [this.registry],
+  });
+
+  observeRequest(method: string, route: string, status: number, durationSeconds: number): void {
+    this.requests.inc({ method, route, status: String(status) });
+    this.requestDuration.observe({ method, route }, durationSeconds);
+  }
+
+  observeCache(cache: string, result: CacheResult): void {
+    this.cacheOperations.inc({ cache, result });
+  }
+
+  observeProvider(provider: string, result: ProviderResult, durationSeconds: number): void {
+    this.providerDuration.observe({ provider, result }, durationSeconds);
+  }
+
+  render(): Promise<string> {
+    return this.registry.metrics();
+  }
+
+  get contentType(): string {
+    return this.registry.contentType;
+  }
+}

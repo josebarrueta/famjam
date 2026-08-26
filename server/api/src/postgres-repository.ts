@@ -18,6 +18,10 @@ export class PostgresFamJamRepository implements FamJamRepository {
     return new PostgresFamJamRepository(new Pool(config));
   }
 
+  async checkReadiness(): Promise<void> {
+    await this.pool.query("SELECT 1");
+  }
+
   async accountForIdentity(subject: string): Promise<Account | null> {
     const result = await this.pool.query<AccountRow>(
       `SELECT identity_subject, family_id, member_id, role
