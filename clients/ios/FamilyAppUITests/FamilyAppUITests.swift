@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 final class FamilyAppUITests: XCTestCase {
     func testLoginDoesNotAskForAManualInvitationCode() {
         let app = XCUIApplication()
