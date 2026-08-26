@@ -58,10 +58,9 @@ final class SessionGateViewModel: ObservableObject {
     }
 
     func acceptInvitationURL(_ url: URL) {
-        guard url.scheme == "famjam", url.host == "invite",
-              let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?.first(where: { $0.name == "code" })?.value else { return }
-        invitationCode = code
+        guard let invitation = FamilyInvitationLink(url: url) else { return }
+        invitationCode = invitation.code
+        errorMessage = nil
     }
 
     func clearInvitation() {
@@ -111,10 +110,10 @@ private struct SignInView: View {
                 }
                 let code = viewModel.invitationCode.trimmingCharacters(in: .whitespacesAndNewlines)
                 if code.isEmpty {
-                    TextField("Invitation code (optional)", text: $viewModel.invitationCode)
-                        .textFieldStyle(.roundedBorder)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    Text("Signing in without an invitation creates a new family for you.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Family invitation ready", systemImage: "person.2.badge.plus")
@@ -123,7 +122,7 @@ private struct SignInView: View {
                         Text("Continue with Google to securely join the family that invited you.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                        Button("Use a different invitation") { viewModel.clearInvitation() }
+                        Button("Ignore this invitation") { viewModel.clearInvitation() }
                             .font(.footnote)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

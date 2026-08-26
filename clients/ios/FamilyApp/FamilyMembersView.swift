@@ -46,7 +46,7 @@ struct FamilyMembersView: View {
                                     Button {
                                         Task { await viewModel.resend(invitation) }
                                     } label: {
-                                        Label("Resend & Share", systemImage: "paperplane")
+                                        Label("Create new link & Share", systemImage: "paperplane")
                                     }
                                     Button(role: .destructive) {
                                         Task { await viewModel.cancel(invitation) }
@@ -206,8 +206,16 @@ private struct InvitationSheet: View {
                 Text(invitation.code)
                     .font(.system(.body, design: .monospaced))
                     .textSelection(.enabled)
-                ShareLink(item: invitation.shareURL) {
-                    Label("Share invitation", systemImage: "square.and.arrow.up")
+                Text("Send this secure link by Mail or Messages. The recipient will join your family after signing in with Google.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                ShareLink(
+                    item: invitation.shareURL,
+                    subject: Text("Join my family on FamJam"),
+                    message: Text("Tap this secure link to join my family on FamJam. The link expires in seven days and can only be used once.")
+                ) {
+                    Label("Send invitation link", systemImage: "paperplane.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 Text("Expires \(invitation.expiresAt.formatted(date: .abbreviated, time: .shortened))")

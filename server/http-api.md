@@ -60,9 +60,11 @@ Supported conflict kinds are `overlapping_participant` and
 - `POST /v1/invitations/{id}/resend` rotates its code and extends expiration by seven days.
 - `POST /v1/sessions` may include `invitationCode` with the OAuth exchange.
 
-Invitation codes are stored as SHA-256 hashes. Successful redemption atomically
-creates the invited member and account in the inviter's family. The client never
-chooses a family ID or overrides the invitation's role.
+Invitation codes are stored as SHA-256 hashes and embedded in shareable
+`famjam://invite?code=…` links; the login screen never asks users to type a code.
+After opening the link, Google sign-in submits the embedded code and successful
+redemption atomically creates the invited member and account in the inviter's
+family. The client never chooses a family ID or overrides the invitation's role.
 
 ## Locations
 
