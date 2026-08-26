@@ -64,6 +64,15 @@ jobs:
         working-directory: clients/ios
     steps:
       - uses: actions/checkout@v5
+      - name: Select newest installed Xcode 16
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -type d -name 'Xcode_16*.app' | sort -V | tail -1)
+          if [[ -z "$XCODE_PATH" ]]; then
+            echo "No Xcode 16 installation found" >&2
+            exit 1
+          fi
+          sudo xcode-select --switch "$XCODE_PATH"
+          xcodebuild -version
       - name: Start simulator boot early
         run: |
           SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c '
