@@ -28,12 +28,12 @@ declare module "fastify" {
 const eventSchema = z.object({
   id: z.string().uuid(),
   title: z.string().trim().min(1),
-  kidID: z.string().nullable(),
+  kidID: z.string().nullable().default(null),
   participantIDs: z.array(z.string()).default([]),
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
-  location: z.string().nullable(),
-  driver: z.string().nullable(),
+  location: z.string().nullable().default(null),
+  driver: z.string().nullable().default(null),
   source: z.enum(["manual", "email_suggested", "voice"]),
   status: z.enum(["confirmed", "pending_review"]),
   recurrence: z.object({

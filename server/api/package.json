@@ -13,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --exclude 'test/*.integration.test.ts'",
-    "test:integration": "vitest run test/postgres.integration.test.ts test/redis.integration.test.ts"
+    "test:integration": "vitest run test/postgres.integration.test.ts test/redis.integration.test.ts",
+    "contract-server": "tsx test/support/contract-server.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",

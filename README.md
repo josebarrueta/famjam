@@ -49,6 +49,9 @@ alerts remain local to each device for now.
 
 ## Continuous integration
 
-The iOS workflow runs the package build and test suite on GitHub-hosted macOS. The
-API workflow independently runs TypeScript tests, typechecking, and builds. Neither
-workflow requires production credentials.
+The API workflow runs unit tests, typechecking, production builds, and isolated
+integration tests against PostgreSQL 17 and Redis 8.10.1. The iOS workflow builds
+the complete simulator app, runs the Swift package suite against a live Fastify
+contract server, and drives a local-mode parent smoke path with XCUITest. Neither
+workflow requires production credentials; Stytch, Google Places, and APNs live
+smoke tests remain opt-in.

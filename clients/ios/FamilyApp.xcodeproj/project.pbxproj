@@ -18,7 +18,18 @@
 		A1000000000000000000000B /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* AppTheme.swift */; };
 		A1000000000000000000000C /* SessionGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* SessionGateView.swift */; };
 		A1000000000000000000000D /* PushNotificationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001C /* PushNotificationDelegate.swift */; };
+		B20000000000000000000001 /* FamilyAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000011 /* FamilyAppUITests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B20000000000000000000030 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000070 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000050;
+			remoteInfo = FamilyApp;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A10000000000000000000010 /* FamilyApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -33,6 +44,8 @@
 		A1000000000000000000001A /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		A1000000000000000000001B /* SessionGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGateView.swift; sourceTree = "<group>"; };
 		A1000000000000000000001C /* PushNotificationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationDelegate.swift; sourceTree = "<group>"; };
+		B20000000000000000000010 /* FamilyAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FamilyAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000000000000000000011 /* FamilyAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyAppUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +57,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B20000000000000000000020 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -51,6 +71,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000041 /* FamilyApp */,
+				B20000000000000000000041 /* FamilyAppUITests */,
 				A10000000000000000000042 /* Frameworks */,
 				A10000000000000000000043 /* Products */,
 			);
@@ -74,6 +95,14 @@
 			path = FamilyApp;
 			sourceTree = "<group>";
 		};
+		B20000000000000000000041 /* FamilyAppUITests */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000011 /* FamilyAppUITests.swift */,
+			);
+			path = FamilyAppUITests;
+			sourceTree = "<group>";
+		};
 		A10000000000000000000042 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -85,6 +114,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000010 /* FamilyApp.app */,
+				B20000000000000000000010 /* FamilyAppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -111,6 +141,24 @@
 			productName = FamilyApp;
 			productReference = A10000000000000000000010 /* FamilyApp.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B20000000000000000000050 /* FamilyAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B20000000000000000000061 /* Build configuration list for PBXNativeTarget "FamilyAppUITests" */;
+			buildPhases = (
+				B20000000000000000000021 /* Sources */,
+				B20000000000000000000020 /* Frameworks */,
+				B20000000000000000000022 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B20000000000000000000031 /* PBXTargetDependency */,
+			);
+			name = FamilyAppUITests;
+			productName = FamilyAppUITests;
+			productReference = B20000000000000000000010 /* FamilyAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -144,6 +192,7 @@
 			projectRoot = "";
 			targets = (
 				A10000000000000000000050 /* FamilyApp */,
+				B20000000000000000000050 /* FamilyAppUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -157,6 +206,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000000A /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B20000000000000000000022 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -180,7 +236,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B20000000000000000000021 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B20000000000000000000001 /* FamilyAppUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B20000000000000000000031 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000050 /* FamilyApp */;
+			targetProxy = B20000000000000000000030 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A10000000000000000000080 /* Debug */ = {
@@ -276,6 +348,40 @@
 			};
 			name = Release;
 		};
+		B20000000000000000000082 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.familyactivitycoordinator.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FamilyApp;
+			};
+			name = Debug;
+		};
+		B20000000000000000000083 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.familyactivitycoordinator.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FamilyApp;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -293,6 +399,15 @@
 			buildConfigurations = (
 				A10000000000000000000082 /* Debug */,
 				A10000000000000000000083 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B20000000000000000000061 /* Build configuration list for PBXNativeTarget "FamilyAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B20000000000000000000082 /* Debug */,
+				B20000000000000000000083 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

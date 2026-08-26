@@ -4,26 +4,67 @@ on:
   pull_request:
     paths:
       - "clients/ios/**"
+      - "server/api/**"
       - ".github/workflows/ios.yml"
   push:
     branches: [main]
     paths:
       - "clients/ios/**"
+      - "server/api/**"
       - ".github/workflows/ios.yml"
 
 jobs:
   test:
     runs-on: macos-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: clients/ios
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/api/package-lock.json
+      - name: Install API dependencies
+        working-directory: server/api
+        run: npm ci
+      - name: Start API contract server
+        working-directory: server/api
+        run: |
+          nohup npm run contract-server >/tmp/famjam-contract-server.log 2>&1 &
+          echo $! >/tmp/famjam-contract-server.pid
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:3100/health >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/famjam-contract-server.log
+          exit 1
       - name: Build
         run: swift build
-      - name: Test core
+      - name: Test core and live API contract
+        env:
+          FAMJAM_CONTRACT_BASE_URL: http://127.0.0.1:3100
         run: swift test
       - name: Build iOS app
         run: >-
           xcodebuild -project FamilyApp.xcodeproj -target FamilyApp
           -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
+      - name: Test local-mode UI smoke path
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          print(next(device["udid"] for runtime in devices.values() for device in runtime if device["name"].startswith("iPhone")))
+          ')
+          xcodebuild -project FamilyApp.xcodeproj -scheme FamilyAppCI \
+            -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            CODE_SIGNING_ALLOWED=NO test
+      - name: Stop API contract server
+        if: always()
+        working-directory: server/api
+        run: |
+          if [[ -f /tmp/famjam-contract-server.pid ]]; then
+            kill "$(cat /tmp/famjam-contract-server.pid)" 2>/dev/null || true
+          fi
