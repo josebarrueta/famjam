@@ -5,6 +5,10 @@ import { InMemoryCache, type Cache } from "./cache.js";
 import { CachedIdentityProvider } from "./cached-identity-provider.js";
 import { CachedLocationSearchProvider } from "./cached-location-search-provider.js";
 import {
+  UnavailableInvitationEmailSender,
+  type InvitationEmailSender,
+} from "./invitation-email-sender.js";
+import {
   EmptyLocationSearchProvider,
   GooglePlacesLocationSearchProvider,
   type LocationSearchProvider,
@@ -13,6 +17,7 @@ import { FamJamMetrics } from "./metrics.js";
 import { PostgresFamJamRepository } from "./postgres-repository.js";
 import { NoopPushNotificationProvider } from "./push-notification-provider.js";
 import { RedisCache } from "./redis-cache.js";
+import { ResendInvitationEmailSender } from "./resend-invitation-email-sender.js";
 import { StytchIdentityProvider } from "./stytch-identity-provider.js";
 
 const databaseURL = process.env.DATABASE_URL;
@@ -34,9 +39,17 @@ const locationProvider: LocationSearchProvider = googlePlacesAPIKey
   : new EmptyLocationSearchProvider();
 
 const repository = PostgresFamJamRepository.fromConnectionString(databaseURL);
+const invitationEmailSender: InvitationEmailSender = process.env.RESEND_API_KEY
+  && process.env.INVITATION_EMAIL_FROM
+  ? new ResendInvitationEmailSender({
+    apiKey: process.env.RESEND_API_KEY,
+    from: process.env.INVITATION_EMAIL_FROM,
+  })
+  : new UnavailableInvitationEmailSender();
 const app = buildApp({
   identityProvider,
   repository,
+  invitationEmailSender,
   locationSearchProvider: new CachedLocationSearchProvider(
     locationProvider,
     cache,

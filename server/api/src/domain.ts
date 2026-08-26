@@ -10,6 +10,7 @@ export interface FamilyInvitation {
   id: string;
   codeHash: string;
   familyID: string;
+  recipientEmail: string | null;
   role: AccountRole;
   expiresAt: string;
 }

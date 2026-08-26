@@ -9,6 +9,10 @@ import { z } from "zod";
 import type { Account, EventConflict, FamilyEvent, FamilyMember } from "./domain.js";
 import type { IdentityProvider } from "./identity-provider.js";
 import {
+  NoopInvitationEmailSender,
+  type InvitationEmailSender,
+} from "./invitation-email-sender.js";
+import {
   EmptyLocationSearchProvider,
   type LocationSearchProvider,
 } from "./location-search-provider.js";
@@ -52,7 +56,10 @@ const oauthSessionSchema = z.object({
   codeVerifier: z.string().min(43).max(128),
   invitationCode: z.string().min(20).optional(),
 });
-const invitationSchema = z.object({ role: z.enum(["parent", "kid"]) });
+const invitationSchema = z.object({
+  role: z.enum(["parent", "kid"]),
+  email: z.email().transform((email) => email.toLowerCase()),
+});
 
 const memberSchema = z.object({
   id: z.string().min(1),
@@ -72,6 +79,7 @@ interface Dependencies {
   repository: FamJamRepository;
   locationSearchProvider?: LocationSearchProvider;
   pushNotificationProvider?: PushNotificationProvider;
+  invitationEmailSender?: InvitationEmailSender;
   readinessCheck?: () => Promise<void>;
   rateLimits?: Partial<Record<"sessions" | "invitations" | "locations", RouteRateLimit>>;
   metrics?: FamJamMetrics;
@@ -84,6 +92,7 @@ export function buildApp({
   repository,
   locationSearchProvider = new EmptyLocationSearchProvider(),
   pushNotificationProvider = new NoopPushNotificationProvider(),
+  invitationEmailSender = new NoopInvitationEmailSender(),
   readinessCheck = async () => {},
   rateLimits = {},
   metrics = new FamJamMetrics(),
@@ -250,11 +259,35 @@ export function buildApp({
       id,
       codeHash: invitationHash(code),
       familyID: account.familyID,
+      recipientEmail: parsed.data.email,
       role: parsed.data.role,
       expiresAt,
     });
+    const members = await repository.membersForFamily(account.familyID);
+    const inviterName = members.find((member) => member.id === account.memberID)?.name
+      ?? "Your family";
+    const invitationURL = new URL("famjam://invite");
+    invitationURL.searchParams.set("code", code);
+    try {
+      await invitationEmailSender.send({
+        recipientEmail: parsed.data.email,
+        inviterName,
+        role: parsed.data.role,
+        invitationURL: invitationURL.toString(),
+        expiresAt,
+      });
+    } catch {
+      await repository.cancelInvitation(account.familyID, id);
+      return reply.code(502).send({ error: "invitation_email_failed" });
+    }
     await repository.markFamilyChanged(account.familyID);
-    return reply.code(201).send({ id, code, role: parsed.data.role, expiresAt });
+    return reply.code(201).send({
+      id,
+      code,
+      email: parsed.data.email,
+      role: parsed.data.role,
+      expiresAt,
+    });
   });
 
   app.get("/v1/invitations", async (request, reply) => {
@@ -262,6 +295,7 @@ export function buildApp({
     if (!account) return;
     return (await repository.pendingInvitations(account.familyID)).map((invitation) => ({
       id: invitation.id,
+      email: invitation.recipientEmail,
       role: invitation.role,
       expiresAt: invitation.expiresAt,
     }));
@@ -284,17 +318,52 @@ export function buildApp({
   }, async (request, reply) => {
     const account = await requireParent(request, reply);
     if (!account) return;
+    const invitationID = (request.params as { id: string }).id;
+    const existing = (await repository.pendingInvitations(account.familyID))
+      .find((invitation) => invitation.id === invitationID);
+    if (!existing) return reply.code(404).send({ error: "invitation_not_found" });
+    if (!existing.recipientEmail) {
+      return reply.code(400).send({ error: "invitation_email_missing" });
+    }
     const code = randomBytes(24).toString("base64url");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const invitation = await repository.rotateInvitation(
       account.familyID,
-      (request.params as { id: string }).id,
+      invitationID,
       invitationHash(code),
       expiresAt,
     );
     if (!invitation) return reply.code(404).send({ error: "invitation_not_found" });
+    const members = await repository.membersForFamily(account.familyID);
+    const inviterName = members.find((member) => member.id === account.memberID)?.name
+      ?? "Your family";
+    const invitationURL = new URL("famjam://invite");
+    invitationURL.searchParams.set("code", code);
+    try {
+      await invitationEmailSender.send({
+        recipientEmail: existing.recipientEmail,
+        inviterName,
+        role: invitation.role,
+        invitationURL: invitationURL.toString(),
+        expiresAt: invitation.expiresAt,
+      });
+    } catch {
+      await repository.rotateInvitation(
+        account.familyID,
+        invitationID,
+        existing.codeHash,
+        existing.expiresAt,
+      );
+      return reply.code(502).send({ error: "invitation_email_failed" });
+    }
     await repository.markFamilyChanged(account.familyID);
-    return { id: invitation.id, code, role: invitation.role, expiresAt: invitation.expiresAt };
+    return {
+      id: invitation.id,
+      code,
+      email: existing.recipientEmail,
+      role: invitation.role,
+      expiresAt: invitation.expiresAt,
+    };
   });
 
   app.get("/v1/locations/search", {

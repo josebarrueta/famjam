@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { InMemoryFamJamRepository } from "../src/in-memory-repository.js";
 import type { IdentityProvider } from "../src/identity-provider.js";
+import type { InvitationEmailSender } from "../src/invitation-email-sender.js";
 import type { LocationSearchProvider } from "../src/location-search-provider.js";
 import type { PushNotificationProvider } from "../src/push-notification-provider.js";
 
@@ -213,6 +214,85 @@ describe("FamJam API", () => {
     await app.close();
   });
 
+  it("lets only a parent send a family invitation email", async () => {
+    const deliveries: Array<{ recipientEmail: string; role: string; invitationURL: string }> = [];
+    const invitationEmailSender: InvitationEmailSender = {
+      async send(delivery) {
+        deliveries.push({
+          recipientEmail: delivery.recipientEmail,
+          role: delivery.role,
+          invitationURL: delivery.invitationURL,
+        });
+      },
+    };
+    const app = buildApp({
+      identityProvider,
+      repository: repository(),
+      invitationEmailSender,
+    });
+
+    const sent = await app.inject({
+      method: "POST",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+      payload: { role: "kid", email: "NewKid@Example.com" },
+    });
+    const forbidden = await app.inject({
+      method: "POST",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer kid-token" },
+      payload: { role: "parent", email: "parent@example.com" },
+    });
+    const resent = await app.inject({
+      method: "POST",
+      url: `/v1/invitations/${sent.json().id}/resend`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(sent.statusCode).toBe(201);
+    expect(forbidden.statusCode).toBe(403);
+    expect(resent.statusCode).toBe(200);
+    expect(deliveries).toEqual([
+      {
+        recipientEmail: "newkid@example.com",
+        role: "kid",
+        invitationURL: `famjam://invite?code=${sent.json().code}`,
+      },
+      {
+        recipientEmail: "newkid@example.com",
+        role: "kid",
+        invitationURL: `famjam://invite?code=${resent.json().code}`,
+      },
+    ]);
+    await app.close();
+  });
+
+  it("does not leave a usable invitation when email delivery fails", async () => {
+    const app = buildApp({
+      identityProvider,
+      repository: repository(),
+      invitationEmailSender: {
+        async send() { throw new Error("email provider unavailable"); },
+      },
+    });
+
+    const failed = await app.inject({
+      method: "POST",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+      payload: { role: "kid", email: "kid@example.com" },
+    });
+    const pending = await app.inject({
+      method: "GET",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(failed.statusCode).toBe(502);
+    expect(pending.json()).toEqual([]);
+    await app.close();
+  });
+
   it("lets a parent invite a kid into the same family", async () => {
     const data = repository();
     const app = buildApp({ identityProvider, repository: data });
@@ -220,7 +300,7 @@ describe("FamJam API", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer parent-token" },
-      payload: { role: "kid" },
+      payload: { role: "kid", email: "sam@example.com" },
     });
     expect(invitation.statusCode).toBe(201);
     const invitationCode = invitation.json().code as string;
@@ -245,7 +325,7 @@ describe("FamJam API", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer parent-token" },
-      payload: { role: "kid" },
+      payload: { role: "kid", email: "kid@example.com" },
     });
 
     const pending = await app.inject({
@@ -263,6 +343,7 @@ describe("FamJam API", () => {
     expect(pending.statusCode).toBe(200);
     expect(pending.json()).toEqual([{
       id: created.json().id,
+      email: "kid@example.com",
       role: "kid",
       expiresAt: created.json().expiresAt,
     }]);
@@ -276,7 +357,7 @@ describe("FamJam API", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer parent-token" },
-      payload: { role: "parent" },
+      payload: { role: "parent", email: "parent@example.com" },
     });
     const id = created.json().id as string;
 
@@ -314,7 +395,7 @@ describe("FamJam API", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer parent-token" },
-      payload: { role: "kid" },
+      payload: { role: "kid", email: "kid@example.com" },
     });
 
     const resent = await app.inject({

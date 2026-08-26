@@ -143,7 +143,7 @@ describe.skipIf(!adminURL)("PostgreSQL HTTP integration", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer integration-token" },
-      payload: { role: "kid" },
+      payload: { role: "kid", email: "child@example.com" },
     });
     expect(invitation.statusCode).toBe(201);
 

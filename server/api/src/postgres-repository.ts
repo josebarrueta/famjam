@@ -76,15 +76,22 @@ export class PostgresFamJamRepository implements FamJamRepository {
 
   async saveInvitation(invitation: FamilyInvitation): Promise<void> {
     await this.pool.query(
-      `INSERT INTO family_invitations (id, code_hash, family_id, role, expires_at)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [invitation.id, invitation.codeHash, invitation.familyID, invitation.role, invitation.expiresAt],
+      `INSERT INTO family_invitations (id, code_hash, family_id, recipient_email, role, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        invitation.id,
+        invitation.codeHash,
+        invitation.familyID,
+        invitation.recipientEmail,
+        invitation.role,
+        invitation.expiresAt,
+      ],
     );
   }
 
   async pendingInvitations(familyID: string): Promise<FamilyInvitation[]> {
     const result = await this.pool.query<InvitationRecordRow>(
-      `SELECT id::text, code_hash, family_id, role, expires_at
+      `SELECT id::text, code_hash, family_id, recipient_email, role, expires_at
        FROM family_invitations
        WHERE family_id = $1 AND consumed_at IS NULL AND expires_at > now()
        ORDER BY expires_at`,
@@ -94,6 +101,7 @@ export class PostgresFamJamRepository implements FamJamRepository {
       id: row.id,
       codeHash: row.code_hash,
       familyID: row.family_id,
+      recipientEmail: row.recipient_email,
       role: row.role,
       expiresAt: row.expires_at.toISOString(),
     }));
@@ -118,7 +126,7 @@ export class PostgresFamJamRepository implements FamJamRepository {
       `UPDATE family_invitations
        SET code_hash = $3, expires_at = $4
        WHERE id = $1 AND family_id = $2 AND consumed_at IS NULL AND expires_at > now()
-       RETURNING id::text, code_hash, family_id, role, expires_at`,
+       RETURNING id::text, code_hash, family_id, recipient_email, role, expires_at`,
       [invitationID, familyID, codeHash, expiresAt],
     );
     const row = result.rows[0];
@@ -126,6 +134,7 @@ export class PostgresFamJamRepository implements FamJamRepository {
       id: row.id,
       codeHash: row.code_hash,
       familyID: row.family_id,
+      recipientEmail: row.recipient_email,
       role: row.role,
       expiresAt: row.expires_at.toISOString(),
     } : null;
@@ -325,6 +334,7 @@ interface InvitationRow {
 interface InvitationRecordRow extends InvitationRow {
   id: string;
   code_hash: string;
+  recipient_email: string | null;
   expires_at: Date;
 }
 

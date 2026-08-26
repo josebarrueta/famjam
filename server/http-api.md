@@ -53,14 +53,19 @@ Supported conflict kinds are `overlapping_participant` and
 
 ## Family invitations
 
-- `POST /v1/invitations` with `{ "role": "parent" | "kid" }` creates a
-  single-use, seven-day invitation. Parent authorization is required.
+- `POST /v1/invitations` with
+  `{ "role": "parent" | "kid", "email": "recipient@example.com" }` creates
+  and emails a single-use, seven-day invitation. Parent authorization is required;
+  kid sessions receive `403`.
 - `GET /v1/invitations` lists pending invitations without exposing their hashed codes.
 - `DELETE /v1/invitations/{id}` cancels an invitation in the parent's family.
-- `POST /v1/invitations/{id}/resend` rotates its code and extends expiration by seven days.
+- `POST /v1/invitations/{id}/resend` rotates its code, extends expiration by seven days,
+  and emails the replacement link to the stored recipient address.
 - `POST /v1/sessions` may include `invitationCode` with the OAuth exchange.
 
-Invitation codes are stored as SHA-256 hashes and embedded in shareable
+Invitation delivery uses the provider-neutral `InvitationEmailSender`; the reference
+adapter calls Resend. Failed delivery removes or restores the invitation so an
+unshared code is never left active. Invitation codes are stored as SHA-256 hashes and embedded in
 `famjam://invite?code=…` links; the login screen never asks users to type a code.
 After opening the link, Google sign-in submits the embedded code and successful
 redemption atomically creates the invited member and account in the inviter's

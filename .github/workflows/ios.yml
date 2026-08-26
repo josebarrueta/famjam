@@ -27,6 +27,15 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: server/api/package-lock.json
+      - name: Start simulator boot early
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          print(next(device["udid"] for runtime in devices.values() for device in runtime if device["name"].startswith("iPhone")))
+          ')
+          echo "FAMJAM_SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
       - name: Install API dependencies
         working-directory: server/api
         run: npm ci
@@ -47,20 +56,19 @@ jobs:
         env:
           FAMJAM_CONTRACT_BASE_URL: http://127.0.0.1:3100
         run: swift test
-      - name: Build iOS app
+      - name: Build iOS app and UI tests
         run: >-
-          xcodebuild -project FamilyApp.xcodeproj -target FamilyApp
-          -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
-      - name: Test local-mode UI smoke path
+          xcodebuild -project FamilyApp.xcodeproj -scheme FamilyAppCI
+          -sdk iphonesimulator -destination "platform=iOS Simulator,id=$FAMJAM_SIMULATOR_ID"
+          CODE_SIGNING_ALLOWED=NO build-for-testing
+      - name: Test UI smoke paths
         run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
-          devices = json.load(sys.stdin)["devices"]
-          print(next(device["udid"] for runtime in devices.values() for device in runtime if device["name"].startswith("iPhone")))
-          ')
+          started=$SECONDS
+          xcrun simctl bootstatus "$FAMJAM_SIMULATOR_ID" -b
+          echo "Simulator ready after $((SECONDS - started)) seconds in this step"
           xcodebuild -project FamilyApp.xcodeproj -scheme FamilyAppCI \
-            -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-            CODE_SIGNING_ALLOWED=NO test
+            -sdk iphonesimulator -destination "platform=iOS Simulator,id=$FAMJAM_SIMULATOR_ID" \
+            CODE_SIGNING_ALLOWED=NO test-without-building
       - name: Stop API contract server
         if: always()
         working-directory: server/api

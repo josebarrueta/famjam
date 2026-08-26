@@ -6,6 +6,7 @@ struct FamilyMembersView: View {
     @State private var isAddingMember = false
     @State private var editingMember: FamilyMember?
     @State private var quickActivity: QuickActivitySelection?
+    @State private var invitationRequest: InvitationRequest?
     private let locationSearch: any LocationSearch
 
     init(
@@ -37,6 +38,10 @@ struct FamilyMembersView: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(invitation.role == .parent ? "Parent invitation" : "Kid invitation")
                                         .font(.headline)
+                                    if let email = invitation.email {
+                                        Text(email)
+                                            .font(.subheadline)
+                                    }
                                     Text("Expires \(invitation.expiresAt.formatted(date: .abbreviated, time: .shortened))")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -46,7 +51,7 @@ struct FamilyMembersView: View {
                                     Button {
                                         Task { await viewModel.resend(invitation) }
                                     } label: {
-                                        Label("Create new link & Share", systemImage: "paperplane")
+                                        Label("Resend email", systemImage: "paperplane")
                                     }
                                     Button(role: .destructive) {
                                         Task { await viewModel.cancel(invitation) }
@@ -117,8 +122,8 @@ struct FamilyMembersView: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if viewModel.canInvite {
                         Menu {
-                            Button("Invite a parent") { Task { await viewModel.invite(role: .parent) } }
-                            Button("Invite a kid") { Task { await viewModel.invite(role: .kid) } }
+                            Button("Invite a parent") { invitationRequest = InvitationRequest(role: .parent) }
+                            Button("Invite a kid") { invitationRequest = InvitationRequest(role: .kid) }
                         } label: {
                             Image(systemName: "person.badge.plus")
                         }
@@ -134,8 +139,18 @@ struct FamilyMembersView: View {
             .sheet(item: $editingMember) { member in
                 FamilyMemberEditor(member: member, onSave: viewModel.save, onDelete: viewModel.delete)
             }
-            .sheet(item: $viewModel.invitation) { invitation in
-                InvitationSheet(invitation: invitation)
+            .sheet(item: $invitationRequest) { request in
+                InvitationEmailSheet(role: request.role) { email in
+                    try await viewModel.invite(role: request.role, recipientEmail: email)
+                }
+            }
+            .alert("Invitation sent", isPresented: Binding(
+                get: { viewModel.invitationSentTo != nil },
+                set: { if !$0 { viewModel.invitationSentTo = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("FamJam emailed a secure invitation to \(viewModel.invitationSentTo ?? "the recipient").")
             }
             .sheet(item: $quickActivity) { selection in
                 AddEventSheet(
@@ -153,7 +168,7 @@ struct FamilyMembersView: View {
 final class FamilyMembersViewModel: ObservableObject {
     @Published private(set) var members: [FamilyMember] = []
     @Published private(set) var pendingInvitations: [PendingFamilyInvitation] = []
-    @Published var invitation: FamilyInvitation?
+    @Published var invitationSentTo: String?
     private let memberStore: any FamilyMemberStore
     private let eventStore: any EventStore
     private let invitationStore: (any FamilyInvitationStore)?
@@ -177,12 +192,14 @@ final class FamilyMembersViewModel: ObservableObject {
     func delete(_ member: FamilyMember) async throws { try await deletionService.delete(member); await load() }
     var canInvite: Bool { invitationStore != nil }
     func saveEvent(_ event: FamilyEvent) async throws -> [EventConflict] { try await eventStore.save(event) }
-    func invite(role: FamilyMemberRole) async {
-        invitation = try? await invitationStore?.create(role: role)
+    func invite(role: FamilyMemberRole, recipientEmail: String) async throws {
+        _ = try await invitationStore?.create(role: role, recipientEmail: recipientEmail)
+        invitationSentTo = recipientEmail
         await load()
     }
     func resend(_ pendingInvitation: PendingFamilyInvitation) async {
-        invitation = try? await invitationStore?.resend(id: pendingInvitation.id)
+        guard (try? await invitationStore?.resend(id: pendingInvitation.id)) != nil else { return }
+        invitationSentTo = pendingInvitation.email
         await load()
     }
     func cancel(_ invitation: PendingFamilyInvitation) async {
@@ -191,40 +208,61 @@ final class FamilyMembersViewModel: ObservableObject {
     }
 }
 
-private struct InvitationSheet: View {
-    let invitation: FamilyInvitation
+private struct InvitationRequest: Identifiable {
+    let id = UUID()
+    let role: FamilyMemberRole
+}
+
+private struct InvitationEmailSheet: View {
+    let role: FamilyMemberRole
+    let onSend: (String) async throws -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var email = ""
+    @State private var isSending = false
+    @State private var errorMessage: String?
+
+    private var normalizedEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                Image(systemName: "person.2.badge.plus")
-                    .font(.system(size: 54))
-                    .foregroundStyle(AppTheme.purple)
-                Text("Invite a \(invitation.role.rawValue)")
-                    .font(.title.bold())
-                Text(invitation.code)
-                    .font(.system(.body, design: .monospaced))
-                    .textSelection(.enabled)
-                Text("Send this secure link by Mail or Messages. The recipient will join your family after signing in with Google.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                ShareLink(
-                    item: invitation.shareURL,
-                    subject: Text("Join my family on FamJam"),
-                    message: Text("Tap this secure link to join my family on FamJam. The link expires in seven days and can only be used once.")
-                ) {
-                    Label("Send invitation link", systemImage: "paperplane.fill")
+            Form {
+                Section {
+                    TextField("Email address", text: $email)
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } footer: {
+                    Text("FamJam will email a secure, single-use link that expires in seven days.")
                 }
-                .buttonStyle(.borderedProminent)
-                Text("Expires \(invitation.expiresAt.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                if let errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                }
             }
-            .padding(24)
-            .navigationTitle("Family Invitation")
-            .toolbar { Button("Done") { dismiss() } }
+            .navigationTitle(role == .parent ? "Invite a Parent" : "Invite a Kid")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSending ? "Sending…" : "Send") {
+                        isSending = true
+                        Task {
+                            do {
+                                try await onSend(normalizedEmail)
+                                dismiss()
+                            } catch {
+                                errorMessage = "We couldn't send the invitation. Please try again."
+                                isSending = false
+                            }
+                        }
+                    }
+                    .disabled(isSending || !normalizedEmail.contains("@"))
+                }
+            }
         }
     }
 }

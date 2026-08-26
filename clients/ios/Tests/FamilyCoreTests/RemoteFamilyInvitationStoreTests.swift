@@ -3,9 +3,31 @@ import XCTest
 @testable import FamilyCore
 
 final class RemoteFamilyInvitationStoreTests: XCTestCase {
+    func testSendsAnInvitationEmailThroughTheRemoteAPI() async throws {
+        let response = """
+        {"id":"invite-1","code":"secure-code","email":"kid@example.com","role":"kid","expiresAt":"2026-09-01T12:00:00Z"}
+        """.data(using: .utf8)!
+        let transport = InvitationHTTPTransport(
+            responses: [HTTPResponse(statusCode: 201, body: response)]
+        )
+        let store: any FamilyInvitationStore = RemoteFamilyInvitationStore(
+            baseURL: URL(string: "https://api.example.com")!,
+            transport: transport
+        )
+
+        let invitation = try await store.create(role: .kid, recipientEmail: "kid@example.com")
+
+        XCTAssertEqual(invitation.id, "invite-1")
+        let requests = await transport.recordedRequests()
+        XCTAssertEqual(requests.first?.method, .post)
+        XCTAssertEqual(requests.first?.url.path, "/v1/invitations")
+        let body = try JSONSerialization.jsonObject(with: requests.first!.body!) as? [String: String]
+        XCTAssertEqual(body, ["role": "kid", "email": "kid@example.com"])
+    }
+
     func testListsPendingInvitationsFromTheRemoteAPI() async throws {
         let response = """
-        [{"id":"invite-1","role":"kid","expiresAt":"2026-09-01T12:00:00Z"}]
+        [{"id":"invite-1","email":"kid@example.com","role":"kid","expiresAt":"2026-09-01T12:00:00Z"}]
         """.data(using: .utf8)!
         let transport = InvitationHTTPTransport(
             responses: [HTTPResponse(statusCode: 200, body: response)]
@@ -19,6 +41,7 @@ final class RemoteFamilyInvitationStoreTests: XCTestCase {
 
         XCTAssertEqual(invitations.map(\.id), ["invite-1"])
         XCTAssertEqual(invitations.map(\.role), [.kid])
+        XCTAssertEqual(invitations.map(\.email), ["kid@example.com"])
         let requests = await transport.recordedRequests()
         XCTAssertEqual(requests.first?.method, .get)
         XCTAssertEqual(requests.first?.url.path, "/v1/invitations")

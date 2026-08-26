@@ -66,6 +66,15 @@ Set a strong `METRICS_BEARER_TOKEN` in hosted environments. Session exchange,
 invitation writes, and Places search have stricter route limits under a global
 request ceiling. Rate-limited responses include `Retry-After`.
 
+## Invitation email
+
+Only authenticated parents can create or resend invitations. Configure the reference
+Resend adapter with `RESEND_API_KEY` and a verified sender in
+`INVITATION_EMAIL_FROM`, for example `FamJam <invites@yourdomain.com>`. The API
+stores recipient addresses with pending invitations, rotates codes on resend, and
+rolls back invitation state when delivery fails. Email delivery remains behind the
+provider-neutral `InvitationEmailSender` interface.
+
 ## Push notifications
 
 Set `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_PRIVATE_KEY`, and

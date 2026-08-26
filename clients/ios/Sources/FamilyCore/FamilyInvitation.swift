@@ -37,25 +37,30 @@ public struct FamilyInvitation: Codable, Equatable, Identifiable, Sendable {
 
 public struct PendingFamilyInvitation: Codable, Equatable, Identifiable, Sendable {
     public let id: String
+    public let email: String?
     public let role: FamilyMemberRole
     public let expiresAt: Date
 
-    public init(id: String, role: FamilyMemberRole, expiresAt: Date) {
+    public init(id: String, email: String? = nil, role: FamilyMemberRole, expiresAt: Date) {
         self.id = id
+        self.email = email
         self.role = role
         self.expiresAt = expiresAt
     }
 }
 
 public protocol FamilyInvitationStore: Sendable {
-    func create(role: FamilyMemberRole) async throws -> FamilyInvitation
+    func create(role: FamilyMemberRole, recipientEmail: String) async throws -> FamilyInvitation
     func pending() async throws -> [PendingFamilyInvitation]
     func cancel(id: String) async throws
     func resend(id: String) async throws -> FamilyInvitation
 }
 
 public actor RemoteFamilyInvitationStore: FamilyInvitationStore {
-    private struct CreateRequest: Encodable { let role: FamilyMemberRole }
+    private struct CreateRequest: Encodable {
+        let role: FamilyMemberRole
+        let email: String
+    }
 
     private let invitationsURL: URL
     private let transport: any HTTPTransport
@@ -94,12 +99,12 @@ public actor RemoteFamilyInvitationStore: FamilyInvitationStore {
         return try decoder.decode(FamilyInvitation.self, from: response.body)
     }
 
-    public func create(role: FamilyMemberRole) async throws -> FamilyInvitation {
+    public func create(role: FamilyMemberRole, recipientEmail: String) async throws -> FamilyInvitation {
         let response = try await transport.send(HTTPRequest(
             method: .post,
             url: invitationsURL,
             headers: ["Content-Type": "application/json"],
-            body: try encoder.encode(CreateRequest(role: role))
+            body: try encoder.encode(CreateRequest(role: role, email: recipientEmail))
         ))
         try response.requireSuccess()
         return try decoder.decode(FamilyInvitation.self, from: response.body)
