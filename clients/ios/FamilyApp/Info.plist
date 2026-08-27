@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>FamJam</string>
+    <string>Rallyroo</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -22,10 +22,10 @@
     <array>
         <dict>
             <key>CFBundleURLName</key>
-            <string>com.familyactivitycoordinator.app.oauth</string>
+            <string>dev.rallyroo.app.oauth</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>famjam</string>
+                <string>rallyroo</string>
             </array>
         </dict>
     </array>

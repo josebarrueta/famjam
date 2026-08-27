@@ -266,7 +266,7 @@ export function buildApp({
     const members = await repository.membersForFamily(account.familyID);
     const inviterName = members.find((member) => member.id === account.memberID)?.name
       ?? "Your family";
-    const invitationURL = new URL("famjam://invite");
+    const invitationURL = new URL("rallyroo://invite");
     invitationURL.searchParams.set("code", code);
     try {
       await invitationEmailSender.send({
@@ -337,7 +337,7 @@ export function buildApp({
     const members = await repository.membersForFamily(account.familyID);
     const inviterName = members.find((member) => member.id === account.memberID)?.name
       ?? "Your family";
-    const invitationURL = new URL("famjam://invite");
+    const invitationURL = new URL("rallyroo://invite");
     invitationURL.searchParams.set("code", code);
     try {
       await invitationEmailSender.send({
@@ -438,7 +438,7 @@ export function buildApp({
       await pushNotificationProvider.send(deviceTokens, {
         title: event.title,
         body: conflicts.length > 0
-          ? "Schedule conflict detected. Open FamJam to review."
+          ? "Schedule conflict detected. Open Rallyroo to review."
           : "Your family schedule was updated.",
         data: { eventID: event.id },
       });

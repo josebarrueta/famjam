@@ -5,7 +5,7 @@ const delivery = {
   recipientEmail: "kid@example.com",
   inviterName: "Alex & Jordan",
   role: "kid" as const,
-  invitationURL: "famjam://invite?code=secure-code",
+  invitationURL: "rallyroo://invite?code=secure-code",
   expiresAt: "2026-09-02T12:00:00Z",
 };
 
@@ -14,7 +14,7 @@ describe("ResendInvitationEmailSender", () => {
     const requests: Array<{ url: string; authorization: string | null; body: unknown }> = [];
     const sender = new ResendInvitationEmailSender({
       apiKey: "resend-test-key",
-      from: "FamJam <invites@example.com>",
+      from: "Rallyroo <invites@example.com>",
       fetch: async (input, init) => {
         const headers = new Headers(init?.headers);
         requests.push({
@@ -32,10 +32,10 @@ describe("ResendInvitationEmailSender", () => {
       url: "https://api.resend.com/emails",
       authorization: "Bearer resend-test-key",
       body: expect.objectContaining({
-        from: "FamJam <invites@example.com>",
+        from: "Rallyroo <invites@example.com>",
         to: ["kid@example.com"],
-        subject: "Alex & Jordan invited you to FamJam",
-        text: expect.stringContaining("famjam://invite?code=secure-code"),
+        subject: "Alex & Jordan invited you to Rallyroo",
+        text: expect.stringContaining("rallyroo://invite?code=secure-code"),
       }),
     }]);
   });
@@ -43,7 +43,7 @@ describe("ResendInvitationEmailSender", () => {
   it("reports a failed Resend delivery", async () => {
     const sender = new ResendInvitationEmailSender({
       apiKey: "resend-test-key",
-      from: "FamJam <invites@example.com>",
+      from: "Rallyroo <invites@example.com>",
       fetch: async () => new Response("provider unavailable", { status: 503 }),
     });
 

@@ -1,4 +1,4 @@
-# FamJam HTTP adapter contract
+# Rallyroo HTTP adapter contract
 
 This contract is backend-vendor neutral. A custom server, Supabase Edge Functions,
 or another provider can implement it. All successful responses use a 2xx status;
@@ -66,7 +66,7 @@ Supported conflict kinds are `overlapping_participant` and
 Invitation delivery uses the provider-neutral `InvitationEmailSender`; the reference
 adapter calls Resend. Failed delivery removes or restores the invitation so an
 unshared code is never left active. Invitation codes are stored as SHA-256 hashes and embedded in
-`famjam://invite?code=…` links; the login screen never asks users to type a code.
+`rallyroo://invite?code=…` links; the login screen never asks users to type a code.
 After opening the link, Google sign-in submits the embedded code and successful
 redemption atomically creates the invited member and account in the inviter's
 family. The client never chooses a family ID or overrides the invitation's role.
@@ -102,19 +102,19 @@ limited requests return `429` and `Retry-After`.
 
 ## Authentication
 
-The FamJam backend owns the identity-provider integration. The iOS client only
-uses FamJam endpoints and has no Stytch SDK or Stytch configuration.
+The Rallyroo backend owns the identity-provider integration. The iOS client only
+uses Rallyroo endpoints and has no Stytch SDK or Stytch configuration.
 
 1. The client generates a PKCE verifier and opens
    `GET /v1/auth/google?codeChallenge=…` in a system authentication browser.
-2. FamJam forwards the challenge and redirects the browser to its configured
+2. Rallyroo forwards the challenge and redirects the browser to its configured
    Stytch Google OAuth flow.
-3. Google/Stytch redirects to `famjam://oauth-callback?stytch_token_type=oauth&token=…`.
+3. Google/Stytch redirects to `rallyroo://oauth-callback?stytch_token_type=oauth&token=…`.
 4. `POST /v1/sessions` with `{ "oauthToken": "…", "codeVerifier": "…" }`
    exchanges the one-time token through the backend's `IdentityProvider` adapter.
 5. If the identity is new and has no invitation, the backend atomically provisions
    it as a parent in a new family. Provisioning is idempotent across retries.
-6. The backend returns the FamJam session contract:
+6. The backend returns the Rallyroo session contract:
 
 ```json
 {
@@ -128,9 +128,9 @@ uses FamJam endpoints and has no Stytch SDK or Stytch configuration.
 `GET /v1/sessions` validates and restores a persisted client session.
 
 Authenticated requests include `Authorization: Bearer <accessToken>`. The backend
-validates the opaque Stytch session through its provider adapter, loads the FamJam
+validates the opaque Stytch session through its provider adapter, loads the Rallyroo
 account, and applies family and role authorization. `DELETE /v1/sessions` revokes
 the hosted session.
 
 No Stytch secret, SDK, configuration, or provider-specific type exists in the iOS
-code. The browser only interacts with Stytch after following the FamJam redirect.
+code. The browser only interacts with Stytch after following the Rallyroo redirect.

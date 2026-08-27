@@ -17,10 +17,10 @@ export class ResendInvitationEmailSender implements InvitationEmailSender {
   }
 
   async send(delivery: InvitationEmailDelivery): Promise<void> {
-    const subject = `${delivery.inviterName} invited you to FamJam`;
+    const subject = `${delivery.inviterName} invited you to Rallyroo`;
     const role = delivery.role === "kid" ? "kid" : "parent";
     const text = [
-      `${delivery.inviterName} invited you to join their family on FamJam as a ${role}.`,
+      `${delivery.inviterName} invited you to join their family on Rallyroo as a ${role}.`,
       "",
       `Open this secure, single-use link: ${delivery.invitationURL}`,
       "",
@@ -37,8 +37,8 @@ export class ResendInvitationEmailSender implements InvitationEmailSender {
         to: [delivery.recipientEmail],
         subject,
         text,
-        html: `<p>${escapeHTML(delivery.inviterName)} invited you to join their family on FamJam as a ${role}.</p>`
-          + `<p><a href="${escapeHTML(delivery.invitationURL)}">Join the family on FamJam</a></p>`
+        html: `<p>${escapeHTML(delivery.inviterName)} invited you to join their family on Rallyroo as a ${role}.</p>`
+          + `<p><a href="${escapeHTML(delivery.invitationURL)}">Join the family on Rallyroo</a></p>`
           + `<p>This secure invitation can only be used once and expires ${escapeHTML(delivery.expiresAt)}.</p>`,
       }),
     });

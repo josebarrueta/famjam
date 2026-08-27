@@ -1,6 +1,6 @@
 apiVersion: v2
 name: famjam
-description: Local-first FamJam API stack with PostgreSQL, Redis, and NGINX
+description: Local-first Rallyroo API stack with PostgreSQL, Redis, and NGINX
 version: 0.1.0
 appVersion: "0.1.0"
 type: application

@@ -27,7 +27,7 @@ struct FamilyMembersView: View {
     var body: some View {
         NavigationStack {
             List {
-                FamJamHeader(title: "Your home team", subtitle: "Parents and kids, all in one place.")
+                RallyrooHeader(title: "Your home team", subtitle: "Parents and kids, all in one place.")
                     .listRowBackground(Color.clear)
                 if !viewModel.pendingInvitations.isEmpty {
                     Section("Pending invitations") {
@@ -150,7 +150,7 @@ struct FamilyMembersView: View {
             )) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("FamJam emailed a secure invitation to \(viewModel.invitationSentTo ?? "the recipient").")
+                Text("Rallyroo emailed a secure invitation to \(viewModel.invitationSentTo ?? "the recipient").")
             }
             .sheet(item: $quickActivity) { selection in
                 AddEventSheet(
@@ -235,7 +235,7 @@ private struct InvitationEmailSheet: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 } footer: {
-                    Text("FamJam will email a secure, single-use link that expires in seven days.")
+                    Text("Rallyroo will email a secure, single-use link that expires in seven days.")
                 }
                 if let errorMessage {
                     Text(errorMessage)

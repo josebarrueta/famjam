@@ -80,7 +80,7 @@ public actor RemoteAuthentication: Authentication {
         }
         let callbackURL = try await webSession.authenticate(
             using: securedAuthorizationURL,
-            callbackScheme: "famjam"
+            callbackScheme: "rallyroo"
         )
         guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
               components.queryItems?.first(where: { $0.name == "stytch_token_type" })?.value == "oauth",

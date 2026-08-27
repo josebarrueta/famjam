@@ -7,7 +7,7 @@ const codeVerifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
 function provider() {
   return new StytchIdentityProvider({
     publicToken: "public-token-test-project",
-    callbackURL: "famjam://oauth-callback",
+    callbackURL: "rallyroo://oauth-callback",
     environmentURL: "https://test.stytch.com/",
     sessions: {
       async authenticate({ session_token }) {
@@ -36,8 +36,8 @@ describe("StytchIdentityProvider", () => {
     const url = new URL(provider().googleAuthorizationURL(codeChallenge));
     expect(`${url.origin}${url.pathname}`).toBe("https://test.stytch.com/v1/public/oauth/google/start");
     expect(url.searchParams.get("public_token")).toBe("public-token-test-project");
-    expect(url.searchParams.get("login_redirect_url")).toBe("famjam://oauth-callback");
-    expect(url.searchParams.get("signup_redirect_url")).toBe("famjam://oauth-callback");
+    expect(url.searchParams.get("login_redirect_url")).toBe("rallyroo://oauth-callback");
+    expect(url.searchParams.get("signup_redirect_url")).toBe("rallyroo://oauth-callback");
     expect(url.searchParams.get("code_challenge")).toBe(codeChallenge);
   });
 

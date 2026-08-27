@@ -1,8 +1,8 @@
-# FamJam TypeScript API
+# Rallyroo TypeScript API
 
 Fastify reference backend for `../http-api.md`. It uses PostgreSQL for scalable,
 shared persistence, Redis 8.10 for shared caching and vector-search readiness, and Stytch B2C for Google-capable
-identity verification. FamJam
+identity verification. Rallyroo
 roles and family membership remain in PostgreSQL, so identity providers stay
 replaceable.
 
@@ -12,7 +12,7 @@ Requirements: Node 20+, PostgreSQL, and a Stytch test project.
 
 ```bash
 cp .env.example .env
-# Fill in all STYTCH_* values and register famjam://oauth-callback in Stytch.
+# Fill in all STYTCH_* values and register rallyroo://oauth-callback in Stytch.
 docker compose up --build
 ```
 
@@ -72,7 +72,7 @@ request ceiling. Rate-limited responses include `Retry-After`.
 
 Only authenticated parents can create or resend invitations. Configure the reference
 Resend adapter with `RESEND_API_KEY` and a verified sender in
-`INVITATION_EMAIL_FROM`, for example `FamJam <invites@yourdomain.com>`. The API
+`INVITATION_EMAIL_FROM`, for example `Rallyroo <invites@yourdomain.com>`. The API
 stores recipient addresses with pending invitations, rotates codes on resend, and
 rolls back invitation state when delivery fails. Email delivery remains behind the
 provider-neutral `InvitationEmailSender` interface.

@@ -71,4 +71,4 @@ helm upgrade --install famjam "$ROOT/deploy/helm/famjam" \
 kubectl --context "$CONTEXT" -n "$NAMESPACE" get pods
 curl --fail --silent --show-error http://127.0.0.1:8080/ready
 echo
-echo "FamJam is ready at http://127.0.0.1:8080"
+echo "Rallyroo is ready at http://127.0.0.1:8080"

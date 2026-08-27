@@ -256,12 +256,12 @@ describe("FamJam API", () => {
       {
         recipientEmail: "newkid@example.com",
         role: "kid",
-        invitationURL: `famjam://invite?code=${sent.json().code}`,
+        invitationURL: `rallyroo://invite?code=${sent.json().code}`,
       },
       {
         recipientEmail: "newkid@example.com",
         role: "kid",
-        invitationURL: `famjam://invite?code=${resent.json().code}`,
+        invitationURL: `rallyroo://invite?code=${resent.json().code}`,
       },
     ]);
     await app.close();

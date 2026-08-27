@@ -8,7 +8,7 @@ struct NotificationsView: View {
     var body: some View {
         NavigationStack {
             List {
-                FamJamHeader(title: "Heads up!", subtitle: "We'll keep scheduling surprises in check.")
+                RallyrooHeader(title: "Heads up!", subtitle: "We'll keep scheduling surprises in check.")
                     .listRowBackground(Color.clear)
                 ForEach(notifications) { notification in
                     VStack(alignment: .leading) {

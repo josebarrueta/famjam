@@ -1,6 +1,6 @@
-# FamJam
+# Rallyroo
 
-FamJam is a colorful native iOS planner for keeping the whole home team in sync. The app is being built local-first: event data
+Rallyroo is a colorful native iOS planner for keeping the whole home team in sync. The app is being built local-first: event data
 and images stay on the device during Phase 1. The iOS client depends only on
 backend-neutral storage contracts; Supabase is one optional implementation for later
 sign-in and realtime sync.
@@ -31,7 +31,7 @@ the event domain and persistence layer.
 
 ## Data modes
 
-FamJam defaults to local mode and requires no account or backend:
+Rallyroo defaults to local mode and requires no account or backend:
 
 ```bash
 FAMJAM_DATA_MODE=local

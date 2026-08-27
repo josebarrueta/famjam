@@ -23,7 +23,7 @@ extension Color {
     }
 }
 
-struct FamJamHeader: View {
+struct RallyrooHeader: View {
     let title: String
     let subtitle: String
 

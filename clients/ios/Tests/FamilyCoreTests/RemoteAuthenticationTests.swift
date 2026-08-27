@@ -16,7 +16,7 @@ final class RemoteAuthenticationTests: XCTestCase {
             HTTPResponse(statusCode: 200, body: try JSONEncoder().encode(expectedSession))
         ])
         let webSession = StubOAuthWebSession(
-            callbackURL: URL(string: "famjam://oauth-callback?stytch_token_type=oauth&token=oauth-token")!
+            callbackURL: URL(string: "rallyroo://oauth-callback?stytch_token_type=oauth&token=oauth-token")!
         )
         let sessionStore = TestAuthSessionStore()
         let authentication: any Authentication = RemoteAuthentication(
@@ -70,7 +70,7 @@ private actor StubOAuthWebSession: OAuthWebSession {
         let components = URLComponents(url: authorizationURL, resolvingAgainstBaseURL: false)
         challenge = components?.queryItems?.first(where: { $0.name == "codeChallenge" })?.value
         XCTAssertEqual(components?.path, "/v1/auth/google")
-        XCTAssertEqual(callbackScheme, "famjam")
+        XCTAssertEqual(callbackScheme, "rallyroo")
         return callbackURL
     }
 

@@ -18,7 +18,7 @@ data:
 
       location = / {
         default_type text/html;
-        return 200 '<!doctype html><html><head><meta charset="utf-8"><title>FamJam</title></head><body><h1>FamJam API</h1><p>The family scheduler is running.</p></body></html>';
+        return 200 '<!doctype html><html><head><meta charset="utf-8"><title>Rallyroo</title></head><body><h1>Rallyroo API</h1><p>The family scheduler is running.</p></body></html>';
       }
 
       location / {

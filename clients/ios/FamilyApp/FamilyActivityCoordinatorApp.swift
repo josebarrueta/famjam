@@ -22,7 +22,7 @@ struct FamilyActivityCoordinatorApp: App {
         do {
             configuration = try AppConfiguration.load()
         } catch {
-            fatalError("Invalid FamJam configuration: \(error)")
+            fatalError("Invalid Rallyroo configuration: \(error)")
         }
 
         allowsSignOut = configuration.dataMode == .remote

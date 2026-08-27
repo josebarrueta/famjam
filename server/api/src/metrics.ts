@@ -17,19 +17,19 @@ export class FamJamMetrics implements Telemetry {
   private readonly registry = new Registry();
   private readonly requests = new Counter({
     name: "famjam_http_requests_total",
-    help: "FamJam HTTP requests",
+    help: "Rallyroo HTTP requests",
     labelNames: ["method", "route", "status"],
     registers: [this.registry],
   });
   private readonly requestDuration = new Histogram({
     name: "famjam_http_request_duration_seconds",
-    help: "FamJam HTTP request duration",
+    help: "Rallyroo HTTP request duration",
     labelNames: ["method", "route"],
     registers: [this.registry],
   });
   private readonly cacheOperations = new Counter({
     name: "famjam_cache_operations_total",
-    help: "FamJam cache operations",
+    help: "Rallyroo cache operations",
     labelNames: ["cache", "result"],
     registers: [this.registry],
   });

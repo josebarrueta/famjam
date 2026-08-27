@@ -29,7 +29,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("App", value: "FamJam")
+                    LabeledContent("App", value: "Rallyroo")
                     LabeledContent("Data", value: allowsSignOut ? "Synced" : "Stored on this device")
                 }
 

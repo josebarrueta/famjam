@@ -4,7 +4,7 @@ public struct FamilyInvitationLink: Equatable, Sendable {
     public let code: String
 
     public init?(url: URL) {
-        guard url.scheme?.lowercased() == "famjam", url.host?.lowercased() == "invite",
+        guard url.scheme?.lowercased() == "rallyroo", url.host?.lowercased() == "invite",
               let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "code" })?.value?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -28,7 +28,7 @@ public struct FamilyInvitation: Codable, Equatable, Identifiable, Sendable {
 
     public var shareURL: URL {
         var components = URLComponents()
-        components.scheme = "famjam"
+        components.scheme = "rallyroo"
         components.host = "invite"
         components.queryItems = [URLQueryItem(name: "code", value: code)]
         return components.url!

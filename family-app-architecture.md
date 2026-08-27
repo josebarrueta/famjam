@@ -99,7 +99,7 @@ Minimal v1 schema — expected to evolve:
 |---|---|---|
 | iOS app | Swift + SwiftUI | Native EventKit/Siri/push access |
 | Backend logic | TypeScript + Fastify | Strong Stytch, Gmail, Calendar, and Anthropic SDKs; fast iteration for prompt-heavy logic |
-| Identity | Stytch (Google OAuth initially) behind an `IdentityProvider` seam | Managed session/JWT security without coupling FamJam authorization to an identity vendor |
+| Identity | Stytch (Google OAuth initially) behind an `IdentityProvider` seam | Managed session/JWT security without coupling Rallyroo authorization to an identity vendor |
 | Database | PostgreSQL (provider-neutral repository adapter) | Scalable relational storage; can be hosted by Supabase or another PostgreSQL provider |
 | Cache | Redis behind a provider-neutral cache seam | Shared short-lived identity and Places caching across API instances; correctness falls back to source providers |
 | LLM | Claude (Anthropic API) | Email parsing, voice-text parsing |

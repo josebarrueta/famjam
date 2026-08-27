@@ -102,7 +102,7 @@ private struct SignInView: View {
                     .frame(maxHeight: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 28))
                 VStack(spacing: 6) {
-                    Text("Welcome to FamJam")
+                    Text("Welcome to Rallyroo")
                         .font(.largeTitle.bold())
                         .foregroundStyle(AppTheme.purple)
                     Text("Sign in to rally your family's week.")

@@ -1,4 +1,4 @@
-# FamJam local Kubernetes deployment
+# Rallyroo local Kubernetes deployment
 
 The Helm chart runs the API, PostgreSQL 17, Redis 8.10.1, and an unprivileged
 NGINX edge proxy. The local profile uses a dedicated kind cluster and exposes
