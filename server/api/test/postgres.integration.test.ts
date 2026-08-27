@@ -22,6 +22,7 @@ function repositoryForTest(): PostgresFamJamRepository {
 
 const identityProvider: IdentityProvider = {
   googleAuthorizationURL: () => "https://identity.example/google",
+  appleAuthorizationURL: () => "https://identity.example/apple",
   async authenticateOAuthToken(token) {
     const identities: Record<string, { subject: string; displayName: string; accessToken: string }> = {
       "oauth-token": { subject: "integration-parent", displayName: "Alex", accessToken: "integration-token" },

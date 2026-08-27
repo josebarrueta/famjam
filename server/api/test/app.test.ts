@@ -14,6 +14,10 @@ const identityProvider: IdentityProvider = {
     if (challenge !== codeChallenge) throw new Error("invalid challenge");
     return "https://identity.example/google";
   },
+  appleAuthorizationURL(challenge) {
+    if (challenge !== codeChallenge) throw new Error("invalid challenge");
+    return "https://identity.example/apple";
+  },
   async authenticateOAuthToken(token, verifier) {
     if (verifier !== codeVerifier) throw new Error("invalid OAuth token");
     if (token === "oauth-token") {
@@ -166,6 +170,19 @@ describe("FamJam API", () => {
       role: "parent",
       accessToken: "parent-token",
     });
+    await app.close();
+  });
+
+  it("exposes backend-owned Apple authorization", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+
+    const authorization = await app.inject({
+      method: "GET",
+      url: `/v1/auth/apple?codeChallenge=${codeChallenge}`,
+    });
+
+    expect(authorization.statusCode).toBe(302);
+    expect(authorization.headers.location).toBe("https://identity.example/apple");
     await app.close();
   });
 

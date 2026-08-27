@@ -150,7 +150,8 @@ export function buildApp({
       routeURL === "/health" ||
       routeURL === "/ready" ||
       routeURL === "/metrics" ||
-      routeURL === "/v1/auth/google"
+      routeURL === "/v1/auth/google" ||
+      routeURL === "/v1/auth/apple"
     ) return;
     if (routeURL === "/v1/sessions" && request.method === "POST") return;
     const token = bearerToken(request.headers.authorization);
@@ -186,6 +187,12 @@ export function buildApp({
     const parsed = oauthAuthorizationSchema.safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_code_challenge" });
     return reply.redirect(identityProvider.googleAuthorizationURL(parsed.data.codeChallenge));
+  });
+
+  app.get("/v1/auth/apple", async (request, reply) => {
+    const parsed = oauthAuthorizationSchema.safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_code_challenge" });
+    return reply.redirect(identityProvider.appleAuthorizationURL(parsed.data.codeChallenge));
   });
 
   app.post("/v1/sessions", {

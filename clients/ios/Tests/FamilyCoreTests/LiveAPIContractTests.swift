@@ -73,6 +73,9 @@ private actor ContractAuthentication: Authentication {
     )
 
     func currentSession() async throws -> AuthSession? { session }
-    func signIn(invitationCode: String?) async throws -> AuthSession { session }
+    func signIn(
+        with provider: AuthenticationProvider,
+        invitationCode: String?
+    ) async throws -> AuthSession { session }
     func signOut() async throws {}
 }

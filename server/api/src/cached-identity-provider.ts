@@ -16,6 +16,10 @@ export class CachedIdentityProvider implements IdentityProvider {
     return this.provider.googleAuthorizationURL(codeChallenge);
   }
 
+  appleAuthorizationURL(codeChallenge: string): string {
+    return this.provider.appleAuthorizationURL(codeChallenge);
+  }
+
   async authenticateOAuthToken(token: string, codeVerifier: string): Promise<IssuedIdentitySession> {
     const issued = await this.observeProvider(() =>
       this.provider.authenticateOAuthToken(token, codeVerifier)

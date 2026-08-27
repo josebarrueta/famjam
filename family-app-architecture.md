@@ -59,7 +59,7 @@ Minimal v1 schema — expected to evolve:
 
 ## 6. Core Features (v1)
 
-- Parent sign-in (Stytch with Google as the initial identity provider)
+- Parent sign-in (Stytch with Apple and Google identity providers)
 - Add / edit / delete events manually (kid, time, location, driver)
 - Weekly view, color-coded per kid
 - Data synced across family devices through a lightweight family change cursor;
@@ -99,7 +99,7 @@ Minimal v1 schema — expected to evolve:
 |---|---|---|
 | iOS app | Swift + SwiftUI | Native EventKit/Siri/push access |
 | Backend logic | TypeScript + Fastify | Strong Stytch, Gmail, Calendar, and Anthropic SDKs; fast iteration for prompt-heavy logic |
-| Identity | Stytch (Google OAuth initially) behind an `IdentityProvider` seam | Managed session/JWT security without coupling Rallyroo authorization to an identity vendor |
+| Identity | Stytch (Apple and Google OAuth) behind an `IdentityProvider` seam | Managed session/JWT security without coupling Rallyroo authorization to an identity vendor |
 | Database | PostgreSQL (provider-neutral repository adapter) | Scalable relational storage; can be hosted by Supabase or another PostgreSQL provider |
 | Cache | Redis behind a provider-neutral cache seam | Shared short-lived identity and Places caching across API instances; correctness falls back to source providers |
 | LLM | Claude (Anthropic API) | Email parsing, voice-text parsing |

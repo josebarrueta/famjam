@@ -12,7 +12,7 @@ public actor RemoteAuthentication: Authentication {
         let invitationCode: String?
     }
 
-    private let authorizationURL: URL
+    private let authorizationBaseURL: URL
     private let sessionsURL: URL
     private let transport: any HTTPTransport
     private let webSession: any OAuthWebSession
@@ -25,7 +25,7 @@ public actor RemoteAuthentication: Authentication {
         webSession: any OAuthWebSession,
         sessionStore: any AuthSessionStore
     ) {
-        authorizationURL = baseURL.appending(path: "v1/auth/google")
+        authorizationBaseURL = baseURL.appending(path: "v1/auth")
         sessionsURL = baseURL.appending(path: "v1/sessions")
         self.transport = transport
         self.webSession = webSession
@@ -66,13 +66,17 @@ public actor RemoteAuthentication: Authentication {
         return validated
     }
 
-    public func signIn(invitationCode: String?) async throws -> AuthSession {
+    public func signIn(
+        with provider: AuthenticationProvider,
+        invitationCode: String?
+    ) async throws -> AuthSession {
         let codeVerifier = UUID().uuidString + UUID().uuidString
         let digest = SHA256.hash(data: Data(codeVerifier.utf8))
         let codeChallenge = Data(digest).base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
+        let authorizationURL = authorizationBaseURL.appending(path: provider.rawValue)
         var components = URLComponents(url: authorizationURL, resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "codeChallenge", value: codeChallenge)]
         guard let securedAuthorizationURL = components?.url else {

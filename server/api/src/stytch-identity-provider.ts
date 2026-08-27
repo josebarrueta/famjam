@@ -43,6 +43,15 @@ export class StytchIdentityProvider implements IdentityProvider {
     return url.toString();
   }
 
+  appleAuthorizationURL(codeChallenge: string): string {
+    const url = new URL("v1/public/oauth/apple/start", this.configuration.environmentURL);
+    url.searchParams.set("public_token", this.configuration.publicToken);
+    url.searchParams.set("login_redirect_url", this.configuration.callbackURL);
+    url.searchParams.set("signup_redirect_url", this.configuration.callbackURL);
+    url.searchParams.set("code_challenge", codeChallenge);
+    return url.toString();
+  }
+
   async authenticateOAuthToken(token: string, codeVerifier: string): Promise<IssuedIdentitySession> {
     const result = await this.configuration.oauth.authenticate({
       token,

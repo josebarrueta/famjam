@@ -43,13 +43,43 @@ final class RemoteAuthenticationTests: XCTestCase {
         let exchange = try XCTUnwrap(requests.first?.body)
         let tokenExchange = try JSONDecoder().decode(OAuthTokenExchange.self, from: exchange)
         XCTAssertEqual(tokenExchange.oauthToken, "oauth-token")
-        let challenge = await webSession.recordedChallenge()
+        let webRequest = await webSession.recordedRequest()
+        XCTAssertEqual(webRequest.authorizationPath, "/v1/auth/google")
+        XCTAssertEqual(webRequest.callbackScheme, "rallyroo")
         let digest = SHA256.hash(data: Data(tokenExchange.codeVerifier.utf8))
         let expectedChallenge = Data(digest).base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
-        XCTAssertEqual(challenge, expectedChallenge)
+        XCTAssertEqual(webRequest.challenge, expectedChallenge)
+    }
+
+    func testSignsInWithAppleThroughTheBackendOwnedOAuthFlow() async throws {
+        let expectedSession = AuthSession(
+            accountID: "account-1",
+            displayName: "Alex",
+            role: .parent,
+            accessToken: "secret-token"
+        )
+        let transport = AuthenticationHTTPTransport(responses: [
+            HTTPResponse(statusCode: 200, body: try JSONEncoder().encode(expectedSession))
+        ])
+        let webSession = StubOAuthWebSession(
+            callbackURL: URL(string: "rallyroo://oauth-callback?stytch_token_type=oauth&token=apple-oauth-token")!
+        )
+        let authentication: any Authentication = RemoteAuthentication(
+            baseURL: URL(string: "https://api.example.com")!,
+            transport: transport,
+            webSession: webSession,
+            sessionStore: TestAuthSessionStore()
+        )
+
+        let session = try await authentication.signIn(with: .apple, invitationCode: nil)
+
+        XCTAssertEqual(session, expectedSession)
+        let webRequest = await webSession.recordedRequest()
+        XCTAssertEqual(webRequest.authorizationPath, "/v1/auth/apple")
+        XCTAssertEqual(webRequest.callbackScheme, "rallyroo")
     }
 }
 
@@ -59,8 +89,14 @@ private struct OAuthTokenExchange: Codable {
 }
 
 private actor StubOAuthWebSession: OAuthWebSession {
+    struct Request {
+        let authorizationPath: String?
+        let callbackScheme: String?
+        let challenge: String?
+    }
+
     let callbackURL: URL
-    private var challenge: String?
+    private var request = Request(authorizationPath: nil, callbackScheme: nil, challenge: nil)
 
     init(callbackURL: URL) {
         self.callbackURL = callbackURL
@@ -68,13 +104,15 @@ private actor StubOAuthWebSession: OAuthWebSession {
 
     func authenticate(using authorizationURL: URL, callbackScheme: String) async throws -> URL {
         let components = URLComponents(url: authorizationURL, resolvingAgainstBaseURL: false)
-        challenge = components?.queryItems?.first(where: { $0.name == "codeChallenge" })?.value
-        XCTAssertEqual(components?.path, "/v1/auth/google")
-        XCTAssertEqual(callbackScheme, "rallyroo")
+        request = Request(
+            authorizationPath: components?.path,
+            callbackScheme: callbackScheme,
+            challenge: components?.queryItems?.first(where: { $0.name == "codeChallenge" })?.value
+        )
         return callbackURL
     }
 
-    func recordedChallenge() -> String? { challenge }
+    func recordedRequest() -> Request { request }
 }
 
 private actor TestAuthSessionStore: AuthSessionStore {

@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 import FamilyCore
 
@@ -68,15 +69,21 @@ final class SessionGateViewModel: ObservableObject {
         errorMessage = nil
     }
 
-    func signIn(invitationCode: String?) async {
+    func signIn(
+        with provider: AuthenticationProvider,
+        invitationCode: String?
+    ) async {
         isLoading = true
         defer { isLoading = false }
         do {
-            session = try await authentication.signIn(invitationCode: invitationCode)
+            session = try await authentication.signIn(
+                with: provider,
+                invitationCode: invitationCode
+            )
             errorMessage = nil
         } catch {
             errorMessage = invitationCode == nil
-                ? "We couldn't sign you in with Google. Please try again."
+                ? "We couldn't sign you in. Please try again."
                 : "This invitation may have expired or already been used. Ask a parent to resend it."
         }
     }
@@ -119,7 +126,7 @@ private struct SignInView: View {
                         Label("Family invitation ready", systemImage: "person.2.badge.plus")
                             .font(.headline)
                             .foregroundStyle(AppTheme.purple)
-                        Text("Continue with Google to securely join the family that invited you.")
+                        Text("Continue with Apple or Google to securely join the family that invited you.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Button("Ignore this invitation") { viewModel.clearInvitation() }
@@ -129,17 +136,34 @@ private struct SignInView: View {
                     .padding()
                     .background(AppTheme.purple.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
                 }
-                Button {
-                    Task { await viewModel.signIn(invitationCode: code.isEmpty ? nil : code) }
-                } label: {
-                    Label(
-                        code.isEmpty ? "Continue with Google" : "Accept invitation with Google",
-                        systemImage: "person.crop.circle.badge.checkmark"
-                    )
-                    .frame(maxWidth: .infinity)
+                VStack(spacing: 12) {
+                    AppleOAuthButton {
+                        Task {
+                            await viewModel.signIn(
+                                with: .apple,
+                                invitationCode: code.isEmpty ? nil : code
+                            )
+                        }
+                    }
+                    .frame(height: 48)
+
+                    Button {
+                        Task {
+                            await viewModel.signIn(
+                                with: .google,
+                                invitationCode: code.isEmpty ? nil : code
+                            )
+                        }
+                    } label: {
+                        Label(
+                            code.isEmpty ? "Continue with Google" : "Accept invitation with Google",
+                            systemImage: "person.crop.circle.badge.checkmark"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppTheme.coral)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AppTheme.coral)
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
@@ -150,6 +174,41 @@ private struct SignInView: View {
             }
             .padding(24)
             .background(AppTheme.background.ignoresSafeArea())
+        }
+    }
+}
+
+private struct AppleOAuthButton: UIViewRepresentable {
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(action: action)
+    }
+
+    func makeUIView(context: Context) -> ASAuthorizationAppleIDButton {
+        let button = ASAuthorizationAppleIDButton(type: .continue, style: .black)
+        button.cornerRadius = 8
+        button.addTarget(
+            context.coordinator,
+            action: #selector(Coordinator.activate),
+            for: .touchUpInside
+        )
+        return button
+    }
+
+    func updateUIView(_ button: ASAuthorizationAppleIDButton, context: Context) {
+        context.coordinator.action = action
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+        }
+
+        @objc func activate() {
+            action()
         }
     }
 }

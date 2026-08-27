@@ -10,7 +10,8 @@ describe("server caches", () => {
   it("caches verified identities and invalidates them on revocation", async () => {
     let verifications = 0;
     const provider: IdentityProvider = {
-      googleAuthorizationURL: () => "https://identity.example",
+      googleAuthorizationURL: () => "https://identity.example/google",
+      appleAuthorizationURL: () => "https://identity.example/apple",
       authenticateOAuthToken: async () => ({
         identity: { subject: "user-1", displayName: "Alex" },
         accessToken: "token-1",

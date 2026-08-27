@@ -67,7 +67,7 @@ Invitation delivery uses the provider-neutral `InvitationEmailSender`; the refer
 adapter calls Resend. Failed delivery removes or restores the invitation so an
 unshared code is never left active. Invitation codes are stored as SHA-256 hashes and embedded in
 `rallyroo://invite?code=…` links; the login screen never asks users to type a code.
-After opening the link, Google sign-in submits the embedded code and successful
+After opening the link, Apple or Google sign-in submits the embedded code and successful
 redemption atomically creates the invited member and account in the inviter's
 family. The client never chooses a family ID or overrides the invitation's role.
 
@@ -105,11 +105,12 @@ limited requests return `429` and `Retry-After`.
 The Rallyroo backend owns the identity-provider integration. The iOS client only
 uses Rallyroo endpoints and has no Stytch SDK or Stytch configuration.
 
-1. The client generates a PKCE verifier and opens
-   `GET /v1/auth/google?codeChallenge=…` in a system authentication browser.
+1. The client generates a PKCE verifier and opens either
+   `GET /v1/auth/apple?codeChallenge=…` or `GET /v1/auth/google?codeChallenge=…`
+   in a system authentication browser.
 2. Rallyroo forwards the challenge and redirects the browser to its configured
-   Stytch Google OAuth flow.
-3. Google/Stytch redirects to `rallyroo://oauth-callback?stytch_token_type=oauth&token=…`.
+   Stytch Apple or Google OAuth flow.
+3. Apple or Google redirects through Stytch to `rallyroo://oauth-callback?stytch_token_type=oauth&token=…`.
 4. `POST /v1/sessions` with `{ "oauthToken": "…", "codeVerifier": "…" }`
    exchanges the one-time token through the backend's `IdentityProvider` adapter.
 5. If the identity is new and has no invitation, the backend atomically provisions

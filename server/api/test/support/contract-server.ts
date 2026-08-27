@@ -4,6 +4,7 @@ import type { IdentityProvider } from "../../src/identity-provider.js";
 
 const identityProvider: IdentityProvider = {
   googleAuthorizationURL: () => "https://identity.example/google",
+  appleAuthorizationURL: () => "https://identity.example/apple",
   async authenticateOAuthToken() {
     return {
       identity: { subject: "contract-parent", displayName: "Alex" },

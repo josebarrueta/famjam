@@ -1,7 +1,7 @@
 # Rallyroo TypeScript API
 
 Fastify reference backend for `../http-api.md`. It uses PostgreSQL for scalable,
-shared persistence, Redis 8.10 for shared caching and vector-search readiness, and Stytch B2C for Google-capable
+shared persistence, Redis 8.10 for shared caching and vector-search readiness, and Stytch B2C for Apple and Google
 identity verification. Rallyroo
 roles and family membership remain in PostgreSQL, so identity providers stay
 replaceable.
@@ -12,7 +12,8 @@ Requirements: Node 20+, PostgreSQL, and a Stytch test project.
 
 ```bash
 cp .env.example .env
-# Fill in all STYTCH_* values and register rallyroo://oauth-callback in Stytch.
+# Fill in all STYTCH_* values, enable Apple and Google OAuth in Stytch,
+# and register rallyroo://oauth-callback as an allowed redirect URL.
 docker compose up --build
 ```
 
@@ -87,11 +88,11 @@ available but delivery uses the no-op adapter.
 
 ## Account provisioning
 
-A first-time Google identity without an invitation is provisioned just in time as
+A first-time Apple or Google identity without an invitation is provisioned just in time as
 the parent of a new family. Provisioning creates the member and identity mapping
 in one transaction and is idempotent across retries. Parents can create, list, cancel, and securely resend single-use, seven-day
 invitations for another parent or kid. Resending rotates the code rather than
-recovering its stored hash. Redeeming an invitation during Google sign-in
+recovering its stored hash. Redeeming an invitation during Apple or Google sign-in
 atomically provisions the new member
 into the inviter's family; family IDs and invited roles are never client-selected.
 
