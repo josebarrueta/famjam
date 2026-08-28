@@ -66,6 +66,14 @@ This journal records why Rallyroo's maintainers made its deployment decisions. I
 
 **Suggestion for other projects:** Set `serviceAccountName` on every Helm release. Start with namespace isolation, then narrow resource and verb permissions further when the chart's API surface is stable.
 
+## 2026-08-27 — Sanitize OCI revisions before using them as Kubernetes labels
+
+**Decision:** The Helm chart label helper replaces `+` in chart versions and truncates the result to Kubernetes' label length limit. CI packages and renders a chart containing SemVer build metadata to preserve this contract.
+
+**Why:** Flux appends an OCI digest to a chart version as SemVer build metadata, such as `0.1.2+abcdef`. The full revision is valid SemVer but `+` is invalid in a Kubernetes label value. The first Flux adoption exposed this mismatch in the migration hook before workloads changed; version `0.1.1` remains immutable and `0.1.2` contains the correction.
+
+**Suggestion for other projects:** Test charts with the exact revisions produced by the deployment controller, not only the source `Chart.yaml` version. Artifact identifiers often have a wider character set than Kubernetes names and labels.
+
 ## 2026-08-27 — Gate upgrades with forward-only database migrations
 
 **Decision:** First installation retains an API init container because PostgreSQL is created by the same chart. Every later Helm upgrade runs the new API image's migration script in a blocking `pre-upgrade` Job. Migrations are transactional, recorded in `schema_migrations`, and serialized by a PostgreSQL advisory lock.
