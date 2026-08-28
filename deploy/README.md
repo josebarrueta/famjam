@@ -56,11 +56,44 @@ Delete the cluster while retaining local database files:
 
 Delete `~/.rallyroo/data` separately only when a full data reset is intended.
 
-## Domain hosting later
+## Published releases
 
-Keep the first milestone loopback-only. For a real domain, the preferred home-hosted
-path is a Cloudflare Tunnel terminating TLS and forwarding to NGINX. It avoids
-opening router ports and works with changing residential IP addresses. Direct DNS
-plus router port-forwarding is possible, but requires a stable public IP, firewall
-rules, TLS automation, and confirmation that the ISP permits inbound hosting.
-Never expose PostgreSQL, Redis, Kubernetes, or the Docker socket—only NGINX.
+Pushing a semantic version tag publishes both release artifacts to GHCR:
+
+```bash
+git tag -a v0.1.0 -m "Rallyroo 0.1.0"
+git push origin v0.1.0
+```
+
+The release workflow publishes:
+
+- multi-platform API image `ghcr.io/josebarrueta/rallyroo-api:0.1.0`;
+- immutable API image tag `sha-<commit>`;
+- `latest` for stable releases only;
+- OCI Helm chart `oci://ghcr.io/josebarrueta/charts/rallyroo:0.1.0`;
+- packaged Helm chart as a workflow artifact.
+
+A release can also be published from **Actions → Release → Run workflow** by
+entering a semantic version. No repository secret is required; publishing uses
+the workflow-scoped `GITHUB_TOKEN`.
+
+Pull or install a published chart with:
+
+```bash
+helm pull oci://ghcr.io/josebarrueta/charts/rallyroo --version 0.1.0
+helm install rallyroo oci://ghcr.io/josebarrueta/charts/rallyroo \
+  --version 0.1.0 \
+  --namespace rallyroo \
+  --create-namespace
+```
+
+The chart expects the `rallyroo-runtime` Secret to exist before installation.
+The API image and chart packages must be public for anonymous Kubernetes pulls;
+package visibility is configured once from their GHCR package settings.
+
+## Domain hosting
+
+The home-hosted deployment uses a Cloudflare Tunnel terminating public TLS and
+forwarding `api.rallyroo.dev` to NGINX at `127.0.0.1:8080`. No router ports are
+opened. Never expose PostgreSQL, Redis, Kubernetes, or the Docker socket—only
+NGINX through the tunnel.

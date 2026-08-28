@@ -1,3 +1,9 @@
+api:
+  image:
+    repository: rallyroo-api
+    tag: local
+    pullPolicy: IfNotPresent
+
 postgres:
   persistence:
     mode: hostPath

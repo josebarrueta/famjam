@@ -33,7 +33,7 @@ spec:
     spec:
       initContainers:
         - name: migrate
-          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          image: "{{ .Values.api.image.repository }}:{{ include "rallyroo.apiImageTag" . }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           command: ["/app/scripts/migrate.sh"]
           envFrom:
@@ -47,7 +47,7 @@ spec:
                   key: DATABASE_URL
       containers:
         - name: api
-          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          image: "{{ .Values.api.image.repository }}:{{ include "rallyroo.apiImageTag" . }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           envFrom:
             - secretRef:

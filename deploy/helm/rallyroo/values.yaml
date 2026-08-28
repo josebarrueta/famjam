@@ -1,7 +1,8 @@
 api:
   image:
-    repository: rallyroo-api
-    tag: local
+    repository: ghcr.io/josebarrueta/rallyroo-api
+    # Defaults to the packaged chart's appVersion when empty.
+    tag: ""
     pullPolicy: IfNotPresent
   replicas: 1
   resources:

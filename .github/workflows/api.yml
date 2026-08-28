@@ -7,12 +7,14 @@ on:
       - "server/api/**"
       - "deploy/**"
       - ".github/workflows/api.yml"
+      - ".github/workflows/release.yml"
   push:
     branches: [main]
     paths:
       - "server/api/**"
       - "deploy/**"
       - ".github/workflows/api.yml"
+      - ".github/workflows/release.yml"
 
 jobs:
   chart:

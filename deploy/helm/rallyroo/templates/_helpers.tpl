@@ -9,3 +9,6 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 app.kubernetes.io/name: {{ include "rallyroo.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+{{- define "rallyroo.apiImageTag" -}}
+{{- default .Chart.AppVersion .Values.api.image.tag -}}
+{{- end }}
