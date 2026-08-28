@@ -135,7 +135,7 @@ jobs:
         run: helm push "dist/rallyroo-$VERSION.tgz" "$CHART_REGISTRY"
 
       - name: Upload packaged chart
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: rallyroo-helm-${{ steps.version.outputs.version }}
           path: dist/rallyroo-${{ steps.version.outputs.version }}.tgz
