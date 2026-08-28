@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rallyroo-reconciler
+  namespace: rallyroo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rallyroo-reconciler
+  namespace: rallyroo
+rules:
+  # The chart contains namespaced workloads only. This intentionally cannot
+  # create cluster-scoped RBAC, CRDs, or resources in another namespace.
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rallyroo-reconciler
+  namespace: rallyroo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rallyroo-reconciler
+subjects:
+  - kind: ServiceAccount
+    name: rallyroo-reconciler
+    namespace: rallyroo

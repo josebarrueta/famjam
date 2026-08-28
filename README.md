@@ -13,7 +13,9 @@ sign-in and realtime sync.
 - `.github/workflows/` — CI workflows.
 - `deploy/helm/rallyroo/` — Helm chart for the API, PostgreSQL, Redis, and NGINX.
 - `deploy/local/` — isolated kind-based local deployment scripts.
+- `deploy/flux/rallyroo/` — Flux OCI release reconciliation manifests.
 - `family-app-architecture.md` — product architecture and delivery phases.
+- `docs/deployment-architecture-journal.md` — deployment decisions, trade-offs, and reusable guidance.
 
 ## Local development
 

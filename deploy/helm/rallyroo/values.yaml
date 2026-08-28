@@ -14,6 +14,17 @@ api:
 
 runtimeSecret: rallyroo-runtime
 
+migrations:
+  # The init container handles first install because PostgreSQL is created by
+  # this chart. This hook gates later upgrades before workloads are changed.
+  preUpgrade:
+    enabled: true
+    backoffLimit: 1
+    activeDeadlineSeconds: 300
+
+tests:
+  image: busybox:1.37.0
+
 postgres:
   image: postgres:17-alpine
   database: rallyroo

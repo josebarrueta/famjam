@@ -1,0 +1,37 @@
+{{- if .Values.migrations.preUpgrade.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrate
+  labels:
+    {{- include "rallyroo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrations.preUpgrade.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.preUpgrade.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "rallyroo.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: "{{ .Values.api.image.repository }}:{{ include "rallyroo.apiImageTag" . }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command: ["/app/scripts/migrate.sh"]
+          envFrom:
+            - secretRef:
+                name: {{ .Values.runtimeSecret }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.runtimeSecret }}
+                  key: DATABASE_URL
+{{- end }}

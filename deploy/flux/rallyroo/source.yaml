@@ -1,0 +1,15 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: rallyroo-chart
+  namespace: rallyroo
+spec:
+  interval: 1m
+  url: oci://ghcr.io/josebarrueta/charts/rallyroo
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    # Automatically promote patch releases. Moving to another minor series is
+    # an explicit architecture/application compatibility decision.
+    semver: ">=0.1.1 <0.2.0"

@@ -37,8 +37,9 @@ The script:
 5. installs or upgrades the chart and waits for readiness.
 
 Database migrations are bundled into the API image, serialized with a PostgreSQL
-advisory lock, and recorded in `schema_migrations` before each API pod starts.
-Running the script again is safe and performs a Helm upgrade.
+advisory lock, and recorded in `schema_migrations`. The API init container handles
+a first install; a blocking Helm `pre-upgrade` Job gates later rollouts before
+workloads change. Running the script again is safe and performs a Helm upgrade.
 
 Inspect the release without relying on the current kubectl context:
 
@@ -67,7 +68,7 @@ git push origin v0.1.0
 
 The release workflow publishes:
 
-- Linux AMD64 API image `ghcr.io/josebarrueta/rallyroo-api:0.1.0`;
+- a native Linux AMD64/ARM64 API image manifest at `ghcr.io/josebarrueta/rallyroo-api:0.1.0`;
 - immutable API image tag `sha-<commit>`;
 - `latest` for stable releases only;
 - OCI Helm chart `oci://ghcr.io/josebarrueta/charts/rallyroo:0.1.0`;
@@ -90,6 +91,35 @@ helm install rallyroo oci://ghcr.io/josebarrueta/charts/rallyroo \
 The chart expects the `rallyroo-runtime` Secret to exist before installation.
 The API image and chart packages must be public for anonymous Kubernetes pulls;
 package visibility is configured once from their GHCR package settings.
+
+## Automatic patch releases with Flux
+
+Flux polls the public OCI chart and upgrades to patch releases in the configured
+minor series. It uses outbound HTTPS only; no deployment webhook is exposed.
+Before enabling it, deploy locally once so the runtime Secret and persistent data
+paths exist, then install the Flux CLI and run:
+
+```bash
+brew install fluxcd/tap/flux
+./deploy/local/enable-flux.sh
+```
+
+The script installs only Flux's source and Helm controllers, applies the
+namespace-scoped reconciler in `deploy/flux/rallyroo/`, adopts the existing
+`rallyroo` Helm release, waits for its Helm test, and runs the public HTTP
+contract. Change the semver range in `deploy/flux/rallyroo/source.yaml` to
+promote a new minor series. Inspect or pause reconciliation with:
+
+```bash
+export KUBECONFIG=~/.rallyroo/kubeconfig
+flux get sources oci -n rallyroo
+flux get helmreleases -n rallyroo
+flux suspend helmrelease rallyroo -n rallyroo
+flux resume helmrelease rallyroo -n rallyroo
+```
+
+Architecture rationale and reusable guidance are recorded in
+[`docs/deployment-architecture-journal.md`](../docs/deployment-architecture-journal.md).
 
 ## Domain hosting
 

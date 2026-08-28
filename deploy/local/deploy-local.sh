@@ -68,6 +68,10 @@ helm upgrade --install rallyroo "$ROOT/deploy/helm/rallyroo" \
   --values "$ROOT/deploy/helm/rallyroo/values-local.yaml" \
   --wait --timeout 5m
 
+helm test rallyroo \
+  --kube-context "$CONTEXT" \
+  --namespace "$NAMESPACE" \
+  --timeout 2m
 kubectl --context "$CONTEXT" -n "$NAMESPACE" get pods
 "$ROOT/deploy/local/test-http-contract.sh"
 echo "Rallyroo is ready at http://127.0.0.1:8080"

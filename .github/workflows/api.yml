@@ -22,8 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: azure/setup-helm@v5
-      - run: helm lint deploy/helm/rallyroo --values deploy/helm/rallyroo/values-local.yaml
-      - run: helm template rallyroo deploy/helm/rallyroo --values deploy/helm/rallyroo/values-local.yaml > /tmp/rallyroo.yaml
+      - run: ./deploy/helm/rallyroo/test-chart-contract.sh
 
   quality:
     runs-on: ubuntu-latest
