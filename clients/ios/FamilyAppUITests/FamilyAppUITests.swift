@@ -9,8 +9,12 @@ final class FamilyAppUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.staticTexts["Welcome to Rallyroo"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Continue with Apple"].exists)
-        XCTAssertTrue(app.buttons["Continue with Google"].exists)
+        let appleButton = app.buttons["Continue with Apple"]
+        let googleButton = app.buttons["Continue with Google"]
+        XCTAssertTrue(appleButton.exists)
+        XCTAssertTrue(googleButton.exists)
+        XCTAssertEqual(appleButton.frame.width, googleButton.frame.width, accuracy: 1)
+        XCTAssertEqual(appleButton.frame.height, googleButton.frame.height, accuracy: 1)
         XCTAssertFalse(app.textFields["Invitation code (optional)"].exists)
     }
 

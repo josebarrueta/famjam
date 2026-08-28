@@ -161,8 +161,8 @@ private struct SignInView: View {
                         )
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppTheme.coral)
+                    .buttonStyle(OAuthButtonStyle(background: AppTheme.coral))
+                    .font(.title3)
                 }
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
@@ -178,6 +178,18 @@ private struct SignInView: View {
     }
 }
 
+private struct OAuthButtonStyle: ButtonStyle {
+    let background: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48)
+            .foregroundStyle(.white)
+            .background(background.opacity(configuration.isPressed ? 0.8 : 1))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .circular))
+    }
+}
+
 private struct AppleOAuthButton: UIViewRepresentable {
     let action: () -> Void
 
@@ -187,7 +199,7 @@ private struct AppleOAuthButton: UIViewRepresentable {
 
     func makeUIView(context: Context) -> ASAuthorizationAppleIDButton {
         let button = ASAuthorizationAppleIDButton(type: .continue, style: .black)
-        button.cornerRadius = 8
+        button.cornerRadius = 6
         button.addTarget(
             context.coordinator,
             action: #selector(Coordinator.activate),
