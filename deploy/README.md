@@ -67,7 +67,7 @@ git push origin v0.1.0
 
 The release workflow publishes:
 
-- multi-platform API image `ghcr.io/josebarrueta/rallyroo-api:0.1.0`;
+- Linux AMD64 API image `ghcr.io/josebarrueta/rallyroo-api:0.1.0`;
 - immutable API image tag `sha-<commit>`;
 - `latest` for stable releases only;
 - OCI Helm chart `oci://ghcr.io/josebarrueta/charts/rallyroo:0.1.0`;
