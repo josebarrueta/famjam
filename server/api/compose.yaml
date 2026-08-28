@@ -2,16 +2,16 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: famjam
-      POSTGRES_PASSWORD: famjam
-      POSTGRES_DB: famjam
+      POSTGRES_USER: rallyroo
+      POSTGRES_PASSWORD: rallyroo
+      POSTGRES_DB: rallyroo
     ports:
       - "5432:5432"
     volumes:
-      - famjam-postgres:/var/lib/postgresql/data
+      - rallyroo-postgres:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U famjam"]
+      test: ["CMD-SHELL", "pg_isready -U rallyroo"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,7 +22,7 @@ services:
       - "6379:6379"
     command: redis-server --save 60 1 --loglevel warning
     volumes:
-      - famjam-redis:/data
+      - rallyroo-redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -33,7 +33,7 @@ services:
     build: .
     command: ["/app/scripts/migrate.sh"]
     environment:
-      DATABASE_URL: postgres://famjam:famjam@postgres:5432/famjam
+      DATABASE_URL: postgres://rallyroo:rallyroo@postgres:5432/rallyroo
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,7 +42,7 @@ services:
     build: .
     env_file: .env
     environment:
-      DATABASE_URL: postgres://famjam:famjam@postgres:5432/famjam
+      DATABASE_URL: postgres://rallyroo:rallyroo@postgres:5432/rallyroo
       REDIS_URL: redis://redis:6379
     ports:
       - "3000:3000"
@@ -58,5 +58,5 @@ services:
         condition: service_healthy
 
 volumes:
-  famjam-postgres:
-  famjam-redis:
+  rallyroo-postgres:
+  rallyroo-redis:

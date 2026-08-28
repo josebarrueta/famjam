@@ -4,7 +4,7 @@ import { CachedIdentityProvider } from "../src/cached-identity-provider.js";
 import { CachedLocationSearchProvider } from "../src/cached-location-search-provider.js";
 import type { IdentityProvider } from "../src/identity-provider.js";
 import type { LocationSearchProvider } from "../src/location-search-provider.js";
-import { FamJamMetrics } from "../src/metrics.js";
+import { RallyrooMetrics } from "../src/metrics.js";
 
 describe("server caches", () => {
   it("caches verified identities and invalidates them on revocation", async () => {
@@ -22,7 +22,7 @@ describe("server caches", () => {
       },
       revokeSession: async () => {},
     };
-    const metrics = new FamJamMetrics();
+    const metrics = new RallyrooMetrics();
     const cached = new CachedIdentityProvider(provider, new InMemoryCache(), 60, metrics);
 
     await cached.verifySession("token-1");
@@ -33,13 +33,13 @@ describe("server caches", () => {
     await cached.verifySession("token-1");
     expect(verifications).toBe(2);
     const output = await metrics.render();
-    expect(output).toContain('famjam_cache_operations_total{cache="identities",result="miss"} 2');
-    expect(output).toContain('famjam_cache_operations_total{cache="identities",result="hit"} 1');
+    expect(output).toContain('rallyroo_cache_operations_total{cache="identities",result="miss"} 2');
+    expect(output).toContain('rallyroo_cache_operations_total{cache="identities",result="hit"} 1');
     expect(output).toContain('provider="stytch",result="success"');
   });
 
   it("exports cache and provider outcomes without exposing cache keys", async () => {
-    const metrics = new FamJamMetrics();
+    const metrics = new RallyrooMetrics();
     const provider: LocationSearchProvider = {
       async search(query) {
         if (query === "failure") throw new Error("provider unavailable");
@@ -58,8 +58,8 @@ describe("server caches", () => {
     await expect(cached.search("failure")).rejects.toThrow("provider unavailable");
     const output = await metrics.render();
 
-    expect(output).toContain('famjam_cache_operations_total{cache="locations",result="miss"} 2');
-    expect(output).toContain('famjam_cache_operations_total{cache="locations",result="hit"} 1');
+    expect(output).toContain('rallyroo_cache_operations_total{cache="locations",result="miss"} 2');
+    expect(output).toContain('rallyroo_cache_operations_total{cache="locations",result="hit"} 1');
     expect(output).toContain('provider="google_places",result="success"');
     expect(output).toContain('provider="google_places",result="failure"');
   });

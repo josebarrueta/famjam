@@ -1,12 +1,12 @@
 postgres:
   persistence:
     mode: hostPath
-    hostPath: /var/local/famjam/postgres
+    hostPath: /var/local/rallyroo/postgres
 
 redis:
   persistence:
     mode: hostPath
-    hostPath: /var/local/famjam/redis
+    hostPath: /var/local/rallyroo/redis
 
 nginx:
   service:

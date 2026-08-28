@@ -20,8 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: azure/setup-helm@v4
-      - run: helm lint deploy/helm/famjam --values deploy/helm/famjam/values-local.yaml
-      - run: helm template famjam deploy/helm/famjam --values deploy/helm/famjam/values-local.yaml > /tmp/famjam.yaml
+      - run: helm lint deploy/helm/rallyroo --values deploy/helm/rallyroo/values-local.yaml
+      - run: helm template rallyroo deploy/helm/rallyroo --values deploy/helm/rallyroo/values-local.yaml > /tmp/rallyroo.yaml
 
   quality:
     runs-on: ubuntu-latest
@@ -46,13 +46,13 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: famjam
-          POSTGRES_PASSWORD: famjam
+          POSTGRES_USER: rallyroo
+          POSTGRES_PASSWORD: rallyroo
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U famjam -d postgres"
+          --health-cmd "pg_isready -U rallyroo -d postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -66,7 +66,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      INTEGRATION_DATABASE_URL: postgres://famjam:famjam@localhost:5432/postgres
+      INTEGRATION_DATABASE_URL: postgres://rallyroo:rallyroo@localhost:5432/postgres
       INTEGRATION_REDIS_URL: redis://localhost:6379
     defaults:
       run:

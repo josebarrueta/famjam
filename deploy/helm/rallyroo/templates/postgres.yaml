@@ -3,11 +3,11 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-postgres
   labels:
-    {{- include "famjam.labels" . | nindent 4 }}
+    {{- include "rallyroo.labels" . | nindent 4 }}
 spec:
   clusterIP: None
   selector:
-    {{- include "famjam.selectorLabels" . | nindent 4 }}
+    {{- include "rallyroo.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
   ports:
     - name: postgres
@@ -18,18 +18,18 @@ kind: StatefulSet
 metadata:
   name: {{ .Release.Name }}-postgres
   labels:
-    {{- include "famjam.labels" . | nindent 4 }}
+    {{- include "rallyroo.labels" . | nindent 4 }}
 spec:
   serviceName: {{ .Release.Name }}-postgres
   replicas: 1
   selector:
     matchLabels:
-      {{- include "famjam.selectorLabels" . | nindent 6 }}
+      {{- include "rallyroo.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: postgres
   template:
     metadata:
       labels:
-        {{- include "famjam.selectorLabels" . | nindent 8 }}
+        {{- include "rallyroo.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: postgres
     spec:
       containers:

@@ -13,8 +13,8 @@ import {
   GooglePlacesLocationSearchProvider,
   type LocationSearchProvider,
 } from "./location-search-provider.js";
-import { FamJamMetrics } from "./metrics.js";
-import { PostgresFamJamRepository } from "./postgres-repository.js";
+import { RallyrooMetrics } from "./metrics.js";
+import { PostgresRallyrooRepository } from "./postgres-repository.js";
 import { NoopPushNotificationProvider } from "./push-notification-provider.js";
 import { RedisCache } from "./redis-cache.js";
 import { ResendInvitationEmailSender } from "./resend-invitation-email-sender.js";
@@ -26,7 +26,7 @@ if (!databaseURL) throw new Error("DATABASE_URL is required");
 const cache: Cache = process.env.REDIS_URL
   ? await RedisCache.connect(process.env.REDIS_URL)
   : new InMemoryCache();
-const metrics = new FamJamMetrics();
+const metrics = new RallyrooMetrics();
 const identityProvider = new CachedIdentityProvider(
   StytchIdentityProvider.fromEnvironment(),
   cache,
@@ -38,7 +38,7 @@ const locationProvider: LocationSearchProvider = googlePlacesAPIKey
   ? new GooglePlacesLocationSearchProvider(googlePlacesAPIKey)
   : new EmptyLocationSearchProvider();
 
-const repository = PostgresFamJamRepository.fromConnectionString(databaseURL);
+const repository = PostgresRallyrooRepository.fromConnectionString(databaseURL);
 const invitationEmailSender: InvitationEmailSender = process.env.RESEND_API_KEY
   && process.env.INVITATION_EMAIL_FROM
   ? new ResendInvitationEmailSender({

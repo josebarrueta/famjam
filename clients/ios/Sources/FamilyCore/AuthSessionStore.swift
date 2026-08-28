@@ -15,7 +15,7 @@ public actor KeychainAuthSessionStore: AuthSessionStore {
     private let service: String
     private let account: String
 
-    public init(service: String = "com.famjam.authentication", account: String = "session") {
+    public init(service: String = "dev.rallyroo.app.authentication", account: String = "session") {
         self.service = service
         self.account = account
     }

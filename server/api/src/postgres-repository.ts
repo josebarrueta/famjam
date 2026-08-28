@@ -8,14 +8,14 @@ import type {
   FamilyInvitation,
   FamilyMember,
 } from "./domain.js";
-import type { FamJamRepository } from "./repository.js";
+import type { RallyrooRepository } from "./repository.js";
 
-export class PostgresFamJamRepository implements FamJamRepository {
+export class PostgresRallyrooRepository implements RallyrooRepository {
   constructor(private readonly pool: Pool) {}
 
-  static fromConnectionString(connectionString: string): PostgresFamJamRepository {
+  static fromConnectionString(connectionString: string): PostgresRallyrooRepository {
     const config: PoolConfig = { connectionString, max: 20 };
-    return new PostgresFamJamRepository(new Pool(config));
+    return new PostgresRallyrooRepository(new Pool(config));
   }
 
   async checkReadiness(): Promise<void> {

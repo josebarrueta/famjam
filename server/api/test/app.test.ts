@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import { InMemoryFamJamRepository } from "../src/in-memory-repository.js";
+import { InMemoryRallyrooRepository } from "../src/in-memory-repository.js";
 import type { IdentityProvider } from "../src/identity-provider.js";
 import type { InvitationEmailSender } from "../src/invitation-email-sender.js";
 import type { LocationSearchProvider } from "../src/location-search-provider.js";
@@ -53,7 +53,7 @@ const locationSearchProvider: LocationSearchProvider = {
 };
 
 function repository() {
-  return new InMemoryFamJamRepository({
+  return new InMemoryRallyrooRepository({
     accounts: [
       { identitySubject: "parent-subject", familyID: "family-1", memberID: "parent-1", role: "parent" },
       { identitySubject: "kid-subject", familyID: "family-1", memberID: "kid-1", role: "kid" },
@@ -80,7 +80,7 @@ function repository() {
   });
 }
 
-describe("FamJam API", () => {
+describe("Rallyroo API", () => {
   it("separates dependency-free liveness from PostgreSQL readiness", async () => {
     const ready = buildApp({
       identityProvider,
@@ -130,7 +130,7 @@ describe("FamJam API", () => {
 
     expect(health.headers["x-request-id"]).toBeDefined();
     expect(publicMetrics.statusCode).toBe(200);
-    expect(publicMetrics.body).toContain("famjam_http_requests_total");
+    expect(publicMetrics.body).toContain("rallyroo_http_requests_total");
     expect(publicMetrics.body).toContain('route="/health"');
 
     const protectedApp = buildApp({

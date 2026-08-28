@@ -3,10 +3,10 @@ import XCTest
 @testable import FamilyCore
 
 final class LiveAPIContractTests: XCTestCase {
-    func testRemoteStoresMatchTheRunningFamJamAPI() async throws {
+    func testRemoteStoresMatchTheRunningRallyrooAPI() async throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let value = environment["FAMJAM_CONTRACT_BASE_URL"], let baseURL = URL(string: value) else {
-            throw XCTSkip("FAMJAM_CONTRACT_BASE_URL is not configured")
+        guard let value = environment["RALLYROO_CONTRACT_BASE_URL"], let baseURL = URL(string: value) else {
+            throw XCTSkip("RALLYROO_CONTRACT_BASE_URL is not configured")
         }
         let authentication = ContractAuthentication()
         let transport = AuthenticatedHTTPTransport(

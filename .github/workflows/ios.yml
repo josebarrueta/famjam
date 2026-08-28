@@ -33,26 +33,26 @@ jobs:
       - name: Start API contract server
         working-directory: server/api
         run: |
-          nohup npm run contract-server >/tmp/famjam-contract-server.log 2>&1 &
-          echo $! >/tmp/famjam-contract-server.pid
+          nohup npm run contract-server >/tmp/rallyroo-contract-server.log 2>&1 &
+          echo $! >/tmp/rallyroo-contract-server.pid
           for attempt in {1..30}; do
             curl --fail --silent http://127.0.0.1:3100/health >/dev/null && exit 0
             sleep 1
           done
-          cat /tmp/famjam-contract-server.log
+          cat /tmp/rallyroo-contract-server.log
           exit 1
       - name: Build core
         run: swift build
       - name: Test core and live API contract
         env:
-          FAMJAM_CONTRACT_BASE_URL: http://127.0.0.1:3100
+          RALLYROO_CONTRACT_BASE_URL: http://127.0.0.1:3100
         run: swift test
       - name: Stop API contract server
         if: always()
         working-directory: server/api
         run: |
-          if [[ -f /tmp/famjam-contract-server.pid ]]; then
-            kill "$(cat /tmp/famjam-contract-server.pid)" 2>/dev/null || true
+          if [[ -f /tmp/rallyroo-contract-server.pid ]]; then
+            kill "$(cat /tmp/rallyroo-contract-server.pid)" 2>/dev/null || true
           fi
 
   ui:
@@ -80,18 +80,18 @@ jobs:
           devices = json.load(sys.stdin)["devices"]
           print(next(device["udid"] for runtime in devices.values() for device in runtime if device["name"].startswith("iPhone")))
           ')
-          echo "FAMJAM_SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
+          echo "RALLYROO_SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
       - name: Build iOS app and UI tests
         run: >-
           xcodebuild -project FamilyApp.xcodeproj -scheme FamilyAppCI
-          -sdk iphonesimulator -destination "platform=iOS Simulator,id=$FAMJAM_SIMULATOR_ID"
+          -sdk iphonesimulator -destination "platform=iOS Simulator,id=$RALLYROO_SIMULATOR_ID"
           CODE_SIGNING_ALLOWED=NO build-for-testing
       - name: Test UI smoke paths
         run: |
           started=$SECONDS
-          xcrun simctl bootstatus "$FAMJAM_SIMULATOR_ID" -b
+          xcrun simctl bootstatus "$RALLYROO_SIMULATOR_ID" -b
           echo "Simulator ready after $((SECONDS - started)) seconds in this step"
           xcodebuild -project FamilyApp.xcodeproj -scheme FamilyAppCI \
-            -sdk iphonesimulator -destination "platform=iOS Simulator,id=$FAMJAM_SIMULATOR_ID" \
+            -sdk iphonesimulator -destination "platform=iOS Simulator,id=$RALLYROO_SIMULATOR_ID" \
             CODE_SIGNING_ALLOWED=NO test-without-building

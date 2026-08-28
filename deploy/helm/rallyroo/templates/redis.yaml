@@ -3,10 +3,10 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-redis
   labels:
-    {{- include "famjam.labels" . | nindent 4 }}
+    {{- include "rallyroo.labels" . | nindent 4 }}
 spec:
   selector:
-    {{- include "famjam.selectorLabels" . | nindent 4 }}
+    {{- include "rallyroo.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: redis
   ports:
     - name: redis
@@ -17,17 +17,17 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-redis
   labels:
-    {{- include "famjam.labels" . | nindent 4 }}
+    {{- include "rallyroo.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "famjam.selectorLabels" . | nindent 6 }}
+      {{- include "rallyroo.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: redis
   template:
     metadata:
       labels:
-        {{- include "famjam.selectorLabels" . | nindent 8 }}
+        {{- include "rallyroo.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: redis
     spec:
       containers:
@@ -65,7 +65,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-redis
   labels:
-    {{- include "famjam.labels" . | nindent 4 }}
+    {{- include "rallyroo.labels" . | nindent 4 }}
 spec:
   accessModes: ["ReadWriteOnce"]
   {{- with .Values.redis.persistence.storageClass }}

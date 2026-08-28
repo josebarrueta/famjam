@@ -1,6 +1,6 @@
 import type { Account, FamilyEvent, FamilyInvitation, FamilyMember } from "./domain.js";
 
-export interface FamJamRepository {
+export interface RallyrooRepository {
   accountForIdentity(subject: string): Promise<Account | null>;
   provisionParentAccount(subject: string, displayName: string): Promise<Account>;
   saveInvitation(invitation: FamilyInvitation): Promise<void>;

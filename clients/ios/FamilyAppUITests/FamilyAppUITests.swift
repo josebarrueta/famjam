@@ -4,8 +4,8 @@ import XCTest
 final class FamilyAppUITests: XCTestCase {
     func testLoginDoesNotAskForAManualInvitationCode() {
         let app = XCUIApplication()
-        app.launchEnvironment["FAMJAM_DATA_MODE"] = "remote"
-        app.launchEnvironment["FAMJAM_REMOTE_BASE_URL"] = "http://127.0.0.1:3199"
+        app.launchEnvironment["RALLYROO_DATA_MODE"] = "remote"
+        app.launchEnvironment["RALLYROO_REMOTE_BASE_URL"] = "http://127.0.0.1:3199"
         app.launch()
 
         XCTAssertTrue(app.staticTexts["Welcome to Rallyroo"].waitForExistence(timeout: 10))
@@ -20,7 +20,7 @@ final class FamilyAppUITests: XCTestCase {
 
     func testParentCanOpenTheLocalScheduleAndFamilyTabs() {
         let app = XCUIApplication()
-        app.launchEnvironment["FAMJAM_DATA_MODE"] = "local"
+        app.launchEnvironment["RALLYROO_DATA_MODE"] = "local"
         app.launch()
 
         XCTAssertTrue(app.navigationBars["Rallyroo"].waitForExistence(timeout: 10))

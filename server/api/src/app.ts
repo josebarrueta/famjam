@@ -16,12 +16,12 @@ import {
   EmptyLocationSearchProvider,
   type LocationSearchProvider,
 } from "./location-search-provider.js";
-import { FamJamMetrics } from "./metrics.js";
+import { RallyrooMetrics } from "./metrics.js";
 import {
   NoopPushNotificationProvider,
   type PushNotificationProvider,
 } from "./push-notification-provider.js";
-import type { FamJamRepository } from "./repository.js";
+import type { RallyrooRepository } from "./repository.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -76,13 +76,13 @@ interface RouteRateLimit {
 
 interface Dependencies {
   identityProvider: IdentityProvider;
-  repository: FamJamRepository;
+  repository: RallyrooRepository;
   locationSearchProvider?: LocationSearchProvider;
   pushNotificationProvider?: PushNotificationProvider;
   invitationEmailSender?: InvitationEmailSender;
   readinessCheck?: () => Promise<void>;
   rateLimits?: Partial<Record<"sessions" | "invitations" | "locations", RouteRateLimit>>;
-  metrics?: FamJamMetrics;
+  metrics?: RallyrooMetrics;
   metricsBearerToken?: string;
   logger?: FastifyServerOptions["logger"];
 }
@@ -95,7 +95,7 @@ export function buildApp({
   invitationEmailSender = new NoopInvitationEmailSender(),
   readinessCheck = async () => {},
   rateLimits = {},
-  metrics = new FamJamMetrics(),
+  metrics = new RallyrooMetrics(),
   metricsBearerToken,
   logger = false,
 }: Dependencies) {

@@ -9,5 +9,5 @@ nodes:
         listenAddress: 127.0.0.1
         protocol: TCP
     extraMounts:
-      - hostPath: /absolute/path/to/.famjam/data
-        containerPath: /var/local/famjam
+      - hostPath: /absolute/path/to/.rallyroo/data
+        containerPath: /var/local/rallyroo

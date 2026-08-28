@@ -35,7 +35,7 @@ temporary PostgreSQL database and use namespaced Redis keys:
 
 ```bash
 npm run test:unit
-INTEGRATION_DATABASE_URL=postgres://famjam:famjam@localhost:5432/postgres \
+INTEGRATION_DATABASE_URL=postgres://rallyroo:rallyroo@localhost:5432/postgres \
 INTEGRATION_REDIS_URL=redis://localhost:6379 \
 npm run test:integration
 ```
@@ -99,6 +99,6 @@ into the inviter's family; family IDs and invited roles are never client-selecte
 ## Architecture
 
 - `IdentityProvider` — verifies external identity; Stytch is the first adapter.
-- `FamJamRepository` — persistence seam; PostgreSQL and in-memory adapters exist.
+- `RallyrooRepository` — persistence seam; PostgreSQL and in-memory adapters exist.
 - `buildApp` — HTTP handler seam used by integration tests.
 - Authorization is enforced server-side for every route.

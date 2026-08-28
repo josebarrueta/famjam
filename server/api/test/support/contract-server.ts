@@ -1,5 +1,5 @@
 import { buildApp } from "../../src/app.js";
-import { InMemoryFamJamRepository } from "../../src/in-memory-repository.js";
+import { InMemoryRallyrooRepository } from "../../src/in-memory-repository.js";
 import type { IdentityProvider } from "../../src/identity-provider.js";
 
 const identityProvider: IdentityProvider = {
@@ -18,7 +18,7 @@ const identityProvider: IdentityProvider = {
   async revokeSession() {},
 };
 
-const repository = new InMemoryFamJamRepository({
+const repository = new InMemoryRallyrooRepository({
   accounts: [{
     identitySubject: "contract-parent",
     familyID: "contract-family",

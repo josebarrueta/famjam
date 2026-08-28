@@ -3,10 +3,10 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-api
   labels:
-    {{- include "famjam.labels" . | nindent 4 }}
+    {{- include "rallyroo.labels" . | nindent 4 }}
 spec:
   selector:
-    {{- include "famjam.selectorLabels" . | nindent 4 }}
+    {{- include "rallyroo.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: api
   ports:
     - name: http
@@ -18,17 +18,17 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-api
   labels:
-    {{- include "famjam.labels" . | nindent 4 }}
+    {{- include "rallyroo.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.api.replicas }}
   selector:
     matchLabels:
-      {{- include "famjam.selectorLabels" . | nindent 6 }}
+      {{- include "rallyroo.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: api
   template:
     metadata:
       labels:
-        {{- include "famjam.selectorLabels" . | nindent 8 }}
+        {{- include "rallyroo.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api
     spec:
       initContainers:

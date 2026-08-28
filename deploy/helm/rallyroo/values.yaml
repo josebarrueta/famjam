@@ -1,6 +1,6 @@
 api:
   image:
-    repository: famjam-api
+    repository: rallyroo-api
     tag: local
     pullPolicy: IfNotPresent
   replicas: 1
@@ -11,12 +11,12 @@ api:
     limits:
       memory: 512Mi
 
-runtimeSecret: famjam-runtime
+runtimeSecret: rallyroo-runtime
 
 postgres:
   image: postgres:17-alpine
-  database: famjam
-  user: famjam
+  database: rallyroo
+  user: rallyroo
   persistence:
     mode: pvc
     size: 5Gi

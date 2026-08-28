@@ -13,28 +13,28 @@ export class NoopTelemetry implements Telemetry {
   observeProvider(): void {}
 }
 
-export class FamJamMetrics implements Telemetry {
+export class RallyrooMetrics implements Telemetry {
   private readonly registry = new Registry();
   private readonly requests = new Counter({
-    name: "famjam_http_requests_total",
+    name: "rallyroo_http_requests_total",
     help: "Rallyroo HTTP requests",
     labelNames: ["method", "route", "status"],
     registers: [this.registry],
   });
   private readonly requestDuration = new Histogram({
-    name: "famjam_http_request_duration_seconds",
+    name: "rallyroo_http_request_duration_seconds",
     help: "Rallyroo HTTP request duration",
     labelNames: ["method", "route"],
     registers: [this.registry],
   });
   private readonly cacheOperations = new Counter({
-    name: "famjam_cache_operations_total",
+    name: "rallyroo_cache_operations_total",
     help: "Rallyroo cache operations",
     labelNames: ["cache", "result"],
     registers: [this.registry],
   });
   private readonly providerDuration = new Histogram({
-    name: "famjam_provider_request_duration_seconds",
+    name: "rallyroo_provider_request_duration_seconds",
     help: "External provider request duration",
     labelNames: ["provider", "result"],
     registers: [this.registry],

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Account, FamilyEvent, FamilyInvitation, FamilyMember } from "./domain.js";
-import type { FamJamRepository } from "./repository.js";
+import type { RallyrooRepository } from "./repository.js";
 
 interface SeedData {
   accounts?: Account[];
@@ -8,7 +8,7 @@ interface SeedData {
   members?: FamilyMember[];
 }
 
-export class InMemoryFamJamRepository implements FamJamRepository {
+export class InMemoryRallyrooRepository implements RallyrooRepository {
   private readonly accounts: Account[];
   private readonly events: FamilyEvent[];
   private readonly members: FamilyMember[];

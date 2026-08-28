@@ -11,7 +11,7 @@ sign-in and realtime sync.
 - `server/api/` — scalable TypeScript/Fastify API with PostgreSQL and Stytch.
 - `server/supabase/` — optional Supabase-specific infrastructure, not an iOS dependency.
 - `.github/workflows/` — CI workflows.
-- `deploy/helm/famjam/` — Helm chart for the API, PostgreSQL, Redis, and NGINX.
+- `deploy/helm/rallyroo/` — Helm chart for the API, PostgreSQL, Redis, and NGINX.
 - `deploy/local/` — isolated kind-based local deployment scripts.
 - `family-app-architecture.md` — product architecture and delivery phases.
 
@@ -34,14 +34,14 @@ the event domain and persistence layer.
 Rallyroo defaults to local mode and requires no account or backend:
 
 ```bash
-FAMJAM_DATA_MODE=local
+RALLYROO_DATA_MODE=local
 ```
 
 The built-in HTTP adapters can be selected without changing app features or domain code:
 
 ```bash
-FAMJAM_DATA_MODE=remote
-FAMJAM_REMOTE_BASE_URL=https://api.example.com
+RALLYROO_DATA_MODE=remote
+RALLYROO_REMOTE_BASE_URL=https://api.example.com
 ```
 
 A complete backend stack can be hosted locally on Kubernetes without a registry:

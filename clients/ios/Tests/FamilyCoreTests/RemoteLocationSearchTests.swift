@@ -3,7 +3,7 @@ import XCTest
 @testable import FamilyCore
 
 final class RemoteLocationSearchTests: XCTestCase {
-    func testSearchesAddressesThroughFamJamBackend() async throws {
+    func testSearchesAddressesThroughRallyrooBackend() async throws {
         let expected = [LocationSuggestion(
             id: "place-1",
             address: "123 Main St, Springfield, IL, USA"

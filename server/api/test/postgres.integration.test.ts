@@ -5,17 +5,17 @@ import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import type { IdentityProvider } from "../src/identity-provider.js";
-import { PostgresFamJamRepository } from "../src/postgres-repository.js";
+import { PostgresRallyrooRepository } from "../src/postgres-repository.js";
 
 const adminURL = process.env.INTEGRATION_DATABASE_URL;
-const databaseName = `famjam_test_${randomUUID().replaceAll("-", "")}`;
+const databaseName = `rallyroo_test_${randomUUID().replaceAll("-", "")}`;
 const migrationsDirectory = fileURLToPath(new URL("../migrations", import.meta.url));
 let databaseURL = "";
 let adminPool: Pool;
-const repositories: PostgresFamJamRepository[] = [];
+const repositories: PostgresRallyrooRepository[] = [];
 
-function repositoryForTest(): PostgresFamJamRepository {
-  const repository = PostgresFamJamRepository.fromConnectionString(databaseURL);
+function repositoryForTest(): PostgresRallyrooRepository {
+  const repository = PostgresRallyrooRepository.fromConnectionString(databaseURL);
   repositories.push(repository);
   return repository;
 }

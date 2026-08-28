@@ -25,14 +25,14 @@ curl http://127.0.0.1:8080/health
 curl http://127.0.0.1:8080/ready
 ```
 
-The script uses a dedicated `~/.famjam/kubeconfig`, so it never selects or authenticates
+The script uses a dedicated `~/.rallyroo/kubeconfig`, so it never selects or authenticates
 to Kubernetes clusters in the default kubeconfig.
 
 The script:
 
-1. creates the isolated `kind-famjam` context if needed;
-2. mounts `~/.famjam/data` into the cluster for durable PostgreSQL and Redis data;
-3. builds and loads `famjam-api:local` without requiring a registry;
+1. creates the isolated `kind-rallyroo` context if needed;
+2. mounts `~/.rallyroo/data` into the cluster for durable PostgreSQL and Redis data;
+3. builds and loads `rallyroo-api:local` without requiring a registry;
 4. creates the provider/runtime Kubernetes Secret outside Helm values;
 5. installs or upgrades the chart and waits for readiness.
 
@@ -43,9 +43,9 @@ Running the script again is safe and performs a Helm upgrade.
 Inspect the release without relying on the current kubectl context:
 
 ```bash
-kubectl --kubeconfig ~/.famjam/kubeconfig --context kind-famjam -n famjam get all
-kubectl --kubeconfig ~/.famjam/kubeconfig --context kind-famjam -n famjam logs deployment/famjam-api
-helm --kubeconfig ~/.famjam/kubeconfig --kube-context kind-famjam -n famjam status famjam
+kubectl --kubeconfig ~/.rallyroo/kubeconfig --context kind-rallyroo -n rallyroo get all
+kubectl --kubeconfig ~/.rallyroo/kubeconfig --context kind-rallyroo -n rallyroo logs deployment/rallyroo-api
+helm --kubeconfig ~/.rallyroo/kubeconfig --kube-context kind-rallyroo -n rallyroo status rallyroo
 ```
 
 Delete the cluster while retaining local database files:
@@ -54,7 +54,7 @@ Delete the cluster while retaining local database files:
 ./deploy/local/delete-local.sh
 ```
 
-Delete `~/.famjam/data` separately only when a full data reset is intended.
+Delete `~/.rallyroo/data` separately only when a full data reset is intended.
 
 ## Domain hosting later
 

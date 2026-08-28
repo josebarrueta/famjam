@@ -18,7 +18,7 @@ public struct AppConfiguration: Equatable, Sendable {
     public static func load(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> AppConfiguration {
-        let rawMode = environment["FAMJAM_DATA_MODE"] ?? DataMode.local.rawValue
+        let rawMode = environment["RALLYROO_DATA_MODE"] ?? DataMode.local.rawValue
         guard let dataMode = DataMode(rawValue: rawMode.lowercased()) else {
             throw AppConfigurationError.unsupportedDataMode(rawMode)
         }
@@ -26,7 +26,7 @@ public struct AppConfiguration: Equatable, Sendable {
         guard dataMode == .remote else {
             return AppConfiguration(dataMode: .local, remoteBaseURL: nil)
         }
-        guard let rawURL = environment["FAMJAM_REMOTE_BASE_URL"] else {
+        guard let rawURL = environment["RALLYROO_REMOTE_BASE_URL"] else {
             throw AppConfigurationError.missingRemoteBaseURL
         }
         guard let url = URL(string: rawURL), url.scheme != nil, url.host != nil else {
