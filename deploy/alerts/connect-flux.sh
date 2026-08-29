@@ -184,99 +184,45 @@ finish() {
 # Replace the example below. Set TOTAL_STAGES to match the stages you write.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=6
+TOTAL_STAGES=2
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 WORKER_DIR="$ROOT/deploy/alerts/resend-worker"
 KUBECONFIG_PATH=${RALLYROO_KUBECONFIG:-$HOME/.rallyroo/kubeconfig}
 CONTEXT=${RALLYROO_CONTEXT:-kind-rallyroo}
+WORKER_BASE_URL=https://alerts.rallyroo.dev
 
-banner "Rallyroo deployment email alerts"
+banner "Connect the deployed alert Worker to Flux"
 
-stage "Prerequisites and Cloudflare login"
-for command in node npm npx openssl curl kubectl flux; do
+stage "Rotate the Worker HMAC and connect Flux"
+for command in npm npx openssl curl kubectl flux; do
   command -v "$command" >/dev/null || { warn "$command is required"; exit 1; }
 done
 [[ -f "$KUBECONFIG_PATH" ]] || { warn "Missing $KUBECONFIG_PATH"; exit 1; }
-step "Install the pinned Worker dependencies."
-(cd "$WORKER_DIR" && npm ci)
-if ! (cd "$WORKER_DIR" && npx wrangler whoami >/dev/null 2>&1); then
-  step "Approve the Cloudflare OAuth request opened by Wrangler. Credentials will use your OS keychain."
-  (cd "$WORKER_DIR" && npx wrangler login --use-keyring)
-fi
-(cd "$WORKER_DIR" && npx wrangler whoami >/dev/null)
-say "Cloudflare authentication is ready."
-pause "Continue to Resend?"
-
-stage "Resend sending key and recipient"
-open_url "https://resend.com/api-keys"
-step "Click Create API Key and name it 'Rallyroo deployment alerts'."
-step "Choose Sending access and restrict it to the verified Rallyroo sending domain when available."
-step "Create the key and copy it now; Resend shows it only once."
-ask_secret RESEND_API_KEY "Paste the Resend API key:"
-[[ "$RESEND_API_KEY" == re_* ]] || { warn "The Resend key should start with re_"; exit 1; }
-ask ALERT_RECIPIENT "Email address that should receive deployment alerts:"
-[[ "$ALERT_RECIPIENT" == *@*.* ]] || { warn "Enter a valid recipient email address"; exit 1; }
-pause "Continue after the key and recipient are correct?"
-
-stage "Resend template and Automation"
-open_url "https://resend.com/templates"
-step "Create a template named 'Rallyroo deployment failed'."
-step "Import or paste deploy/alerts/resend-worker/resend-template.html."
-step "Set the sender to a verified Rallyroo address and subject to '[Rallyroo] Deployment failed: {{{REASON}}}'."
-step "Define these string variables: APPLICATION, ENVIRONMENT, OBJECT, NAMESPACE, REASON, MESSAGE, REVISION, TIMESTAMP."
-step "Publish the template. Draft templates cannot be used by Automations."
-open_url "https://resend.com/automations"
-step "Create an Automation named 'Rallyroo deployment failures' with custom event trigger deployment.failed."
-step "Add Send Email, select the published template, and map each template variable to the matching lowercase event field."
-step "The mappings are APPLICATION→event.application through TIMESTAMP→event.timestamp."
-step "Start the Automation. Enabled Automations cannot be edited without duplicating them."
-pause "Continue after the Automation shows Enabled?"
-
-stage "Deploy the signed Flux adapter"
+curl --fail --silent --show-error --output /dev/null "$WORKER_BASE_URL/health" || {
+  warn "$WORKER_BASE_URL is not reachable yet; wait for DNS propagation and retry"
+  exit 1
+}
 FLUX_HMAC_SECRET=$(openssl rand -hex 32)
 secrets_file=$(mktemp)
 trap 'rm -f "${secrets_file:-}"' EXIT
 chmod 600 "$secrets_file"
-printf 'FLUX_HMAC_SECRET=%s\nRESEND_API_KEY=%s\nALERT_RECIPIENT=%s\n' \
-  "$FLUX_HMAC_SECRET" "$RESEND_API_KEY" "$ALERT_RECIPIENT" >"$secrets_file"
-step "Deploy the Worker to alerts.rallyroo.dev and upload all three values as encrypted Worker secrets."
+printf 'FLUX_HMAC_SECRET=%s\n' "$FLUX_HMAC_SECRET" >"$secrets_file"
+step "Wrangler will deploy the same Worker while rotating only its HMAC secret. Existing Resend secrets are preserved."
 (cd "$WORKER_DIR" && npx wrangler deploy --secrets-file "$secrets_file")
 rm -f "$secrets_file"
-WORKER_BASE_URL=https://alerts.rallyroo.dev
-say "Waiting for the new Custom Domain DNS record and certificate..."
-worker_ready=false
-for _ in {1..60}; do
-  if curl --fail --silent --show-error --output /dev/null "$WORKER_BASE_URL/health" 2>/dev/null; then
-    worker_ready=true
-    break
-  fi
-  printf '.'
-  sleep 5
-done
-printf '\n'
-if [[ "$worker_ready" != true ]]; then
-  warn "alerts.rallyroo.dev did not become reachable within five minutes. The Worker is deployed, but Flux has not been connected. After DNS resolves, run ./deploy/alerts/connect-flux.sh."
-  exit 1
-fi
-say "Worker health check passed."
-pause "Continue to connect Flux?"
-
-stage "Connect Flux using the shared HMAC key"
-export RALLYROO_KUBECONFIG="$KUBECONFIG_PATH"
-export RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL="$WORKER_BASE_URL/flux"
-export RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET="$FLUX_HMAC_SECRET"
-"$ROOT/deploy/local/enable-flux.sh"
-unset RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET
+RALLYROO_KUBECONFIG="$KUBECONFIG_PATH" \
+RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL="$WORKER_BASE_URL/flux" \
+RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET="$FLUX_HMAC_SECRET" \
+  "$ROOT/deploy/local/enable-flux.sh"
 kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$CONTEXT" -n rallyroo get provider,alert
-say "Flux now signs HelmRelease error events; the Worker verifies them before contacting Resend."
+say "The Worker and Flux now share the same HMAC key."
 pause "Continue to the delivery test?"
 
 stage "Verify end-to-end email delivery"
-export RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL="$WORKER_BASE_URL/flux"
-export RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET="$FLUX_HMAC_SECRET"
-(cd "$WORKER_DIR" && npm run test:delivery)
-unset RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET
+RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL="$WORKER_BASE_URL/flux" \
+RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET="$FLUX_HMAC_SECRET" \
+  npm --prefix "$WORKER_DIR" run test:delivery
 open_url "https://resend.com/automations"
 step "Open Rallyroo deployment failures → Runs and confirm the setup-test run completed."
 step "Confirm the deployment alert arrived at the recipient inbox."

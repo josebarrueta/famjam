@@ -47,3 +47,13 @@ From the repository root, run the repeatable interactive wizard:
 It performs Cloudflare login, walks through the Resend template and Automation,
 uploads Worker secrets without writing them into the repository, configures the
 Kubernetes Secret, and sends a signed end-to-end test event.
+
+If initial deployment completed but Custom Domain DNS propagation ended the wizard
+before Flux was connected, resume without re-entering the Resend key:
+
+```bash
+./deploy/alerts/connect-flux.sh
+```
+
+The resume wizard rotates only the HMAC secret. Wrangler preserves the existing
+Resend secrets omitted from that deployment.
