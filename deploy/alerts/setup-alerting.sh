@@ -211,7 +211,7 @@ pause "Continue to Resend?"
 stage "Resend sending key and recipient"
 open_url "https://resend.com/api-keys"
 step "Click Create API Key and name it 'Rallyroo deployment alerts'."
-step "Choose Sending access and restrict it to the verified Rallyroo sending domain when available."
+step "Choose Full access. Resend currently treats custom-event submission as an Events API operation; Sending access is limited to the direct email endpoint."
 step "Create the key and copy it now; Resend shows it only once."
 ask_secret RESEND_API_KEY "Paste the Resend API key:"
 [[ "$RESEND_API_KEY" == re_* ]] || { warn "The Resend key should start with re_"; exit 1; }

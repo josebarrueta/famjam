@@ -15,7 +15,8 @@ PostgreSQL, the Rallyroo API, or the Cloudflare Tunnel.
 ## Required Worker secrets
 
 - `FLUX_HMAC_SECRET` — shared only with Flux's `generic-hmac` Provider.
-- `RESEND_API_KEY` — sending-only and domain-restricted when possible.
+- `RESEND_API_KEY` — full-access key. Resend's sending-only permission does not
+  authorize the custom Events API used by Automations.
 - `ALERT_RECIPIENT` — contact used to trigger the Resend Automation.
 
 Never commit these values or put them in Wrangler `vars`. The committed
