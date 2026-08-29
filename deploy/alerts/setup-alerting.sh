@@ -236,20 +236,14 @@ pause "Continue after the Automation shows Enabled?"
 stage "Deploy the signed Flux adapter"
 FLUX_HMAC_SECRET=$(openssl rand -hex 32)
 secrets_file=$(mktemp)
-deploy_log=$(mktemp)
-trap 'rm -f "${secrets_file:-}" "${deploy_log:-}"' EXIT
+trap 'rm -f "${secrets_file:-}"' EXIT
 chmod 600 "$secrets_file"
 printf 'FLUX_HMAC_SECRET=%s\nRESEND_API_KEY=%s\nALERT_RECIPIENT=%s\n' \
   "$FLUX_HMAC_SECRET" "$RESEND_API_KEY" "$ALERT_RECIPIENT" >"$secrets_file"
-step "Deploy the Worker and upload all three values as encrypted Worker secrets."
-(cd "$WORKER_DIR" && npx wrangler deploy --secrets-file "$secrets_file") | tee "$deploy_log"
+step "Deploy the Worker to alerts.rallyroo.dev and upload all three values as encrypted Worker secrets."
+(cd "$WORKER_DIR" && npx wrangler deploy --secrets-file "$secrets_file")
 rm -f "$secrets_file"
-WORKER_BASE_URL=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' "$deploy_log" | tail -n1 || true)
-if [[ -z "$WORKER_BASE_URL" ]]; then
-  ask WORKER_BASE_URL "Paste the HTTPS Worker URL printed by Wrangler:"
-fi
-WORKER_BASE_URL=${WORKER_BASE_URL%/}
-[[ "$WORKER_BASE_URL" == https://* ]] || { warn "Worker URL must use HTTPS"; exit 1; }
+WORKER_BASE_URL=https://alerts.rallyroo.dev
 curl --fail --silent --output /dev/null "$WORKER_BASE_URL/health"
 say "Worker health check passed."
 pause "Continue to connect Flux?"

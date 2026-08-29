@@ -30,9 +30,11 @@ npm run typecheck
 npm run deploy:dry-run
 ```
 
-Only `/health` and `/flux` exist. `/flux` requires a valid HMAC and rejects
-non-error, non-Rallyroo events. Resend failures return `502` so Flux can treat the
-delivery as failed rather than silently accepting it.
+The production endpoint is the Worker Custom Domain `alerts.rallyroo.dev`;
+`workers.dev` and preview URLs are disabled. Only `/health` and `/flux` exist.
+`/flux` requires a valid HMAC and rejects non-error, non-Rallyroo events. Resend
+failures return `502` so Flux can treat the delivery as failed rather than silently
+accepting it.
 
 ## Setup
 

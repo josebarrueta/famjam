@@ -115,8 +115,10 @@ Cloudflare Worker and Resend Automation with the interactive wizard:
 ./deploy/alerts/setup-alerting.sh
 ```
 
-The Resend API key and recipient exist only as encrypted Worker secrets. Flux stores
-only the Worker endpoint and shared HMAC key in the
+The Worker is published at the Custom Domain `alerts.rallyroo.dev`; Cloudflare
+creates its DNS record and certificate, and `workers.dev` is disabled. The Resend
+API key and recipient exist only as encrypted Worker secrets. Flux stores only the
+Worker endpoint and shared HMAC key in the
 `rallyroo-deployment-alert-webhook` Kubernetes Secret. The Worker accepts only
 signed Rallyroo HelmRelease errors and converts them into Resend's
 `deployment.failed` custom event. Resend owns the published template, Automation
