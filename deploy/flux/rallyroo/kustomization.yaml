@@ -5,3 +5,4 @@ resources:
   - rbac.yaml
   - source.yaml
   - release.yaml
+  - notification.yaml

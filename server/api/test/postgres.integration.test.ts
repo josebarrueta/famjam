@@ -9,7 +9,7 @@ import { PostgresRallyrooRepository } from "../src/postgres-repository.js";
 
 const adminURL = process.env.INTEGRATION_DATABASE_URL;
 const databaseName = `rallyroo_test_${randomUUID().replaceAll("-", "")}`;
-const migrationsDirectory = fileURLToPath(new URL("../migrations", import.meta.url));
+const migrationsDirectory = fileURLToPath(new URL("../migrations/pre", import.meta.url));
 let databaseURL = "";
 let adminPool: Pool;
 const repositories: PostgresRallyrooRepository[] = [];

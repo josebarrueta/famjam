@@ -1,0 +1,26 @@
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: rallyroo-deployment-webhook
+  namespace: rallyroo
+spec:
+  type: generic
+  secretRef:
+    name: rallyroo-deployment-alert-webhook
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: rallyroo-deployment-failures
+  namespace: rallyroo
+spec:
+  providerRef:
+    name: rallyroo-deployment-webhook
+  eventSeverity: error
+  eventMetadata:
+    application: rallyroo
+    environment: home-production
+    summary: Rallyroo deployment failed; inspect the HelmRelease and migration Job
+  eventSources:
+    - kind: HelmRelease
+      name: rallyroo

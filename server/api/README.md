@@ -26,7 +26,7 @@ For development outside Docker:
 npm install
 npm test
 npm run typecheck
-cat migrations/*.sql | psql "$DATABASE_URL" -v ON_ERROR_STOP=1
+APPLICATION_VERSION=development DATABASE_URL="$DATABASE_URL" ./scripts/migrate.sh pre
 npm run dev
 ```
 
@@ -38,7 +38,18 @@ npm run test:unit
 INTEGRATION_DATABASE_URL=postgres://rallyroo:rallyroo@localhost:5432/postgres \
 INTEGRATION_REDIS_URL=redis://localhost:6379 \
 npm run test:integration
+INTEGRATION_DATABASE_URL=postgres://rallyroo:rallyroo@localhost:5432/postgres \
+npm run test:migrations
 ```
+
+Migration filenames use one global numeric sequence. Put mandatory,
+backward-compatible rollout changes in `migrations/pre/`. Put optional compatible
+backfills or deferred work in `migrations/post/`; post migrations run only when the
+chart's `migrations.postUpgrade.enabled` value is explicitly enabled. Never edit an
+applied migration: the runner verifies its SHA-256 checksum and stores its version,
+name, checksum, application version, and applied timestamp in
+`schema_migrations`. Records created by the earlier filename-only runner are
+backfilled as `legacy-unrecorded` rather than assigned a misleading release version.
 
 GitHub Actions runs these as separate quality and service-backed integration jobs
 using PostgreSQL 17 and Redis 8.10.1.

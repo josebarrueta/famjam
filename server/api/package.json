@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --exclude 'test/*.integration.test.ts'",
     "test:integration": "vitest run test/postgres.integration.test.ts test/redis.integration.test.ts",
+    "test:migrations": "./test/migrations.integration.sh",
     "contract-server": "tsx test/support/contract-server.ts"
   },
   "dependencies": {

@@ -37,9 +37,13 @@ The script:
 5. installs or upgrades the chart and waits for readiness.
 
 Database migrations are bundled into the API image, serialized with a PostgreSQL
-advisory lock, and recorded in `schema_migrations`. The API init container handles
-a first install; a blocking Helm `pre-upgrade` Job gates later rollouts before
-workloads change. Running the script again is safe and performs a Helm upgrade.
+advisory lock, and recorded with checksums and application versions in
+`schema_migrations`. `migrations/pre/` contains mandatory backward-compatible
+changes. The API init container handles them on first install; a blocking Helm
+`pre-upgrade` Job gates later rollouts before workloads change. Optional compatible
+work in `migrations/post/` can run after a healthy rollout by explicitly enabling
+`migrations.postUpgrade.enabled`. A failed migration rolls back its transaction and
+fails the Helm release before promotion. Running the script again is safe.
 
 Inspect the release without relying on the current kubectl context:
 
@@ -101,10 +105,18 @@ paths exist, then install the Flux CLI and run:
 
 ```bash
 brew install fluxcd/tap/flux
+read -rsp "Deployment alert webhook URL: " RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL; echo
+export RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL
 ./deploy/local/enable-flux.sh
+unset RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL
 ```
 
-The script installs only Flux's source and Helm controllers, applies the
+The webhook URL is stored only in the `rallyroo-deployment-alert-webhook`
+Kubernetes Secret. Flux sends error events for the Rallyroo HelmRelease, including
+migration-hook failures, to that generic HTTPS endpoint. If the variable is omitted,
+reconciliation still works but the script warns that outbound alerts are not active.
+
+The script installs Flux's source, Helm, and notification controllers, applies the
 namespace-scoped reconciler in `deploy/flux/rallyroo/`, adopts the existing
 `rallyroo` Helm release, waits for its Helm test, and runs the public HTTP
 contract. Change the semver range in `deploy/flux/rallyroo/source.yaml` to

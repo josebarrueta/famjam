@@ -21,6 +21,13 @@ migrations:
     enabled: true
     backoffLimit: 1
     activeDeadlineSeconds: 300
+  # Optional compatible work that must wait until the new release is healthy.
+  # Destructive changes do not belong here because Flux may still roll back.
+  postUpgrade:
+    enabled: false
+    backoffLimit: 1
+    activeDeadlineSeconds: 300
+    rolloutWaitImage: registry.k8s.io/kubectl:v1.36.1
 
 tests:
   image: busybox:1.37.0

@@ -36,10 +36,13 @@ spec:
           image: "{{ .Values.api.image.repository }}:{{ include "rallyroo.apiImageTag" . }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           command: ["/app/scripts/migrate.sh"]
+          args: ["pre"]
           envFrom:
             - secretRef:
                 name: {{ .Values.runtimeSecret }}
           env:
+            - name: APPLICATION_VERSION
+              value: {{ include "rallyroo.apiImageTag" . | quote }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

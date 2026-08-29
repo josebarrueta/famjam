@@ -15,13 +15,26 @@ export KUBECONFIG="$LOCAL_KUBECONFIG"
 kubectl --context "$CONTEXT" cluster-info >/dev/null
 flux check --pre --context "$CONTEXT"
 
-# Only artifact discovery and Helm reconciliation are needed. The default
-# ingress-denying network policies remain enabled and no webhook is exposed.
+# Artifact discovery, Helm reconciliation, and outbound failure notifications
+# are needed. The default ingress-denying policies remain; no webhook is exposed.
 flux install \
   --context "$CONTEXT" \
   --namespace flux-system \
-  --components source-controller,helm-controller \
+  --components source-controller,helm-controller,notification-controller \
   --network-policy=true
+
+kubectl --context "$CONTEXT" apply -f "$ROOT/deploy/flux/rallyroo/namespace.yaml"
+if [[ -n "${RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL:-}" ]]; then
+  [[ "$RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL" == https://* ]] || {
+    echo "RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL must use HTTPS" >&2
+    exit 1
+  }
+  kubectl --context "$CONTEXT" -n rallyroo create secret generic rallyroo-deployment-alert-webhook \
+    --from-literal=address="$RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL" \
+    --dry-run=client -o yaml | kubectl --context "$CONTEXT" apply -f -
+elif ! kubectl --context "$CONTEXT" -n rallyroo get secret rallyroo-deployment-alert-webhook >/dev/null 2>&1; then
+  echo "Warning: deployment failure alerts are not delivered until RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL is configured." >&2
+fi
 
 kubectl --context "$CONTEXT" apply -k "$ROOT/deploy/flux/rallyroo"
 kubectl --context "$CONTEXT" -n rallyroo wait ocirepository/rallyroo-chart \

@@ -76,13 +76,21 @@ This journal records why Rallyroo's maintainers made its deployment decisions. I
 
 ## 2026-08-27 — Gate upgrades with forward-only database migrations
 
-**Decision:** First installation retains an API init container because PostgreSQL is created by the same chart. Every later Helm upgrade runs the new API image's migration script in a blocking `pre-upgrade` Job. Migrations are transactional, recorded in `schema_migrations`, and serialized by a PostgreSQL advisory lock.
+**Decision:** First installation retains an API init container because PostgreSQL is created by the same chart. Every later Helm upgrade runs the new API image's `migrations/pre/` directory in a blocking `pre-upgrade` Job. An optional `post-upgrade` Job runs `migrations/post/` after the new workloads are healthy. Directory placement expresses timing; migration numbers remain globally unique. Migrations are transactional, serialized by a PostgreSQL advisory lock, and recorded with version, filename, SHA-256 checksum, application version, and applied timestamp.
 
-**Why:** A pre-install hook cannot reach PostgreSQL before this combined chart creates it. On upgrades PostgreSQL already exists, so a hook can fail the release before application workloads change. The init container remains an idempotent safety net.
+**Why:** A pre-install hook cannot reach PostgreSQL before this combined chart creates it. On upgrades PostgreSQL already exists, so a pre hook can fail the release before application workloads change. The post directory gives maintainers a clear location for compatible backfills or deferred indexes that should wait until old replicas are gone, while projects that do not need two phases can keep all work in pre. Checksums detect accidental edits to immutable history.
 
-**Consequence:** Application rollback does not reverse schema changes. Automated migrations must use expand/contract sequencing: add compatible schema, deploy compatible code, backfill when needed, stop using old schema, and remove it only in a later release. Destructive changes require explicit review and a verified backup.
+**Consequence:** Application rollback does not reverse schema changes. Both automated phases must remain compatible with the rollback version. Automated migrations use expand/contract sequencing: add compatible schema, deploy compatible code, backfill when needed, stop using old schema, and remove it only in a later release outside the rollback window. Destructive changes require explicit review and a verified backup.
 
-**Suggestion for other projects:** Make migration success a rollout gate, but design the database for both the old and new application during rolling deployment and rollback. If database infrastructure has a separate lifecycle, a `pre-install,pre-upgrade` migration Job can replace the first-install init-container compromise.
+**Suggestion for other projects:** Make migration success a rollout gate, give pre- and post-rollout work obvious homes, and keep one durable version sequence in the database. Design every automated change for both the old and new application. If database infrastructure has a separate lifecycle, a `pre-install,pre-upgrade` migration Job can replace the first-install init-container compromise.
+
+## 2026-08-27 — Alert on failed release reconciliation
+
+**Decision:** Flux's notification controller forwards Rallyroo HelmRelease error events to a generic HTTPS webhook. The destination address lives in a Kubernetes Secret rather than Git or Helm values. Migration-hook failures are HelmRelease errors, so they use the same alert path as readiness, test, and rollback failures.
+
+**Why:** Stopping a failed deployment protects availability, but a silently stalled release still requires an operator to notice it. A generic provider keeps the repository independent of Slack, Teams, Discord, or a particular incident platform.
+
+**Suggestion for other projects:** Alert from the deployment reconciler rather than teaching every migration script about messaging providers. This preserves one release-failure path and includes the controller's release revision and failure reason.
 
 ## 2026-08-27 — Define release success beyond pod startup
 

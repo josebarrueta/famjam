@@ -62,10 +62,27 @@ jobs:
   verify:
     needs: prepare
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: rallyroo
+          POSTGRES_PASSWORD: rallyroo
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rallyroo -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      INTEGRATION_DATABASE_URL: postgres://rallyroo:rallyroo@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v5
       - uses: azure/setup-helm@v5
       - run: ./deploy/helm/rallyroo/test-chart-contract.sh
+      - run: ./deploy/flux/rallyroo/test-flux-contract.sh
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -76,6 +93,7 @@ jobs:
         run: |
           npm ci
           npm run test:unit
+          npm run test:migrations
           npm run typecheck
           npm run build
 

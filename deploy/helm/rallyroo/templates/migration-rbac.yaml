@@ -1,0 +1,36 @@
+{{- if .Values.migrations.postUpgrade.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-migration
+  labels:
+    {{- include "rallyroo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-migration-rollout-reader
+  labels:
+    {{- include "rallyroo.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: [{{ printf "%s-api" .Release.Name | quote }}]
+    verbs: ["get", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-migration-rollout-reader
+  labels:
+    {{- include "rallyroo.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-migration
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-migration-rollout-reader
+{{- end }}

@@ -9,7 +9,6 @@ services:
       - "5432:5432"
     volumes:
       - rallyroo-postgres:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rallyroo"]
       interval: 5s
@@ -31,8 +30,9 @@ services:
 
   migrate:
     build: .
-    command: ["/app/scripts/migrate.sh"]
+    command: ["/app/scripts/migrate.sh", "pre"]
     environment:
+      APPLICATION_VERSION: compose-local
       DATABASE_URL: postgres://rallyroo:rallyroo@postgres:5432/rallyroo
     depends_on:
       postgres:
