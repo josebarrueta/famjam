@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
+import { CalendarSourceModule } from "../src/calendar-source-module.js";
 import type { IdentityProvider } from "../src/identity-provider.js";
 import { PostgresRallyrooRepository } from "../src/postgres-repository.js";
 
@@ -129,6 +130,78 @@ describe.skipIf(!adminURL)("PostgreSQL HTTP integration", () => {
     expect(events.json()).toEqual([
       expect.objectContaining({ id: "00000000-0000-4000-8000-000000000099", title: "Integration rehearsal" }),
     ]);
+    await reader.close();
+  });
+
+  it("persists synchronized calendar sources and imported events across API instances", async () => {
+    const writerRepository = repositoryForTest();
+    const feedBody = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:persisted-calendar@example",
+      "SUMMARY:Persisted team practice",
+      "DTSTART:20260920T180000Z",
+      "DTEND:20260920T190000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const moduleFor = (repository: PostgresRallyrooRepository) => new CalendarSourceModule({
+      repository,
+      protectURL: (url) => `encrypted:${url}`,
+      revealURL: (url) => url.replace(/^encrypted:/, ""),
+      fetchFeed: async () => ({ body: feedBody }),
+    });
+    const writer = buildApp({
+      identityProvider,
+      repository: writerRepository,
+      calendarSources: moduleFor(writerRepository),
+    });
+    await writer.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: { oauthToken: "oauth-token", codeVerifier: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq" },
+    });
+    const created = await writer.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer integration-token" },
+      payload: {
+        name: "TeamSnap",
+        url: "https://ical.example/team.ics",
+        participantIDs: [(await writerRepository.accountForIdentity("integration-parent"))!.memberID],
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    expect((await writer.inject({
+      method: "POST",
+      url: `/v1/calendar-sources/${created.json().id}/sync`,
+      headers: { authorization: "Bearer integration-token" },
+    })).statusCode).toBe(200);
+    await writer.close();
+
+    const readerRepository = repositoryForTest();
+    const reader = buildApp({
+      identityProvider,
+      repository: readerRepository,
+      calendarSources: moduleFor(readerRepository),
+    });
+    const sources = await reader.inject({
+      method: "GET",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer integration-token" },
+    });
+    const events = await reader.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer integration-token" },
+    });
+    expect(sources.json()).toEqual([
+      expect.objectContaining({ name: "TeamSnap", status: "ready" }),
+    ]);
+    expect(events.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: "Persisted team practice", source: "calendar", readOnly: true }),
+    ]));
     await reader.close();
   });
 

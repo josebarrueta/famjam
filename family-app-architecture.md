@@ -51,8 +51,8 @@ Minimal v1 schema — expected to evolve:
   (kids only), color_tag
 - **events**: id, title, participant_ids (one or more family members; supports
   parent work/appointment events and kid activities), start_time, end_time,
-  location, driver, source (`manual` | `email_suggested` | `voice`), status
-  (`confirmed` | `pending_review`)
+  location, driver, source (`manual` | `email_suggested` | `voice` | `calendar`), status
+  (`confirmed` | `pending_review`); imported calendar projections also retain read-only provenance
 - **users**: id, role (`parent` | `kid`), auth link to Supabase Auth
 - **conflicts** (derived, not stored): computed at write-time by checking new events
   against existing ones for overlapping times or the same driver double-booked
@@ -64,6 +64,9 @@ Minimal v1 schema — expected to evolve:
 - Weekly view, color-coded per kid
 - Data synced across family devices through a lightweight family change cursor;
   clients refresh automatically when the cursor advances or the app becomes active
+- Parent-managed HTTPS iCalendar subscriptions for TeamSnap, school, and sports
+  schedules, with read-only provenance, recurrence expansion, conflict participation,
+  and deterministic exact deduplication across family members' feeds
 
 ## 7. Agentic Features (v2+)
 

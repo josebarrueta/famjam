@@ -51,6 +51,29 @@ Save response:
 Supported conflict kinds are `overlapping_participant` and
 `double_booked_driver`.
 
+Imported calendar events additionally use `source: "calendar"`, `readOnly: true`,
+and a `provenance` array containing `sourceID`, `sourceName`, and `externalUID`.
+They participate in conflict detection but cannot be edited as native Rallyroo events.
+Exact duplicates are consolidated by external identity or normalized title, time,
+and location; participant IDs and provenance are combined.
+
+## Calendar subscriptions
+
+Authenticated parents can manage read-only iCalendar subscriptions:
+
+- `POST /v1/calendar-sources` with `{ "name", "url", "participantIDs" }` creates
+  a connection. HTTPS links are required; `webcal:` subscription links are normalized
+  to HTTPS. Participant IDs must belong to the family.
+- `GET /v1/calendar-sources` lists connection metadata without revealing feed URLs.
+- `POST /v1/calendar-sources/{id}/sync` atomically refreshes imported events.
+- `DELETE /v1/calendar-sources/{id}` removes the connection and its imported events.
+
+Kid sessions receive `403`. Feed URLs are bearer-style secrets encrypted in
+PostgreSQL. The reference adapter rejects private-network destinations, limits
+redirects, response size, recurrence expansion, and request duration. A failed
+refresh returns `502`, marks the connection as failed, and preserves the last good
+schedule. Recurrences are expanded into bounded schedule occurrences.
+
 ## Family invitations
 
 - `POST /v1/invitations` with

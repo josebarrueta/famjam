@@ -58,9 +58,12 @@ See [`deploy/README.md`](deploy/README.md) for persistence, credentials, inspect
 and the later domain/TLS path.
 
 Remote mode configuration is validated by `AppConfiguration`. Authentication,
-events, and family members use vendor-neutral interfaces; a Supabase Edge Function,
-custom server, or another provider can implement `server/http-api.md`. Conflict
-alerts remain local to each device for now.
+events, family members, and calendar subscriptions use vendor-neutral interfaces;
+a custom server or another provider can implement `server/http-api.md`. Parents can
+add HTTPS iCalendar feeds for TeamSnap, schools, and sports calendars from Settings.
+Imported events remain read-only, participate in conflict detection, and consolidate
+exact duplicates across family members' subscriptions while preserving combined
+participants and provenance. Conflict alerts remain local to each device for now.
 
 ## Continuous integration
 

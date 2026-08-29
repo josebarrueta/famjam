@@ -55,7 +55,7 @@ struct WeeklyScheduleView: View {
                                     )
                                         .contentShape(Rectangle())
                                         .onTapGesture {
-                                            if allowsEditing {
+                                            if allowsEditing && !occurrence.sourceEvent.isReadOnly {
                                                 editingEvent = occurrence.sourceEvent
                                             }
                                         }
@@ -164,6 +164,13 @@ struct WeeklyScheduleView: View {
     }
 }
 
+private extension Sequence where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
+    }
+}
+
 private struct EventRow: View {
     let display: ScheduleEventDisplay
 
@@ -183,6 +190,14 @@ private struct EventRow: View {
                 Text(display.event.startTime.formatted(date: .omitted, time: .shortened))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if display.event.isReadOnly {
+                    Label(
+                        display.event.provenance.map(\.sourceName).uniqued().joined(separator: " • "),
+                        systemImage: "calendar.badge.clock"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
                 if let location = display.event.location, !location.isEmpty {
                     Label(location, systemImage: "mappin.and.ellipse")
                         .font(.subheadline)

@@ -5,6 +5,8 @@ import type { IdentityProvider } from "../src/identity-provider.js";
 import type { InvitationEmailSender } from "../src/invitation-email-sender.js";
 import type { LocationSearchProvider } from "../src/location-search-provider.js";
 import type { PushNotificationProvider } from "../src/push-notification-provider.js";
+import { CalendarSourceModule } from "../src/calendar-source-module.js";
+import { InMemoryCalendarSourceRepository } from "../src/in-memory-calendar-source-repository.js";
 
 const codeChallenge = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
 const codeVerifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
@@ -62,6 +64,7 @@ function repository() {
     members: [
       { id: "parent-1", familyID: "family-1", name: "Alex", role: "parent", colorTag: "blue" },
       { id: "kid-1", familyID: "family-1", name: "Emma", role: "kid", colorTag: "purple" },
+      { id: "kid-2", familyID: "family-1", name: "Noah", role: "kid", colorTag: "orange" },
       { id: "parent-2", familyID: "family-2", name: "Jordan", role: "parent", colorTag: "green" },
     ],
     events: [{
@@ -523,6 +526,449 @@ describe("Rallyroo API", () => {
     expect(registration.statusCode).toBe(204);
     expect(write.statusCode).toBe(200);
     expect(pushes).toEqual([{ tokens: ["device-token-1"], title: "Band practice" }]);
+    await app.close();
+  });
+
+  it("lets only parents create and list participant-scoped calendar subscriptions", async () => {
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => `protected:${url}`,
+      revealURL: (protectedURL) => protectedURL.replace(/^protected:/, ""),
+      fetchFeed: async () => ({ body: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n" }),
+    });
+    const app = buildApp({
+      identityProvider,
+      repository: repository(),
+      calendarSources,
+    });
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "Emma TeamSnap",
+        url: "https://ical.example/emma-secret-feed.ics",
+        participantIDs: ["kid-1"],
+      },
+    });
+    const forbidden = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer kid-token" },
+      payload: {
+        name: "Not allowed",
+        url: "https://ical.example/secret.ics",
+        participantIDs: ["kid-1"],
+      },
+    });
+    const listed = await app.inject({
+      method: "GET",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      name: "Emma TeamSnap",
+      participantIDs: ["kid-1"],
+      status: "pending",
+    });
+    expect(created.json()).not.toHaveProperty("url");
+    expect(forbidden.statusCode).toBe(403);
+    expect(listed.json()).toEqual([created.json()]);
+    await app.close();
+  });
+
+  it("synchronizes duplicate calendar events as one schedule item with combined participants and provenance", async () => {
+    const feeds = new Map([
+      ["https://ical.example/emma.ics", [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:emma-party@example",
+        "SUMMARY:Class Party",
+        "DTSTART:20260912T180000Z",
+        "DTEND:20260912T200000Z",
+        "LOCATION:Lincoln School",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n")],
+      ["https://ical.example/noah.ics", [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:noah-party@example",
+        "SUMMARY:  CLASS PARTY  ",
+        "DTSTART:20260912T180000Z",
+        "DTEND:20260912T200000Z",
+        "LOCATION:Lincoln School",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n")],
+    ]);
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => `protected:${url}`,
+      revealURL: (protectedURL) => protectedURL.replace(/^protected:/, ""),
+      fetchFeed: async (url) => ({ body: feeds.get(url)! }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+    const createSource = async (url: string, participantID: string) => (await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: { name: participantID, url, participantIDs: [participantID] },
+    })).json();
+    const emma = await createSource("https://ical.example/emma.ics", "kid-1");
+    const noah = await createSource("https://ical.example/noah.ics", "kid-2");
+
+    for (const source of [emma, noah]) {
+      const synced = await app.inject({
+        method: "POST",
+        url: `/v1/calendar-sources/${source.id}/sync`,
+        headers: { authorization: "Bearer parent-token" },
+      });
+      expect(synced.statusCode).toBe(200);
+    }
+    const schedule = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const imported = schedule.json().filter((event: { source: string }) => event.source === "calendar");
+
+    expect(imported).toHaveLength(1);
+    expect(imported[0]).toMatchObject({
+      title: "Class Party",
+      participantIDs: ["kid-1", "kid-2"],
+      readOnly: true,
+    });
+    expect(imported[0].provenance).toHaveLength(2);
+    await app.close();
+  });
+
+  it("expands recurring calendar events into distinct schedule occurrences", async () => {
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:weekly@example",
+        "SUMMARY:Weekly practice",
+        "DTSTART:20260915T180000Z",
+        "DTEND:20260915T190000Z",
+        "RRULE:FREQ=WEEKLY;COUNT=2",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n") }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+    const source = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "TeamSnap",
+        url: "https://ical.example/team.ics",
+        participantIDs: ["kid-1"],
+      },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/v1/calendar-sources/${source.json().id}/sync`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    const schedule = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const imported = schedule.json().filter((event: { source: string }) => event.source === "calendar");
+    expect(imported.map((event: { startTime: string }) => event.startTime)).toEqual([
+      "2026-09-15T18:00:00.000Z",
+      "2026-09-22T18:00:00.000Z",
+    ]);
+    await app.close();
+  });
+
+  it("includes imported calendar events in conflict detection", async () => {
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:practice@example",
+        "SUMMARY:Team practice",
+        "DTSTART:20260915T180000Z",
+        "DTEND:20260915T190000Z",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n") }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+    const source = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "TeamSnap",
+        url: "https://ical.example/team.ics",
+        participantIDs: ["kid-1"],
+      },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/v1/calendar-sources/${source.json().id}/sync`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    const saved = await app.inject({
+      method: "PUT",
+      url: "/v1/events/00000000-0000-4000-8000-000000000077",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: "00000000-0000-4000-8000-000000000077",
+        title: "Piano",
+        kidID: "kid-1",
+        participantIDs: ["kid-1"],
+        startTime: "2026-09-15T18:30:00Z",
+        endTime: "2026-09-15T19:30:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed",
+      },
+    });
+
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json().conflicts).toEqual([
+      expect.objectContaining({ kind: "overlapping_participant", memberID: "kid-1" }),
+    ]);
+    await app.close();
+  });
+
+  it("rejects edits and event deletion for imported calendar events", async () => {
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:readonly@example",
+        "SUMMARY:Read-only practice",
+        "DTSTART:20260916T180000Z",
+        "DTEND:20260916T190000Z",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n") }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+    const source = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "TeamSnap",
+        url: "https://ical.example/team.ics",
+        participantIDs: ["kid-1"],
+      },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/v1/calendar-sources/${source.json().id}/sync`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const schedule = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const imported = schedule.json().find((event: { source: string }) => event.source === "calendar");
+
+    const edited = await app.inject({
+      method: "PUT",
+      url: `/v1/events/${imported.id}`,
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        ...imported,
+        title: "Changed locally",
+        source: "manual",
+        readOnly: undefined,
+        provenance: undefined,
+      },
+    });
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/v1/events/${imported.id}`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(edited.statusCode).toBe(409);
+    expect(deleted.statusCode).toBe(409);
+    await app.close();
+  });
+
+  it("removes events missing from a refreshed calendar without changing native events", async () => {
+    let feedBody = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:cancelled@example",
+      "SUMMARY:Cancelled practice",
+      "DTSTART:20260916T180000Z",
+      "DTEND:20260916T190000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: feedBody }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+    const source = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "TeamSnap",
+        url: "https://ical.example/team.ics",
+        participantIDs: ["kid-1"],
+      },
+    });
+    const sync = () => app.inject({
+      method: "POST",
+      url: `/v1/calendar-sources/${source.json().id}/sync`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+    await sync();
+    feedBody = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
+    await sync();
+
+    const schedule = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    expect(schedule.json()).toEqual([
+      expect.objectContaining({ title: "Soccer practice", source: "manual" }),
+    ]);
+    await app.close();
+  });
+
+  it("preserves the last good schedule when a calendar refresh fails", async () => {
+    let feedBody = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:preserved@example",
+      "SUMMARY:Preserved practice",
+      "DTSTART:20260917T180000Z",
+      "DTEND:20260917T190000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: feedBody }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+    const source = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "TeamSnap",
+        url: "https://ical.example/team.ics",
+        participantIDs: ["kid-1"],
+      },
+    });
+    const sync = () => app.inject({
+      method: "POST",
+      url: `/v1/calendar-sources/${source.json().id}/sync`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+    expect((await sync()).statusCode).toBe(200);
+    feedBody = "not a calendar";
+
+    expect((await sync()).statusCode).toBe(502);
+    const sources = await app.inject({
+      method: "GET",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const schedule = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    expect(sources.json()[0]).toMatchObject({ status: "error", lastError: "sync_failed" });
+    expect(schedule.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: "Preserved practice" }),
+    ]));
+    await app.close();
+  });
+
+  it("lets a parent remove a calendar subscription and all of its imported events", async () => {
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:removed@example",
+        "SUMMARY:Removed practice",
+        "DTSTART:20260917T180000Z",
+        "DTEND:20260917T190000Z",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n") }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+    const source = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "TeamSnap",
+        url: "https://ical.example/team.ics",
+        participantIDs: ["kid-1"],
+      },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/v1/calendar-sources/${source.json().id}/sync`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    const removed = await app.inject({
+      method: "DELETE",
+      url: `/v1/calendar-sources/${source.json().id}`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const schedule = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(removed.statusCode).toBe(204);
+    expect(schedule.json().filter((event: { source: string }) => event.source === "calendar")).toEqual([]);
     await app.close();
   });
 

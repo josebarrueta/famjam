@@ -1,6 +1,8 @@
 import "dotenv/config";
 import { APNSPushNotificationProvider } from "./apns-push-notification-provider.js";
 import { buildApp } from "./app.js";
+import { calendarURLProtection, fetchPublicCalendarFeed } from "./calendar-source-adapters.js";
+import { CalendarSourceModule } from "./calendar-source-module.js";
 import { InMemoryCache, type Cache } from "./cache.js";
 import { CachedIdentityProvider } from "./cached-identity-provider.js";
 import { CachedLocationSearchProvider } from "./cached-location-search-provider.js";
@@ -39,6 +41,14 @@ const locationProvider: LocationSearchProvider = googlePlacesAPIKey
   : new EmptyLocationSearchProvider();
 
 const repository = PostgresRallyrooRepository.fromConnectionString(databaseURL);
+const calendarEncryptionKey = process.env.CALENDAR_SOURCE_ENCRYPTION_KEY;
+const calendarSources = calendarEncryptionKey
+  ? new CalendarSourceModule({
+    repository,
+    ...calendarURLProtection(calendarEncryptionKey),
+    fetchFeed: fetchPublicCalendarFeed,
+  })
+  : undefined;
 const invitationEmailSender: InvitationEmailSender = process.env.RESEND_API_KEY
   && process.env.INVITATION_EMAIL_FROM
   ? new ResendInvitationEmailSender({
@@ -50,6 +60,7 @@ const app = buildApp({
   identityProvider,
   repository,
   invitationEmailSender,
+  ...(calendarSources ? { calendarSources } : {}),
   locationSearchProvider: new CachedLocationSearchProvider(
     locationProvider,
     cache,

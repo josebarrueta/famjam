@@ -22,6 +22,19 @@ public enum EventSource: String, Codable, Sendable {
     case manual
     case emailSuggested = "email_suggested"
     case voice
+    case calendar
+}
+
+public struct EventProvenance: Codable, Equatable, Sendable {
+    public let sourceID: String
+    public let sourceName: String
+    public let externalUID: String
+
+    public init(sourceID: String, sourceName: String, externalUID: String) {
+        self.sourceID = sourceID
+        self.sourceName = sourceName
+        self.externalUID = externalUID
+    }
 }
 
 public enum EventStatus: String, Codable, Sendable {
@@ -41,6 +54,14 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
     public var source: EventSource
     public var status: EventStatus
     public var recurrence: EventRecurrence?
+    public var isReadOnly: Bool
+    public var provenance: [EventProvenance]
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, kidID, participantIDs, startTime, endTime, location
+        case driver, source, status, recurrence, provenance
+        case isReadOnly = "readOnly"
+    }
 
     public init(
         id: UUID = UUID(),
@@ -53,7 +74,9 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
         driver: String? = nil,
         source: EventSource,
         status: EventStatus,
-        recurrence: EventRecurrence? = nil
+        recurrence: EventRecurrence? = nil,
+        isReadOnly: Bool = false,
+        provenance: [EventProvenance] = []
     ) {
         self.id = id
         self.title = title
@@ -66,6 +89,25 @@ public struct FamilyEvent: Codable, Equatable, Identifiable, Sendable {
         self.source = source
         self.status = status
         self.recurrence = recurrence
+        self.isReadOnly = isReadOnly
+        self.provenance = provenance
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        kidID = try container.decodeIfPresent(KidID.self, forKey: .kidID)
+        participantIDs = try container.decodeIfPresent([KidID].self, forKey: .participantIDs) ?? []
+        startTime = try container.decode(Date.self, forKey: .startTime)
+        endTime = try container.decode(Date.self, forKey: .endTime)
+        location = try container.decodeIfPresent(String.self, forKey: .location)
+        driver = try container.decodeIfPresent(String.self, forKey: .driver)
+        source = try container.decode(EventSource.self, forKey: .source)
+        status = try container.decode(EventStatus.self, forKey: .status)
+        recurrence = try container.decodeIfPresent(EventRecurrence.self, forKey: .recurrence)
+        isReadOnly = try container.decodeIfPresent(Bool.self, forKey: .isReadOnly) ?? false
+        provenance = try container.decodeIfPresent([EventProvenance].self, forKey: .provenance) ?? []
     }
 }
 

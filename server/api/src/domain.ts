@@ -47,9 +47,15 @@ export interface FamilyEvent {
   endTime: string;
   location: string | null;
   driver: string | null;
-  source: "manual" | "email_suggested" | "voice";
+  source: "manual" | "email_suggested" | "voice" | "calendar";
   status: "confirmed" | "pending_review";
   recurrence?: EventRecurrence | null;
+  readOnly?: boolean;
+  provenance?: Array<{
+    sourceID: string;
+    sourceName: string;
+    externalUID: string;
+  }>;
 }
 
 export interface EventConflict {

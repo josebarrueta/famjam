@@ -9,8 +9,13 @@ import type {
   FamilyMember,
 } from "./domain.js";
 import type { RallyrooRepository } from "./repository.js";
+import type {
+  CalendarSource,
+  CalendarSourceRepository,
+  ImportedCalendarEvent,
+} from "./calendar-source-module.js";
 
-export class PostgresRallyrooRepository implements RallyrooRepository {
+export class PostgresRallyrooRepository implements RallyrooRepository, CalendarSourceRepository {
   constructor(private readonly pool: Pool) {}
 
   static fromConnectionString(connectionString: string): PostgresRallyrooRepository {
@@ -280,6 +285,124 @@ export class PostgresRallyrooRepository implements RallyrooRepository {
     await this.pool.query("DELETE FROM events WHERE family_id = $1 AND id = $2", [familyID, eventID]);
   }
 
+  async saveCalendarSource(source: CalendarSource): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO calendar_sources (
+         family_id, id, name, feed_url_ciphertext, participant_ids, status,
+         last_synced_at, last_error, etag, last_modified
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       ON CONFLICT (family_id, id) DO UPDATE SET
+         name=EXCLUDED.name, feed_url_ciphertext=EXCLUDED.feed_url_ciphertext,
+         participant_ids=EXCLUDED.participant_ids, status=EXCLUDED.status,
+         last_synced_at=EXCLUDED.last_synced_at, last_error=EXCLUDED.last_error,
+         etag=EXCLUDED.etag, last_modified=EXCLUDED.last_modified`,
+      [
+        source.familyID, source.id, source.name, source.protectedURL,
+        source.participantIDs, source.status, source.lastSyncedAt, source.lastError,
+        source.etag, source.lastModified,
+      ],
+    );
+  }
+
+  async calendarSource(familyID: string, sourceID: string): Promise<CalendarSource | null> {
+    const result = await this.pool.query<CalendarSourceRow>(
+      `SELECT family_id, id::text, name, feed_url_ciphertext, participant_ids,
+              status, last_synced_at, last_error, etag, last_modified
+       FROM calendar_sources WHERE family_id = $1 AND id = $2`,
+      [familyID, sourceID],
+    );
+    return result.rows[0] ? calendarSourceFromRow(result.rows[0]) : null;
+  }
+
+  async calendarSourcesForFamily(familyID: string): Promise<CalendarSource[]> {
+    const result = await this.pool.query<CalendarSourceRow>(
+      `SELECT family_id, id::text, name, feed_url_ciphertext, participant_ids,
+              status, last_synced_at, last_error, etag, last_modified
+       FROM calendar_sources WHERE family_id = $1 ORDER BY name, id`,
+      [familyID],
+    );
+    return result.rows.map(calendarSourceFromRow);
+  }
+
+  async deleteCalendarSource(familyID: string, sourceID: string): Promise<boolean> {
+    const result = await this.pool.query(
+      "DELETE FROM calendar_sources WHERE family_id = $1 AND id = $2",
+      [familyID, sourceID],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async replaceCalendarEvents(
+    source: CalendarSource,
+    events: ImportedCalendarEvent[],
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query(
+        "SELECT 1 FROM calendar_sources WHERE family_id = $1 AND id = $2 FOR UPDATE",
+        [source.familyID, source.id],
+      );
+      if (!locked.rows[0]) throw new Error("Calendar source no longer exists");
+      await client.query("DELETE FROM imported_calendar_events WHERE source_id = $1", [source.id]);
+      for (const event of events) {
+        await client.query(
+          `INSERT INTO imported_calendar_events (
+             family_id, source_id, external_uid, title, start_time, end_time,
+             location, participant_ids, fingerprint
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [
+            event.familyID, event.sourceID, event.externalUID, event.title,
+            event.startTime, event.endTime, event.location, event.participantIDs,
+            event.fingerprint,
+          ],
+        );
+      }
+      await client.query(
+        `UPDATE calendar_sources SET
+           name=$3, feed_url_ciphertext=$4, participant_ids=$5, status=$6,
+           last_synced_at=$7, last_error=$8, etag=$9, last_modified=$10
+         WHERE family_id=$1 AND id=$2`,
+        [
+          source.familyID, source.id, source.name, source.protectedURL,
+          source.participantIDs, source.status, source.lastSyncedAt, source.lastError,
+          source.etag, source.lastModified,
+        ],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async calendarEventsForFamily(familyID: string): Promise<ImportedCalendarEvent[]> {
+    const result = await this.pool.query<ImportedCalendarEventRow>(
+      `SELECT event.family_id, event.source_id::text, source.name AS source_name,
+              event.external_uid, event.title, event.start_time, event.end_time,
+              event.location, event.participant_ids, event.fingerprint
+       FROM imported_calendar_events event
+       JOIN calendar_sources source
+         ON source.family_id = event.family_id AND source.id = event.source_id
+       WHERE event.family_id = $1 ORDER BY event.start_time, event.source_id`,
+      [familyID],
+    );
+    return result.rows.map((row) => ({
+      familyID: row.family_id,
+      sourceID: row.source_id,
+      sourceName: row.source_name,
+      externalUID: row.external_uid,
+      title: row.title,
+      startTime: asISOString(row.start_time),
+      endTime: asISOString(row.end_time),
+      location: row.location,
+      participantIDs: row.participant_ids,
+      fingerprint: row.fingerprint,
+    }));
+  }
+
   async membersForFamily(familyID: string): Promise<FamilyMember[]> {
     const result = await this.pool.query<MemberRow>(
       `SELECT family_id, id, name, role, grade_or_birth_year, color_tag
@@ -353,6 +476,32 @@ interface EventRow {
   recurrence: EventRecurrence | null;
 }
 
+interface CalendarSourceRow {
+  family_id: string;
+  id: string;
+  name: string;
+  feed_url_ciphertext: string;
+  participant_ids: string[];
+  status: CalendarSource["status"];
+  last_synced_at: Date | string | null;
+  last_error: string | null;
+  etag: string | null;
+  last_modified: string | null;
+}
+
+interface ImportedCalendarEventRow {
+  family_id: string;
+  source_id: string;
+  source_name: string;
+  external_uid: string;
+  title: string;
+  start_time: Date | string;
+  end_time: Date | string;
+  location: string | null;
+  participant_ids: string[];
+  fingerprint: string;
+}
+
 interface MemberRow {
   family_id: string;
   id: string;
@@ -360,6 +509,21 @@ interface MemberRow {
   role: AccountRole;
   grade_or_birth_year: string | null;
   color_tag: string;
+}
+
+function calendarSourceFromRow(row: CalendarSourceRow): CalendarSource {
+  return {
+    familyID: row.family_id,
+    id: row.id,
+    name: row.name,
+    protectedURL: row.feed_url_ciphertext,
+    participantIDs: row.participant_ids,
+    status: row.status,
+    lastSyncedAt: row.last_synced_at ? asISOString(row.last_synced_at) : null,
+    lastError: row.last_error,
+    etag: row.etag,
+    lastModified: row.last_modified,
+  };
 }
 
 function accountFromRow(row: AccountRow): Account {

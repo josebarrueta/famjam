@@ -23,6 +23,40 @@ final class RemoteEventStoreTests: XCTestCase {
         XCTAssertEqual(requests.first?.url.absoluteString, "https://api.example.com/v1/events")
     }
 
+    func testDecodesReadOnlyImportedCalendarProvenance() async throws {
+        let payload = Data("""
+        [{
+          "id":"00000000-0000-5000-8000-000000000102",
+          "title":"Team practice",
+          "kidID":null,
+          "participantIDs":["kid-1"],
+          "startTime":"2026-09-15T18:00:00Z",
+          "endTime":"2026-09-15T19:00:00Z",
+          "location":"Lincoln Field",
+          "driver":null,
+          "source":"calendar",
+          "status":"confirmed",
+          "readOnly":true,
+          "provenance":[{
+            "sourceID":"00000000-0000-4000-8000-000000000201",
+            "sourceName":"TeamSnap",
+            "externalUID":"practice@example"
+          }]
+        }]
+        """.utf8)
+        let store: any EventStore = RemoteEventStore(
+            baseURL: URL(string: "https://api.example.com")!,
+            transport: RecordingHTTPTransport(responses: [HTTPResponse(statusCode: 200, body: payload)])
+        )
+
+        let events = try await store.events()
+        let event = try XCTUnwrap(events.first)
+
+        XCTAssertEqual(event.source, .calendar)
+        XCTAssertTrue(event.isReadOnly)
+        XCTAssertEqual(event.provenance.first?.sourceName, "TeamSnap")
+    }
+
     func testSavesAnEventThroughTheRemoteAPI() async throws {
         let transport = RecordingHTTPTransport(
             responses: [HTTPResponse(statusCode: 200, body: Data("{\"conflicts\":[]}".utf8))]

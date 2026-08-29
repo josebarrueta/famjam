@@ -7,6 +7,7 @@ import Fastify, {
 } from "fastify";
 import { z } from "zod";
 import type { Account, EventConflict, FamilyEvent, FamilyMember } from "./domain.js";
+import type { CalendarSourceModule } from "./calendar-source-module.js";
 import type { IdentityProvider } from "./identity-provider.js";
 import {
   NoopInvitationEmailSender,
@@ -69,6 +70,14 @@ const memberSchema = z.object({
   colorTag: z.string().min(1),
 });
 
+const calendarSourceSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  url: z.string()
+    .transform((url) => url.replace(/^webcal:/i, "https:"))
+    .pipe(z.url().refine((url) => new URL(url).protocol === "https:", "HTTPS is required")),
+  participantIDs: z.array(z.string().min(1)).min(1),
+});
+
 interface RouteRateLimit {
   max: number;
   timeWindow: number;
@@ -80,6 +89,7 @@ interface Dependencies {
   locationSearchProvider?: LocationSearchProvider;
   pushNotificationProvider?: PushNotificationProvider;
   invitationEmailSender?: InvitationEmailSender;
+  calendarSources?: CalendarSourceModule;
   readinessCheck?: () => Promise<void>;
   rateLimits?: Partial<Record<"sessions" | "invitations" | "locations", RouteRateLimit>>;
   metrics?: RallyrooMetrics;
@@ -93,6 +103,7 @@ export function buildApp({
   locationSearchProvider = new EmptyLocationSearchProvider(),
   pushNotificationProvider = new NoopPushNotificationProvider(),
   invitationEmailSender = new NoopInvitationEmailSender(),
+  calendarSources,
   readinessCheck = async () => {},
   rateLimits = {},
   metrics = new RallyrooMetrics(),
@@ -373,6 +384,60 @@ export function buildApp({
     };
   });
 
+  app.post("/v1/calendar-sources", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    if (!calendarSources) return reply.code(503).send({ error: "calendar_sources_unavailable" });
+    const parsed = calendarSourceSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_calendar_source" });
+    const familyMembers = await repository.membersForFamily(account.familyID);
+    const memberIDs = new Set(familyMembers.map((member) => member.id));
+    if (parsed.data.participantIDs.some((memberID) => !memberIDs.has(memberID))) {
+      return reply.code(400).send({ error: "unknown_participant" });
+    }
+    return reply.code(201).send(await calendarSources.create({
+      familyID: account.familyID,
+      ...parsed.data,
+    }));
+  });
+
+  app.get("/v1/calendar-sources", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    if (!calendarSources) return reply.code(503).send({ error: "calendar_sources_unavailable" });
+    return calendarSources.list(account.familyID);
+  });
+
+  app.delete("/v1/calendar-sources/:id", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    if (!calendarSources) return reply.code(503).send({ error: "calendar_sources_unavailable" });
+    const deleted = await calendarSources.delete(
+      account.familyID,
+      (request.params as { id: string }).id,
+    );
+    if (!deleted) return reply.code(404).send({ error: "calendar_source_not_found" });
+    await repository.markFamilyChanged(account.familyID);
+    return reply.code(204).send();
+  });
+
+  app.post("/v1/calendar-sources/:id/sync", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    if (!calendarSources) return reply.code(503).send({ error: "calendar_sources_unavailable" });
+    try {
+      const source = await calendarSources.sync(
+        account.familyID,
+        (request.params as { id: string }).id,
+      );
+      if (!source) return reply.code(404).send({ error: "calendar_source_not_found" });
+      await repository.markFamilyChanged(account.familyID);
+      return source;
+    } catch {
+      return reply.code(502).send({ error: "calendar_source_sync_failed" });
+    }
+  });
+
   app.get("/v1/locations/search", {
     config: { rateLimit: limits.locations },
   }, async (request, reply) => {
@@ -407,7 +472,10 @@ export function buildApp({
 
   app.get("/v1/events", async (request) => {
     const account = requiredAccount(request);
-    const events = await repository.eventsForFamily(account.familyID);
+    const events = [
+      ...await repository.eventsForFamily(account.familyID),
+      ...(calendarSources ? await calendarSources.events(account.familyID) : []),
+    ];
     const visible = account.role === "parent"
       ? events
       : events.filter((event) => event.participantIDs.includes(account.memberID));
@@ -421,6 +489,9 @@ export function buildApp({
     if (!parsed.success) return reply.code(400).send({ error: "invalid_event", details: parsed.error.issues });
     const routeID = (request.params as { id: string }).id;
     if (routeID !== parsed.data.id) return reply.code(400).send({ error: "event_id_mismatch" });
+    if (calendarSources && (await calendarSources.events(account.familyID)).some((event) => event.id === routeID)) {
+      return reply.code(409).send({ error: "imported_event_read_only" });
+    }
     const familyMembers = await repository.membersForFamily(account.familyID);
     const memberIDs = new Set(familyMembers.map((member) => member.id));
     const referencedMemberIDs = [
@@ -436,7 +507,10 @@ export function buildApp({
       familyID: account.familyID,
       ...(recurrence !== undefined ? { recurrence } : {}),
     };
-    const existing = await repository.eventsForFamily(account.familyID);
+    const existing = [
+      ...await repository.eventsForFamily(account.familyID),
+      ...(calendarSources ? await calendarSources.events(account.familyID) : []),
+    ];
     const conflicts = detectConflicts(event, existing.filter((candidate) => candidate.id !== event.id));
     await repository.saveEvent(event);
     await repository.markFamilyChanged(account.familyID);
@@ -458,7 +532,11 @@ export function buildApp({
   app.delete("/v1/events/:id", async (request, reply) => {
     const account = await requireParent(request, reply);
     if (!account) return;
-    await repository.deleteEvent(account.familyID, (request.params as { id: string }).id);
+    const eventID = (request.params as { id: string }).id;
+    if (calendarSources && (await calendarSources.events(account.familyID)).some((event) => event.id === eventID)) {
+      return reply.code(409).send({ error: "imported_event_read_only" });
+    }
+    await repository.deleteEvent(account.familyID, eventID);
     await repository.markFamilyChanged(account.familyID);
     return reply.code(204).send();
   });

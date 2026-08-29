@@ -13,6 +13,7 @@ struct FamilyActivityCoordinatorApp: App {
     private let authentication: any Authentication
     private let locationSearch: any LocationSearch
     private let invitationStore: (any FamilyInvitationStore)?
+    private let calendarSourceStore: (any CalendarSourceStore)?
     private let changeMonitor: (any FamilyChangeMonitor)?
     private let deviceRegistrationStore: (any DeviceRegistrationStore)?
     private let allowsSignOut: Bool
@@ -34,6 +35,7 @@ struct FamilyActivityCoordinatorApp: App {
             memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
             locationSearch = EmptyLocationSearch()
             invitationStore = nil
+            calendarSourceStore = nil
             changeMonitor = nil
             deviceRegistrationStore = nil
         case .remote:
@@ -51,6 +53,10 @@ struct FamilyActivityCoordinatorApp: App {
             memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: authenticatedTransport)
             locationSearch = RemoteLocationSearch(baseURL: baseURL, transport: authenticatedTransport)
             invitationStore = RemoteFamilyInvitationStore(
+                baseURL: baseURL,
+                transport: authenticatedTransport
+            )
+            calendarSourceStore = RemoteCalendarSourceStore(
                 baseURL: baseURL,
                 transport: authenticatedTransport
             )
@@ -91,12 +97,15 @@ struct FamilyActivityCoordinatorApp: App {
                     }
                     SettingsView(
                         allowsSignOut: allowsSignOut,
+                        calendarSourceStore: session.role == .parent ? calendarSourceStore : nil,
+                        memberStore: session.role == .parent ? memberStore : nil,
                         onSignOut: signOut
                     )
                     .tabItem { Label("Settings", systemImage: "gearshape") }
                 }
                 .tint(AppTheme.coral)
                 .task { await monitorFamilyChanges() }
+                .task { await synchronizeCalendars(for: session.role) }
                 .task { await requestPushNotifications() }
                 .onReceive(NotificationCenter.default.publisher(for: .didRegisterDeviceToken)) { notification in
                     guard let token = notification.object as? String else { return }
@@ -119,6 +128,30 @@ struct FamilyActivityCoordinatorApp: App {
         )) == true
         if granted {
             UIApplication.shared.registerForRemoteNotifications()
+        }
+    }
+
+    private func synchronizeCalendars(for role: AccountRole) async {
+        guard role == .parent, let calendarSourceStore else { return }
+        while !Task.isCancelled {
+            if let sources = try? await calendarSourceStore.sources() {
+                let staleBefore = Date.now.addingTimeInterval(-15 * 60)
+                let stale = sources.filter { source in
+                    source.lastSyncedAt.map { $0 < staleBefore } ?? true
+                }
+                var changed = false
+                for source in stale {
+                    if (try? await calendarSourceStore.synchronize(source)) != nil {
+                        changed = true
+                    }
+                }
+                if changed {
+                    await MainActor.run {
+                        NotificationCenter.default.post(name: .familyDataDidChange, object: nil)
+                    }
+                }
+            }
+            try? await Task.sleep(for: .seconds(15 * 60))
         }
     }
 

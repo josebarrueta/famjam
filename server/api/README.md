@@ -66,6 +66,21 @@ Enable **Places API (New)** in Google Cloud and restrict the key to that API. If
 key is omitted, manual location entry still works and autocomplete returns no
 suggestions.
 
+## Calendar subscriptions
+
+Set `CALENDAR_SOURCE_ENCRYPTION_KEY` to a base64-encoded 32-byte random key to
+activate parent-managed iCalendar imports. Store this key in the runtime secret,
+not Helm values or Git, and retain it across deployments: losing it makes existing
+feed URLs unreadable. Rotation requires decrypting and re-encrypting stored URLs.
+
+The iCalendar adapter supports TeamSnap and other HTTPS subscription feeds. It
+expands bounded recurrences, atomically replaces each source snapshot, preserves
+the last good snapshot on failure, and consolidates exact cross-source duplicates
+while combining participants and provenance. Imported events are read-only and
+participate in conflict detection. User-supplied URLs are protected against
+private-network access, redirects to private hosts, oversized responses, and slow
+requests.
+
 ## Production operations
 
 The API writes structured JSON request logs with request IDs, status codes, and
