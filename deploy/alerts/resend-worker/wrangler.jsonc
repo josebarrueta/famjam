@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "rallyroo-deployment-alerts",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-29",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "limits": {
+    "cpu_ms": 50,
+    "subrequests": 1
+  },
+  "secrets": {
+    "required": ["FLUX_HMAC_SECRET", "RESEND_API_KEY", "ALERT_RECIPIENT"]
+  }
+}

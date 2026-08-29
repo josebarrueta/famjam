@@ -24,16 +24,23 @@ flux install \
   --network-policy=true
 
 kubectl --context "$CONTEXT" apply -f "$ROOT/deploy/flux/rallyroo/namespace.yaml"
-if [[ -n "${RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL:-}" ]]; then
-  [[ "$RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL" == https://* ]] || {
+alert_url=${RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL:-}
+alert_hmac_secret=${RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET:-}
+if [[ -n "$alert_url" || -n "$alert_hmac_secret" ]]; then
+  [[ -n "$alert_url" && -n "$alert_hmac_secret" ]] || {
+    echo "Both deployment alert URL and HMAC secret are required" >&2
+    exit 1
+  }
+  [[ "$alert_url" == https://* ]] || {
     echo "RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL must use HTTPS" >&2
     exit 1
   }
   kubectl --context "$CONTEXT" -n rallyroo create secret generic rallyroo-deployment-alert-webhook \
-    --from-literal=address="$RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL" \
+    --from-literal=address="$alert_url" \
+    --from-literal=token="$alert_hmac_secret" \
     --dry-run=client -o yaml | kubectl --context "$CONTEXT" apply -f -
 elif ! kubectl --context "$CONTEXT" -n rallyroo get secret rallyroo-deployment-alert-webhook >/dev/null 2>&1; then
-  echo "Warning: deployment failure alerts are not delivered until RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL is configured." >&2
+  echo "Warning: deployment failure alerts are not delivered until the alert setup wizard is completed." >&2
 fi
 
 kubectl --context "$CONTEXT" apply -k "$ROOT/deploy/flux/rallyroo"

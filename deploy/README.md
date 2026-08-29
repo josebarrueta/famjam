@@ -105,16 +105,23 @@ paths exist, then install the Flux CLI and run:
 
 ```bash
 brew install fluxcd/tap/flux
-read -rsp "Deployment alert webhook URL: " RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL; echo
-export RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL
 ./deploy/local/enable-flux.sh
-unset RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL
 ```
 
-The webhook URL is stored only in the `rallyroo-deployment-alert-webhook`
-Kubernetes Secret. Flux sends error events for the Rallyroo HelmRelease, including
-migration-hook failures, to that generic HTTPS endpoint. If the variable is omitted,
-reconciliation still works but the script warns that outbound alerts are not active.
+To deliver Helm and migration failures by email, configure the HMAC-signed
+Cloudflare Worker and Resend Automation with the interactive wizard:
+
+```bash
+./deploy/alerts/setup-alerting.sh
+```
+
+The Resend API key and recipient exist only as encrypted Worker secrets. Flux stores
+only the Worker endpoint and shared HMAC key in the
+`rallyroo-deployment-alert-webhook` Kubernetes Secret. The Worker accepts only
+signed Rallyroo HelmRelease errors and converts them into Resend's
+`deployment.failed` custom event. Resend owns the published template, Automation
+run history, and delivery. If the wizard has not run, reconciliation still works
+but `enable-flux.sh` warns that outbound alerts are not active.
 
 The script installs Flux's source, Helm, and notification controllers, applies the
 namespace-scoped reconciler in `deploy/flux/rallyroo/`, adopts the existing

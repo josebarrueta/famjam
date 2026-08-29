@@ -1,0 +1,43 @@
+name: Deployment Alert Worker
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "deploy/alerts/resend-worker/**"
+      - "deploy/alerts/setup-alerting.sh"
+      - "deploy/flux/rallyroo/**"
+      - "deploy/local/enable-flux.sh"
+      - ".github/workflows/deployment-alert-worker.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/alerts/resend-worker/**"
+      - "deploy/alerts/setup-alerting.sh"
+      - "deploy/flux/rallyroo/**"
+      - "deploy/local/enable-flux.sh"
+      - ".github/workflows/deployment-alert-worker.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/alerts/resend-worker
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: deploy/alerts/resend-worker/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run deploy:dry-run
+      - name: Verify Flux alert contract
+        working-directory: .
+        run: ./deploy/flux/rallyroo/test-flux-contract.sh
+      - name: Verify setup wizard syntax
+        working-directory: .
+        run: bash -n deploy/alerts/setup-alerting.sh deploy/local/enable-flux.sh

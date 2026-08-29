@@ -86,11 +86,11 @@ This journal records why Rallyroo's maintainers made its deployment decisions. I
 
 ## 2026-08-27 — Alert on failed release reconciliation
 
-**Decision:** Flux's notification controller forwards Rallyroo HelmRelease error events to a generic HTTPS webhook. The destination address lives in a Kubernetes Secret rather than Git or Helm values. Migration-hook failures are HelmRelease errors, so they use the same alert path as readiness, test, and rollback failures.
+**Decision:** Flux's notification controller signs Rallyroo HelmRelease error events with HMAC and sends them to a narrow Cloudflare Worker. The Worker verifies and reduces the event, then triggers Resend's `deployment.failed` custom event. Resend Automation owns the published template, recipient delivery, and run history. The Worker endpoint and HMAC key live in a Kubernetes Secret; the Resend key and recipient live only as encrypted Worker secrets. Migration-hook failures are HelmRelease errors, so they use the same alert path as readiness, test, and rollback failures.
 
-**Why:** Stopping a failed deployment protects availability, but a silently stalled release still requires an operator to notice it. A generic provider keeps the repository independent of Slack, Teams, Discord, or a particular incident platform.
+**Why:** Stopping a failed deployment protects availability, but a silently stalled release still requires an operator to notice it. Flux cannot transform its fixed webhook payload into Resend's custom-event schema, so the Worker is a small protocol adapter rather than an email service. Hosting it outside the home cluster avoids depending on the application or database that may be failing.
 
-**Suggestion for other projects:** Alert from the deployment reconciler rather than teaching every migration script about messaging providers. This preserves one release-failure path and includes the controller's release revision and failure reason.
+**Suggestion for other projects:** Alert from the deployment reconciler rather than teaching every migration script about messaging providers. Authenticate outbound events, minimize the adapter's authority, and let the delivery provider own templates and retries. This preserves one release-failure path and includes the controller's release revision and failure reason.
 
 ## 2026-08-27 — Define release success beyond pod startup
 

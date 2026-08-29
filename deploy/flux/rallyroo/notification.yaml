@@ -4,7 +4,7 @@ metadata:
   name: rallyroo-deployment-webhook
   namespace: rallyroo
 spec:
-  type: generic
+  type: generic-hmac
   secretRef:
     name: rallyroo-deployment-alert-webhook
 ---
