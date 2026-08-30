@@ -22,9 +22,11 @@ The target design is:
 - local development continues using `server/api/.env`;
 - readable production configuration is committed as Helm/Flux values and rendered
   into `rallyroo-runtime-config`;
-- each 1Password item becomes one narrowly scoped Kubernetes Secret;
-- the API receives ConfigMap and Secret values as normal environment variables;
-- PostgreSQL and migration Jobs receive only PostgreSQL credentials;
+- an in-cluster 1Password Connect Server and Operator synchronize each item into
+  one narrowly scoped Kubernetes Secret;
+- secret values are mounted as read-only files and loaded into memory by a
+  provider-neutral runtime configuration module;
+- PostgreSQL and migration Jobs receive only the PostgreSQL password file;
 - no application credential is committed to Git or passed in Helm command-line
   values.
 
@@ -51,7 +53,7 @@ Kubernetes Secret keys.
 
 | Item title | Secret custom fields | Source |
 |---|---|---|
-| `rallyroo-postgres` | `POSTGRES_PASSWORD`, `DATABASE_URL` | Rallyroo-generated/derived |
+| `rallyroo-postgres` | `POSTGRES_PASSWORD` | Rallyroo-generated |
 | `rallyroo-stytch` | `STYTCH_SECRET` | Stytch Live environment |
 | `rallyroo-google-places` | `GOOGLE_PLACES_API_KEY` | Google Cloud |
 | `rallyroo-resend-invitations` | `RESEND_API_KEY` | Resend, Sending access |
@@ -67,15 +69,18 @@ separate. Invitation delivery should use a domain-restricted Sending-access key.
 Resend custom Events currently requires Full access, so the Worker uses the
 separate Full-access key.
 
-`DATABASE_URL` currently remains in `rallyroo-postgres` because the API and migration
-runner require it. The target chart may derive it from an explicitly injected
-`POSTGRES_PASSWORD`, removing the duplicated password from 1Password.
+Production does not store `DATABASE_URL`. PostgreSQL host, port, database, and user
+are readable configuration; only `POSTGRES_PASSWORD` is secret. The API reads the
+mounted password file and passes a structured configuration object to the
+PostgreSQL client. Migration Jobs build a temporary mode-`0600` libpq password file
+without placing the password in a URL, process argument, or environment variable.
 
-The 1Password Service Account token is a bootstrap credential and cannot be synced
-by the operator that needs it to start. Save its recovery copy in a separate
-administrator-only 1Password location, and place it only in the
-`onepassword-system/onepassword-service-account-token` Kubernetes Secret during
-bootstrap.
+The Connect `1password-credentials.json` file and Connect access token are bootstrap
+credentials and cannot be synchronized by the infrastructure that needs them to
+start. Save recovery copies in a separate administrator-only 1Password location.
+Bootstrap places them only in the `onepassword-system/op-credentials` and
+`onepassword-system/onepassword-token` Kubernetes Secrets. Never pass either value
+through Helm `--set` because Helm stores release values in the cluster.
 
 ## Rallyroo-generated secrets
 
@@ -99,16 +104,9 @@ in the current PostgreSQL connection URL without additional encoding.
 openssl rand -hex 32 | tr -d '\n' | pbcopy
 ```
 
-Paste it into `rallyroo-postgres` → `POSTGRES_PASSWORD`.
-
-Until `DATABASE_URL` is derived by the chart, set its concealed value to:
-
-```text
-postgres://rallyroo:<the-same-password>@rallyroo-postgres:5432/rallyroo
-```
-
-Do not use `localhost`; the API reaches PostgreSQL through the internal Kubernetes
-Service `rallyroo-postgres`.
+Paste it into `rallyroo-postgres` → `POSTGRES_PASSWORD`. Do not create a
+`DATABASE_URL` field. The API reaches PostgreSQL through readable connection
+configuration for the internal Kubernetes Service `rallyroo-postgres`.
 
 ### Calendar source encryption key
 
@@ -231,22 +229,22 @@ The existing tunnel token is issued by Cloudflare Zero Trust. Save a recovery co
 in `rallyroo-cloudflare-tunnel` → `CLOUDFLARE_TUNNEL_TOKEN`. It remains a system
 connector credential and is not injected into Rallyroo pods.
 
-### 1Password Operator bootstrap
+### 1Password Connect and Operator bootstrap
 
-Create a dedicated 1Password Service Account with read-only access to
-`rallyroo-prod`, no write/share permission, and no vault-creation permission. Save
-the token immediately because 1Password displays it once.
+In 1Password.com, open Developer Tools / Integrations and create a Connect Server
+integration named for the Rallyroo production cluster. Grant it access only to
+`rallyroo-prod`. Download `1password-credentials.json` and create a Connect access
+token; both are shown only during setup.
 
-The currently pinned 1Password chart `2.4.1` and Operator `1.12.0` expose
-`operator.authMethod=service-account`, although a separate 1Password documentation
-page still states that Service Accounts cannot be used with the Operator. Treat
-this as a compatibility risk: the bootstrap must run a real preflight sync before
-production cutover. If preflight fails, use 1Password Connect rather than weakening
-secret management.
+Install the pinned 1Password chart `2.4.1` with Connect and Operator enabled,
+Operator `authMethod=connect`, namespace-restricted watching, and automatic workload
+restart enabled. Connect remains a ClusterIP-only internal dependency with no
+Ingress or public tunnel. Bootstrap creates the credentials and token Secrets
+before Helm installation without placing their values in Helm release history.
 
 Sources:
 
-- [1Password Service Account setup](https://www.1password.dev/service-accounts/get-started.md)
+- [1Password Connect Server setup](https://developer.1password.com/docs/connect/get-started/)
 - [1Password Operator chart 2.4.1 values](https://github.com/1Password/connect-helm-charts/blob/connect-2.4.1/charts/connect/values.yaml)
 - [1Password Operator 1.12.0](https://github.com/1Password/onepassword-operator/releases/tag/v1.12.0)
 
@@ -305,8 +303,7 @@ database. Source: [Docker Official Image for PostgreSQL](https://github.com/dock
 
 Do not begin until all boxes are true:
 
-- [ ] The new `rallyroo-postgres` item is saved with matching
-      `POSTGRES_PASSWORD` and `DATABASE_URL`.
+- [ ] The new `rallyroo-postgres` item contains only `POSTGRES_PASSWORD`.
 - [ ] All required provider items exist in `rallyroo-prod`.
 - [ ] The readable ConfigMap values have been reviewed.
 - [ ] The 1Password Operator preflight created test Kubernetes Secrets without
@@ -364,5 +361,5 @@ Source: [PostgreSQL 17 `ALTER ROLE`](https://www.postgresql.org/docs/17/sql-alte
 - [ ] Places search, invitation email, APNs, and calendar sync are smoke-tested.
 - [ ] Metrics require the bearer token.
 - [ ] Flux-to-Worker HMAC and Resend Automation delivery are verified.
-- [ ] Service Account token rotation and application-secret rotation are documented
-      and scheduled.
+- [ ] Connect credentials, Connect token, and application-secret rotation are
+      documented and scheduled.
