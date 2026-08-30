@@ -1,0 +1,37 @@
+title = "Rallyroo secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "rallyroo-secret-assignment"
+description = "Rallyroo production secret assigned a literal value"
+regex = '''(?i)(?:POSTGRES_PASSWORD|STYTCH_SECRET|GOOGLE_PLACES_API_KEY|RESEND_API_KEY|APNS_PRIVATE_KEY|CALENDAR_SOURCE_ENCRYPTION_KEY|METRICS_BEARER_TOKEN|FLUX_HMAC_SECRET|CLOUDFLARE_TUNNEL_TOKEN|OP_CONNECT_TOKEN)[ \t]*(?:=|:)[ \t]*["']?([A-Za-z0-9+/_.,=-]{16,})'''
+secretGroup = 1
+keywords = [
+  "postgres_password",
+  "stytch_secret",
+  "google_places_api_key",
+  "resend_api_key",
+  "apns_private_key",
+  "calendar_source_encryption_key",
+  "metrics_bearer_token",
+  "flux_hmac_secret",
+  "cloudflare_tunnel_token",
+  "op_connect_token",
+]
+
+[[rules.allowlists]]
+description = "Known local-only and test placeholders"
+stopwords = [
+  "rallyroo-local-only",
+  "famjam-local-only",
+  "test-hmac-secret",
+  "test-resend-key",
+]
+
+[[rules]]
+id = "onepassword-connect-credentials-file"
+description = "1Password Connect credentials files must never enter Git"
+path = '''(?i)(^|/)1password-credentials\.json$'''
+regex = '''.+'''

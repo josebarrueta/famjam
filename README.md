@@ -65,6 +65,20 @@ Imported events remain read-only, participate in conflict detection, and consoli
 exact duplicates across family members' subscriptions while preserving combined
 participants and provenance. Conflict alerts remain local to each device for now.
 
+## Secret scanning
+
+Install the repository's pre-commit guard once per clone:
+
+```bash
+brew install pre-commit
+pre-commit install
+```
+
+The pinned Gitleaks hook scans staged changes with the rules in `.gitleaks.toml`.
+The Security workflow independently scans Git history on every pull request and
+push to `main`, so CI still blocks leaks when a local hook is skipped. Findings are
+redacted; a real credential finding requires immediate revocation or rotation.
+
 ## Continuous integration
 
 The API workflow runs unit tests, typechecking, production builds, and isolated
