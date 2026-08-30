@@ -141,6 +141,9 @@ flux resume helmrelease rallyroo -n rallyroo
 
 Architecture rationale and reusable guidance are recorded in
 [`docs/deployment-architecture-journal.md`](../docs/deployment-architecture-journal.md).
+The production value inventory, 1Password item layout, secret-generation procedures,
+and destructive PostgreSQL password reset are documented in
+[`docs/production-configuration-and-secret-bootstrap.md`](../docs/production-configuration-and-secret-bootstrap.md).
 
 ## Domain hosting
 
