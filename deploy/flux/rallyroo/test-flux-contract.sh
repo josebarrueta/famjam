@@ -10,6 +10,14 @@ grep -q 'RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL' "$ENABLE_SCRIPT"
 grep -q 'RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET' "$ENABLE_SCRIPT"
 grep -q -- '--from-literal=token=' "$ENABLE_SCRIPT"
 grep -q 'notification.yaml' "$FLUX_DIR/kustomization.yaml"
+grep -q 'onepassword-items.yaml' "$FLUX_DIR/kustomization.yaml"
+grep -q '^kind: OnePasswordItem$' "$FLUX_DIR/onepassword-items.yaml"
+grep -q '^  name: rallyroo-deployment-alert-webhook$' "$FLUX_DIR/onepassword-items.yaml"
+grep -q '^  itemPath: vaults/rallyroo-prod/items/rallyroo-deployment-alert-webhook$' "$FLUX_DIR/onepassword-items.yaml"
+if grep -Eq '(token|address):[[:space:]]+[^[:space:]]' "$FLUX_DIR/onepassword-items.yaml"; then
+  echo "OnePasswordItem manifests must contain references, never secret values" >&2
+  exit 1
+fi
 grep -q '^kind: Provider$' "$FLUX_DIR/notification.yaml"
 grep -q '^  type: generic-hmac$' "$FLUX_DIR/notification.yaml"
 grep -q '^kind: Alert$' "$FLUX_DIR/notification.yaml"

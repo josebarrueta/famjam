@@ -12,18 +12,19 @@ PostgreSQL reset for adopting a new production password.
 
 ## Status and cutover prerequisite
 
-The repository does not yet contain the 1Password Operator integration described
-below. Create and populate the 1Password items now, but **do not reset the cluster
-or database until the operator manifests, split Secret references, ConfigMap, and
-bootstrap wizard are merged and tested**.
+The cluster runs the pinned 1Password Operator with direct Service Account
+authentication, and Flux owns the first `OnePasswordItem`. Create and populate the
+remaining items now, but **do not reset the cluster or database until all item
+manifests, split Secret references, ConfigMap values, and bootstrap recovery steps
+are merged and tested**.
 
 The target design is:
 
 - local development continues using `server/api/.env`;
 - readable production configuration is committed as Helm/Flux values and rendered
   into `rallyroo-runtime-config`;
-- an in-cluster 1Password Connect Server and Operator synchronize each item into
-  one narrowly scoped Kubernetes Secret;
+- an in-cluster 1Password Operator authenticates directly with a read-only Service
+  Account and synchronizes each item into one narrowly scoped Kubernetes Secret;
 - secret values are mounted as read-only files and loaded into memory by a
   provider-neutral runtime configuration module;
 - PostgreSQL and migration Jobs receive only the PostgreSQL password file;
@@ -51,7 +52,7 @@ category. Leave built-in `username`, `credential`, and website fields empty. Cus
 field labels are case-sensitive because the 1Password Operator maps them to
 Kubernetes Secret keys.
 
-| Item title | Secret custom fields | Source |
+| Item title | Required custom fields | Source |
 |---|---|---|
 | `rallyroo-postgres` | `POSTGRES_PASSWORD` | Rallyroo-generated |
 | `rallyroo-stytch` | `STYTCH_SECRET` | Stytch Live environment |
@@ -60,7 +61,7 @@ Kubernetes Secret keys.
 | `rallyroo-apns` | `APNS_PRIVATE_KEY`, `APNS_KEY_ID` | Apple Developer |
 | `rallyroo-calendar-encryption` | `CALENDAR_SOURCE_ENCRYPTION_KEY` | Rallyroo-generated |
 | `rallyroo-observability` | `METRICS_BEARER_TOKEN` | Rallyroo-generated |
-| `rallyroo-deployment-alert-webhook` | `token` | Rallyroo-generated shared HMAC |
+| `rallyroo-deployment-alert-webhook` | concealed `token`, text `address` | Rallyroo-generated shared HMAC and `https://alerts.rallyroo.dev/flux` |
 | `rallyroo-alert-worker-resend` | `RESEND_API_KEY` | Resend, Full access |
 | `rallyroo-cloudflare-tunnel` | `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Zero Trust |
 
@@ -75,12 +76,12 @@ mounted password file and passes a structured configuration object to the
 PostgreSQL client. Migration Jobs build a temporary mode-`0600` libpq password file
 without placing the password in a URL, process argument, or environment variable.
 
-The Connect `1password-credentials.json` file and Connect access token are bootstrap
-credentials and cannot be synchronized by the infrastructure that needs them to
-start. Save recovery copies in a separate administrator-only 1Password location.
-Bootstrap places them only in the `onepassword-system/op-credentials` and
-`onepassword-system/onepassword-token` Kubernetes Secrets. Never pass either value
-through Helm `--set` because Helm stores release values in the cluster.
+The read-only 1Password Service Account token is a bootstrap credential and cannot
+be synchronized by the Operator that needs it to start. Save its recovery copy in
+a separate administrator-only vault that the Service Account cannot access.
+Bootstrap places it only in
+`onepassword-system/onepassword-service-account-token`. Never pass the value through
+Helm `--set` because Helm stores release values in the cluster.
 
 ## Rallyroo-generated secrets
 
@@ -229,22 +230,22 @@ The existing tunnel token is issued by Cloudflare Zero Trust. Save a recovery co
 in `rallyroo-cloudflare-tunnel` → `CLOUDFLARE_TUNNEL_TOKEN`. It remains a system
 connector credential and is not injected into Rallyroo pods.
 
-### 1Password Connect and Operator bootstrap
+### 1Password Service Account and Operator bootstrap
 
-In 1Password.com, open Developer Tools / Integrations and create a Connect Server
-integration named for the Rallyroo production cluster. Grant it access only to
-`rallyroo-prod`. Download `1password-credentials.json` and create a Connect access
-token; both are shown only during setup.
+In 1Password.com, open Developer Tools / Service Accounts and create
+`rallyroo-kubernetes-operator-prod`. Grant it read-only access to `rallyroo-prod`
+with no create, edit, delete, archive, or share permissions. Save the token when it
+is displayed because it cannot be recovered later.
 
-Install the pinned 1Password chart `2.4.1` with Connect and Operator enabled,
-Operator `authMethod=connect`, namespace-restricted watching, and automatic workload
-restart enabled. Connect remains a ClusterIP-only internal dependency with no
-Ingress or public tunnel. Bootstrap creates the credentials and token Secrets
-before Helm installation without placing their values in Helm release history.
+Create `onepassword-system/onepassword-service-account-token` before Helm
+installation without printing the value or putting it in command arguments.
+Install pinned chart `2.4.1` with Operator `1.12.0`, `connect.create=false`,
+`operator.authMethod=service-account`, `operator.watchNamespace={rallyroo}`, and
+automatic workload restart enabled. The Operator has no Ingress or public service.
 
 Sources:
 
-- [1Password Connect Server setup](https://developer.1password.com/docs/connect/get-started/)
+- [1Password Kubernetes Operator with a Service Account](https://www.1password.dev/k8s/operator)
 - [1Password Operator chart 2.4.1 values](https://github.com/1Password/connect-helm-charts/blob/connect-2.4.1/charts/connect/values.yaml)
 - [1Password Operator 1.12.0](https://github.com/1Password/onepassword-operator/releases/tag/v1.12.0)
 
@@ -360,5 +361,5 @@ Source: [PostgreSQL 17 `ALTER ROLE`](https://www.postgresql.org/docs/17/sql-alte
 - [ ] Places search, invitation email, APNs, and calendar sync are smoke-tested.
 - [ ] Metrics require the bearer token.
 - [ ] Flux-to-Worker HMAC and Resend Automation delivery are verified.
-- [ ] Connect credentials, Connect token, and application-secret rotation are
+- [ ] Service Account bootstrap-token and application-secret rotation are
       documented and scheduled.
