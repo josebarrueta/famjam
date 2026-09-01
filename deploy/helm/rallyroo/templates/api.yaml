@@ -30,6 +30,10 @@ spec:
       labels:
         {{- include "rallyroo.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api
+      {{- if .Values.runtimeConfig.enabled }}
+      annotations:
+        checksum/runtime-config: {{ include (print $.Template.BasePath "/runtime-config.yaml") . | sha256sum }}
+      {{- end }}
     spec:
       initContainers:
         - name: migrate
@@ -67,6 +71,23 @@ spec:
                   key: DATABASE_URL
             - name: REDIS_URL
               value: redis://{{ .Release.Name }}-redis:6379
+            {{- if .Values.runtimeConfig.enabled }}
+            - name: APNS_TEAM_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-runtime-config
+                  key: APNS_TEAM_ID
+            - name: APNS_BUNDLE_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-runtime-config
+                  key: APNS_BUNDLE_ID
+            - name: APNS_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-runtime-config
+                  key: APNS_ENV
+            {{- end }}
           ports:
             - name: http
               containerPort: 3000

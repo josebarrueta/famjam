@@ -57,7 +57,7 @@ Kubernetes Secret keys.
 | `rallyroo-stytch` | `STYTCH_SECRET` | Stytch Live environment |
 | `rallyroo-google-places` | `GOOGLE_PLACES_API_KEY` | Google Cloud |
 | `rallyroo-resend-invitations` | `RESEND_API_KEY` | Resend, Sending access |
-| `rallyroo-apns` | `APNS_PRIVATE_KEY` | Apple Developer |
+| `rallyroo-apns` | `APNS_PRIVATE_KEY`, `APNS_KEY_ID` | Apple Developer |
 | `rallyroo-calendar-encryption` | `CALENDAR_SOURCE_ENCRYPTION_KEY` | Rallyroo-generated |
 | `rallyroo-observability` | `METRICS_BEARER_TOKEN` | Rallyroo-generated |
 | `rallyroo-deployment-alert-webhook` | `token` | Rallyroo-generated shared HMAC |
@@ -212,8 +212,8 @@ After Apple Developer membership and the app identifier are active:
    the account supports it;
 4. download the `.p8` file once and store its complete contents in
    `rallyroo-apns` → `APNS_PRIVATE_KEY`;
-5. record the Key ID, Team ID, bundle ID, and environment as readable
-   configuration.
+5. store the Key ID with the private key because those values rotate together;
+6. record the Team ID, bundle ID, and environment as readable configuration.
 
 Apple only allows the private key download once. The key does not expire but can be
 revoked.
@@ -260,8 +260,7 @@ rendered into `rallyroo-runtime-config`.
 | `STYTCH_OAUTH_CALLBACK_URL` | `rallyroo://oauth-callback` |
 | `STYTCH_ENV` | `live` |
 | `INVITATION_EMAIL_FROM` | Sender on the verified Resend domain |
-| `APNS_KEY_ID` | Apple APNs key identifier |
-| `APNS_TEAM_ID` | Apple Developer Team ID |
+| `APNS_TEAM_ID` | Apple Developer Team ID (`5LS29Z8553`) |
 | `APNS_BUNDLE_ID` | `dev.rallyroo.app` |
 | `APNS_ENV` | `production` |
 | `LOG_LEVEL` | `info` |

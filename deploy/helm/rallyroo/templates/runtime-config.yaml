@@ -1,0 +1,12 @@
+{{- if .Values.runtimeConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-runtime-config
+  labels:
+    {{- include "rallyroo.labels" . | nindent 4 }}
+data:
+  APNS_TEAM_ID: {{ required "runtimeConfig.apns.teamID is required when runtimeConfig is enabled" .Values.runtimeConfig.apns.teamID | quote }}
+  APNS_BUNDLE_ID: {{ required "runtimeConfig.apns.bundleID is required when runtimeConfig is enabled" .Values.runtimeConfig.apns.bundleID | quote }}
+  APNS_ENV: {{ required "runtimeConfig.apns.environment is required when runtimeConfig is enabled" .Values.runtimeConfig.apns.environment | quote }}
+{{- end }}

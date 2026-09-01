@@ -32,6 +32,12 @@ spec:
     enable: true
     ignoreFailures: false
   values:
+    runtimeConfig:
+      enabled: true
+      apns:
+        teamID: 5LS29Z8553
+        bundleID: dev.rallyroo.app
+        environment: production
     postgres:
       persistence:
         mode: hostPath
