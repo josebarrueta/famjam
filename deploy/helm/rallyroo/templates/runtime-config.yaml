@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "rallyroo.labels" . | nindent 4 }}
 data:
+  LOG_LEVEL: {{ required "runtimeConfig.logLevel is required when runtimeConfig is enabled" .Values.runtimeConfig.logLevel | quote }}
   STYTCH_PROJECT_ID: {{ required "runtimeConfig.stytch.projectID is required when runtimeConfig is enabled" .Values.runtimeConfig.stytch.projectID | quote }}
   STYTCH_PUBLIC_TOKEN: {{ required "runtimeConfig.stytch.publicToken is required when runtimeConfig is enabled" .Values.runtimeConfig.stytch.publicToken | quote }}
   STYTCH_OAUTH_CALLBACK_URL: {{ required "runtimeConfig.stytch.oauthCallbackURL is required when runtimeConfig is enabled" .Values.runtimeConfig.stytch.oauthCallbackURL | quote }}

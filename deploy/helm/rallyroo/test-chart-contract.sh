@@ -46,6 +46,7 @@ grep -q '"helm.sh/hook": test' "$rendered"
 grep -q 'http://rallyroo-api:3000/ready' "$rendered"
 grep -q 'repository: rallyroo-api' "$VALUES"
 grep -q 'name: rallyroo-runtime-config' "$rendered"
+grep -q 'LOG_LEVEL: "info"' "$rendered"
 grep -q 'STYTCH_PROJECT_ID: "project-live-test"' "$rendered"
 grep -q 'STYTCH_PUBLIC_TOKEN: "public-token-live-test"' "$rendered"
 grep -q 'STYTCH_OAUTH_CALLBACK_URL: "rallyroo://oauth-callback"' "$rendered"
@@ -84,6 +85,10 @@ grep -q 'value: /run/secrets/observability/metrics-token' "$rendered"
 grep -q 'secretName: rallyroo-observability' "$rendered"
 if grep -q 'name: DATABASE_URL' "$rendered"; then
   echo "Production workloads must not receive DATABASE_URL" >&2
+  exit 1
+fi
+if grep -q 'name: rallyroo-runtime$' "$rendered"; then
+  echo "Production workloads must not reference the legacy catch-all Secret" >&2
   exit 1
 fi
 if grep -q 'name: rallyroo-runtime-config' "$flux_rendered"; then

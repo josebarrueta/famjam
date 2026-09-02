@@ -69,9 +69,10 @@ spec:
           image: "{{ .Values.api.image.repository }}:{{ include "rallyroo.apiImageTag" . }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           envFrom:
+            {{- if not .Values.runtimeConfig.enabled }}
             - secretRef:
                 name: {{ .Values.runtimeSecret }}
-            {{- if .Values.runtimeConfig.enabled }}
+            {{- else }}
             - configMapRef:
                 name: {{ .Release.Name }}-runtime-config
             {{- end }}

@@ -26,6 +26,7 @@ runtimeConfig:
   # Production enables this through Flux. Local development continues reading
   # provider configuration from server/api/.env through the runtime Secret.
   enabled: false
+  logLevel: info
   stytch:
     projectID: ""
     publicToken: ""
