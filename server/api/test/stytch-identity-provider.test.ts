@@ -32,7 +32,8 @@ function provider() {
 }
 
 describe("StytchIdentityProvider", () => {
-  it("uses the configured custom domain for public OAuth authorization", () => {
+  it("uses the configured custom domain for browser and server Stytch calls", () => {
+    let clientConfiguration: { custom_base_url?: string } | undefined;
     const configured = StytchIdentityProvider.fromEnvironment({
       STYTCH_PROJECT_ID: "project-live-test",
       STYTCH_SECRET_FILE: "/run/secrets/stytch/secret",
@@ -43,8 +44,15 @@ describe("StytchIdentityProvider", () => {
     }, (path) => {
       expect(path).toBe("/run/secrets/stytch/secret");
       return "secret-live-test";
+    }, (configuration) => {
+      clientConfiguration = configuration;
+      return {
+        sessions: { async authenticate() { throw new Error("not called"); }, async revoke() {} },
+        oauth: { async authenticate() { throw new Error("not called"); } },
+      };
     });
 
+    expect(clientConfiguration?.custom_base_url).toBe("https://login.rallyroo.dev/");
     const url = new URL(configured.googleAuthorizationURL(codeChallenge));
     expect(`${url.origin}${url.pathname}`).toBe(
       "https://login.rallyroo.dev/v1/public/oauth/google/start",

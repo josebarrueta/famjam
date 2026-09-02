@@ -24,6 +24,18 @@ export interface StytchOAuthClient {
   }>;
 }
 
+interface StytchClientConfiguration {
+  project_id: string;
+  secret: string;
+  env: string;
+  custom_base_url?: string;
+}
+
+type StytchClientFactory = (configuration: StytchClientConfiguration) => {
+  sessions: StytchSessionClient;
+  oauth: StytchOAuthClient;
+};
+
 interface StytchIdentityProviderConfiguration {
   publicToken: string;
   callbackURL: string;
@@ -80,6 +92,7 @@ export class StytchIdentityProvider implements IdentityProvider {
   static fromEnvironment(
     environment: NodeJS.ProcessEnv = process.env,
     readSecretFile?: SecretFileReader,
+    createClient: StytchClientFactory = (configuration) => new Client(configuration),
   ): StytchIdentityProvider {
     const projectID = environment.STYTCH_PROJECT_ID;
     const secret = configuredSecret("STYTCH_SECRET", environment, readSecretFile);
@@ -91,11 +104,16 @@ export class StytchIdentityProvider implements IdentityProvider {
       );
     }
     const apiEnvironmentURL = environment.STYTCH_ENV === "live" ? envs.live : envs.test;
-    const environmentURL = authorizationBaseURL(
-      environment.STYTCH_CUSTOM_BASE_URL,
-      apiEnvironmentURL,
-    );
-    const client = new Client({ project_id: projectID, secret, env: apiEnvironmentURL });
+    const customBaseURL = environment.STYTCH_CUSTOM_BASE_URL
+      ? authorizationBaseURL(environment.STYTCH_CUSTOM_BASE_URL, apiEnvironmentURL)
+      : undefined;
+    const environmentURL = customBaseURL ?? apiEnvironmentURL;
+    const client = createClient({
+      project_id: projectID,
+      secret,
+      env: apiEnvironmentURL,
+      ...(customBaseURL ? { custom_base_url: customBaseURL } : {}),
+    });
     return new StytchIdentityProvider({
       publicToken,
       callbackURL,
