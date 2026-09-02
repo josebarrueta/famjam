@@ -154,3 +154,12 @@ The home-hosted deployment uses a Cloudflare Tunnel terminating public TLS and
 forwarding `api.rallyroo.dev` to NGINX at `127.0.0.1:8080`. No router ports are
 opened. Never expose PostgreSQL, Redis, Kubernetes, or the Docker socket—only
 NGINX through the tunnel.
+
+The same NGINX edge serves a tracker-free product and legal site from
+`deploy/helm/rallyroo/files/site/`. Configure `rallyroo.dev` and
+`www.rallyroo.dev` as additional public hostnames on the same tunnel, both
+forwarding to `http://127.0.0.1:8080`. NGINX selects the site by hostname while
+preserving the branded `404` contract at the API root and unknown API paths.
+
+Before using the public URLs in Google Auth Platform or App Store Connect,
+configure and verify Cloudflare Email Routing for `support@rallyroo.dev`.

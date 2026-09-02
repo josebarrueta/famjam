@@ -83,6 +83,11 @@ grep -q 'secretName: rallyroo-apns' "$rendered"
 grep -q 'name: METRICS_BEARER_TOKEN_FILE' "$rendered"
 grep -q 'value: /run/secrets/observability/metrics-token' "$rendered"
 grep -q 'secretName: rallyroo-observability' "$rendered"
+grep -q 'name: rallyroo-site' "$rendered"
+grep -q 'server_name rallyroo.dev www.rallyroo.dev' "$rendered"
+grep -q 'Privacy Policy' "$rendered"
+grep -q 'support@rallyroo.dev' "$rendered"
+grep -q 'mountPath: /usr/share/nginx/html' "$rendered"
 if grep -q 'name: DATABASE_URL' "$rendered"; then
   echo "Production workloads must not receive DATABASE_URL" >&2
   exit 1
