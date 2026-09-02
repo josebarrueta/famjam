@@ -18,6 +18,7 @@
 		A1000000000000000000000B /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* AppTheme.swift */; };
 		A1000000000000000000000C /* SessionGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* SessionGateView.swift */; };
 		A1000000000000000000000D /* PushNotificationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001C /* PushNotificationDelegate.swift */; };
+		A1000000000000000000000E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001D /* PrivacyInfo.xcprivacy */; };
 		B20000000000000000000001 /* FamilyAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000011 /* FamilyAppUITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -44,6 +45,7 @@
 		A1000000000000000000001A /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		A1000000000000000000001B /* SessionGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGateView.swift; sourceTree = "<group>"; };
 		A1000000000000000000001C /* PushNotificationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationDelegate.swift; sourceTree = "<group>"; };
+		A1000000000000000000001D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B20000000000000000000010 /* FamilyAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FamilyAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000000000000000000011 /* FamilyAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyAppUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -91,6 +93,7 @@
 				A1000000000000000000001A /* AppTheme.swift */,
 				A1000000000000000000001B /* SessionGateView.swift */,
 				A1000000000000000000001C /* PushNotificationDelegate.swift */,
+				A1000000000000000000001D /* PrivacyInfo.xcprivacy */,
 			);
 			path = FamilyApp;
 			sourceTree = "<group>";
@@ -206,6 +209,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000000A /* Assets.xcassets in Resources */,
+				A1000000000000000000000E /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
