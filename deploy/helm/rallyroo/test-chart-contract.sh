@@ -25,7 +25,8 @@ helm template rallyroo "$CHART" --values "$VALUES" --is-upgrade \
   --set providerSecrets.stytch=rallyroo-stytch \
   --set providerSecrets.calendarEncryption=rallyroo-calendar-encryption \
   --set providerSecrets.googlePlaces=rallyroo-google-places \
-  --set providerSecrets.resendInvitations=rallyroo-resend-invitations >"$rendered"
+  --set providerSecrets.resendInvitations=rallyroo-resend-invitations \
+  --set providerSecrets.apns=rallyroo-apns >"$rendered"
 helm package "$CHART" --destination "$tmp" --version "0.1.1+deadbeef" >/dev/null
 helm template rallyroo "$tmp/rallyroo-0.1.1+deadbeef.tgz" \
   --values "$VALUES" --is-upgrade >"$flux_rendered"
@@ -72,6 +73,11 @@ grep -q 'secretName: rallyroo-google-places' "$rendered"
 grep -q 'name: RESEND_API_KEY_FILE' "$rendered"
 grep -q 'value: /run/secrets/resend-invitations/api-key' "$rendered"
 grep -q 'secretName: rallyroo-resend-invitations' "$rendered"
+grep -q 'name: APNS_KEY_ID_FILE' "$rendered"
+grep -q 'value: /run/secrets/apns/key-id' "$rendered"
+grep -q 'name: APNS_PRIVATE_KEY_FILE' "$rendered"
+grep -q 'value: /run/secrets/apns/private-key' "$rendered"
+grep -q 'secretName: rallyroo-apns' "$rendered"
 if grep -q 'name: DATABASE_URL' "$rendered"; then
   echo "Production workloads must not receive DATABASE_URL" >&2
   exit 1

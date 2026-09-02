@@ -1,6 +1,7 @@
 import { connect } from "node:http2";
 import { importPKCS8, SignJWT } from "jose";
 import type { PushNotification, PushNotificationProvider } from "./push-notification-provider.js";
+import { configuredSecret, type SecretFileReader } from "./runtime-configuration.js";
 
 interface APNSConfiguration {
   keyID: string;
@@ -15,11 +16,15 @@ export class APNSPushNotificationProvider implements PushNotificationProvider {
 
   constructor(private readonly configuration: APNSConfiguration) {}
 
-  static fromEnvironment(environment: NodeJS.ProcessEnv = process.env): APNSPushNotificationProvider | null {
-    const keyID = environment.APNS_KEY_ID;
+  static fromEnvironment(
+    environment: NodeJS.ProcessEnv = process.env,
+    readSecretFile?: SecretFileReader,
+  ): APNSPushNotificationProvider | null {
+    const keyID = configuredSecret("APNS_KEY_ID", environment, readSecretFile);
     const teamID = environment.APNS_TEAM_ID;
     const bundleID = environment.APNS_BUNDLE_ID;
-    const privateKey = environment.APNS_PRIVATE_KEY?.replaceAll("\\n", "\n");
+    const privateKey = configuredSecret("APNS_PRIVATE_KEY", environment, readSecretFile)
+      ?.replaceAll("\\n", "\n");
     if (!keyID || !teamID || !bundleID || !privateKey) return null;
     return new APNSPushNotificationProvider({
       keyID,

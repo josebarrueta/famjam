@@ -37,6 +37,7 @@ spec:
       calendarEncryption: rallyroo-calendar-encryption
       googlePlaces: rallyroo-google-places
       resendInvitations: rallyroo-resend-invitations
+      apns: rallyroo-apns
     runtimeConfig:
       enabled: true
       stytch:

@@ -19,6 +19,7 @@ providerSecrets:
   calendarEncryption: ""
   googlePlaces: ""
   resendInvitations: ""
+  apns: ""
 
 runtimeConfig:
   # Production enables this through Flux. Local development continues reading
