@@ -50,10 +50,10 @@ const calendarSources = calendarEncryptionKey
     fetchFeed: fetchPublicCalendarFeed,
   })
   : undefined;
-const invitationEmailSender: InvitationEmailSender = process.env.RESEND_API_KEY
-  && process.env.INVITATION_EMAIL_FROM
+const resendAPIKey = configuredSecret("RESEND_API_KEY");
+const invitationEmailSender: InvitationEmailSender = resendAPIKey && process.env.INVITATION_EMAIL_FROM
   ? new ResendInvitationEmailSender({
-    apiKey: process.env.RESEND_API_KEY,
+    apiKey: resendAPIKey,
     from: process.env.INVITATION_EMAIL_FROM,
   })
   : new UnavailableInvitationEmailSender();

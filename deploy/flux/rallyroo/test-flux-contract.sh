@@ -22,6 +22,8 @@ grep -q '^  name: rallyroo-calendar-encryption$' "$FLUX_DIR/onepassword-items.ya
 grep -q '^  itemPath: vaults/rallyroo-prod/items/rallyroo-calendar-encryption$' "$FLUX_DIR/onepassword-items.yaml"
 grep -q '^  name: rallyroo-google-places$' "$FLUX_DIR/onepassword-items.yaml"
 grep -q '^  itemPath: vaults/rallyroo-prod/items/rallyroo-google-places$' "$FLUX_DIR/onepassword-items.yaml"
+grep -q '^  name: rallyroo-resend-invitations$' "$FLUX_DIR/onepassword-items.yaml"
+grep -q '^  itemPath: vaults/rallyroo-prod/items/rallyroo-resend-invitations$' "$FLUX_DIR/onepassword-items.yaml"
 if grep -Eq '(token|address):[[:space:]]+[^[:space:]]' "$FLUX_DIR/onepassword-items.yaml"; then
   echo "OnePasswordItem manifests must contain references, never secret values" >&2
   exit 1

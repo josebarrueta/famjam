@@ -18,6 +18,7 @@ providerSecrets:
   stytch: ""
   calendarEncryption: ""
   googlePlaces: ""
+  resendInvitations: ""
 
 runtimeConfig:
   # Production enables this through Flux. Local development continues reading
@@ -29,6 +30,8 @@ runtimeConfig:
     oauthCallbackURL: rallyroo://oauth-callback
     environment: test
     customBaseURL: ""
+  invitationEmail:
+    from: ""
   apns:
     teamID: ""
     bundleID: dev.rallyroo.app

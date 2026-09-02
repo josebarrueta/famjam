@@ -36,6 +36,7 @@ spec:
       stytch: rallyroo-stytch
       calendarEncryption: rallyroo-calendar-encryption
       googlePlaces: rallyroo-google-places
+      resendInvitations: rallyroo-resend-invitations
     runtimeConfig:
       enabled: true
       stytch:
@@ -44,6 +45,8 @@ spec:
         oauthCallbackURL: rallyroo://oauth-callback
         environment: live
         customBaseURL: https://login.rallyroo.dev
+      invitationEmail:
+        from: "Rallyroo <invites@rallyroo.dev>"
       apns:
         teamID: 5LS29Z8553
         bundleID: dev.rallyroo.app

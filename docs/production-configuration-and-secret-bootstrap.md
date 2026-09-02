@@ -261,7 +261,7 @@ rendered into `rallyroo-runtime-config`.
 | `STYTCH_OAUTH_CALLBACK_URL` | `rallyroo://oauth-callback` |
 | `STYTCH_ENV` | `live` |
 | `STYTCH_CUSTOM_BASE_URL` | `https://login.rallyroo.dev` |
-| `INVITATION_EMAIL_FROM` | Sender on the verified Resend domain |
+| `INVITATION_EMAIL_FROM` | `Rallyroo <invites@rallyroo.dev>` |
 | `APNS_TEAM_ID` | Apple Developer Team ID (`5LS29Z8553`) |
 | `APNS_BUNDLE_ID` | `dev.rallyroo.app` |
 | `APNS_ENV` | `production` |

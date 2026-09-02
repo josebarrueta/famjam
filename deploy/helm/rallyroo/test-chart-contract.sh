@@ -17,13 +17,15 @@ helm template rallyroo "$CHART" --values "$VALUES" --is-upgrade \
   --set runtimeConfig.stytch.publicToken=public-token-live-test \
   --set runtimeConfig.stytch.environment=live \
   --set runtimeConfig.stytch.customBaseURL=https://login.rallyroo.dev \
+  --set 'runtimeConfig.invitationEmail.from=Rallyroo <invites@rallyroo.dev>' \
   --set runtimeConfig.apns.teamID=5LS29Z8553 \
   --set runtimeConfig.apns.bundleID=dev.rallyroo.app \
   --set runtimeConfig.apns.environment=production \
   --set postgres.credentialsSecret=rallyroo-postgres \
   --set providerSecrets.stytch=rallyroo-stytch \
   --set providerSecrets.calendarEncryption=rallyroo-calendar-encryption \
-  --set providerSecrets.googlePlaces=rallyroo-google-places >"$rendered"
+  --set providerSecrets.googlePlaces=rallyroo-google-places \
+  --set providerSecrets.resendInvitations=rallyroo-resend-invitations >"$rendered"
 helm package "$CHART" --destination "$tmp" --version "0.1.1+deadbeef" >/dev/null
 helm template rallyroo "$tmp/rallyroo-0.1.1+deadbeef.tgz" \
   --values "$VALUES" --is-upgrade >"$flux_rendered"
@@ -47,6 +49,7 @@ grep -q 'STYTCH_PUBLIC_TOKEN: "public-token-live-test"' "$rendered"
 grep -q 'STYTCH_OAUTH_CALLBACK_URL: "rallyroo://oauth-callback"' "$rendered"
 grep -q 'STYTCH_ENV: "live"' "$rendered"
 grep -q 'STYTCH_CUSTOM_BASE_URL: "https://login.rallyroo.dev"' "$rendered"
+grep -q 'INVITATION_EMAIL_FROM: "Rallyroo <invites@rallyroo.dev>"' "$rendered"
 grep -q 'APNS_TEAM_ID: "5LS29Z8553"' "$rendered"
 grep -q 'APNS_BUNDLE_ID: "dev.rallyroo.app"' "$rendered"
 grep -q 'APNS_ENV: "production"' "$rendered"
@@ -66,6 +69,9 @@ grep -q 'secretName: rallyroo-calendar-encryption' "$rendered"
 grep -q 'name: GOOGLE_PLACES_API_KEY_FILE' "$rendered"
 grep -q 'value: /run/secrets/google-places/api-key' "$rendered"
 grep -q 'secretName: rallyroo-google-places' "$rendered"
+grep -q 'name: RESEND_API_KEY_FILE' "$rendered"
+grep -q 'value: /run/secrets/resend-invitations/api-key' "$rendered"
+grep -q 'secretName: rallyroo-resend-invitations' "$rendered"
 if grep -q 'name: DATABASE_URL' "$rendered"; then
   echo "Production workloads must not receive DATABASE_URL" >&2
   exit 1
