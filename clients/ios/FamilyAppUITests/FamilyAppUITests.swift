@@ -30,7 +30,7 @@ final class FamilyAppUITests: XCTestCase {
         XCTAssertTrue(signOut.waitForExistence(timeout: 5))
         signOut.tap()
 
-        let confirmation = app.sheets.buttons["Sign Out"]
+        let confirmation = app.buttons["confirm-sign-out"].firstMatch
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         confirmation.tap()
         XCTAssertTrue(app.staticTexts["Welcome to Rallyroo"].waitForExistence(timeout: 5))

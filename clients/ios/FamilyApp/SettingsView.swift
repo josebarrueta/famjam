@@ -70,6 +70,7 @@ struct SettingsView: View {
                 Button("Sign Out", role: .destructive) {
                     onSignOut.perform()
                 }
+                .accessibilityIdentifier("confirm-sign-out")
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("You can sign in again at any time.")
