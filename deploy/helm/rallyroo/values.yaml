@@ -20,6 +20,7 @@ providerSecrets:
   googlePlaces: ""
   resendInvitations: ""
   apns: ""
+  observability: ""
 
 runtimeConfig:
   # Production enables this through Flux. Local development continues reading

@@ -30,6 +30,7 @@ const cache: Cache = process.env.REDIS_URL
   ? await RedisCache.connect(process.env.REDIS_URL)
   : new InMemoryCache();
 const metrics = new RallyrooMetrics();
+const metricsBearerToken = configuredSecret("METRICS_BEARER_TOKEN");
 const identityProvider = new CachedIdentityProvider(
   StytchIdentityProvider.fromEnvironment(),
   cache,
@@ -72,8 +73,8 @@ const app = buildApp({
     ?? new NoopPushNotificationProvider(),
   readinessCheck: () => repository.checkReadiness(),
   metrics,
-  ...(process.env.METRICS_BEARER_TOKEN
-    ? { metricsBearerToken: process.env.METRICS_BEARER_TOKEN }
+  ...(metricsBearerToken
+    ? { metricsBearerToken }
     : {}),
   logger: {
     level: process.env.LOG_LEVEL ?? "info",

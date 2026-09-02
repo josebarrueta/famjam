@@ -38,6 +38,7 @@ spec:
       googlePlaces: rallyroo-google-places
       resendInvitations: rallyroo-resend-invitations
       apns: rallyroo-apns
+      observability: rallyroo-observability
     runtimeConfig:
       enabled: true
       stytch:

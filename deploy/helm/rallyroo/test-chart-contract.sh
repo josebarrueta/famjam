@@ -26,7 +26,8 @@ helm template rallyroo "$CHART" --values "$VALUES" --is-upgrade \
   --set providerSecrets.calendarEncryption=rallyroo-calendar-encryption \
   --set providerSecrets.googlePlaces=rallyroo-google-places \
   --set providerSecrets.resendInvitations=rallyroo-resend-invitations \
-  --set providerSecrets.apns=rallyroo-apns >"$rendered"
+  --set providerSecrets.apns=rallyroo-apns \
+  --set providerSecrets.observability=rallyroo-observability >"$rendered"
 helm package "$CHART" --destination "$tmp" --version "0.1.1+deadbeef" >/dev/null
 helm template rallyroo "$tmp/rallyroo-0.1.1+deadbeef.tgz" \
   --values "$VALUES" --is-upgrade >"$flux_rendered"
@@ -78,6 +79,9 @@ grep -q 'value: /run/secrets/apns/key-id' "$rendered"
 grep -q 'name: APNS_PRIVATE_KEY_FILE' "$rendered"
 grep -q 'value: /run/secrets/apns/private-key' "$rendered"
 grep -q 'secretName: rallyroo-apns' "$rendered"
+grep -q 'name: METRICS_BEARER_TOKEN_FILE' "$rendered"
+grep -q 'value: /run/secrets/observability/metrics-token' "$rendered"
+grep -q 'secretName: rallyroo-observability' "$rendered"
 if grep -q 'name: DATABASE_URL' "$rendered"; then
   echo "Production workloads must not receive DATABASE_URL" >&2
   exit 1
