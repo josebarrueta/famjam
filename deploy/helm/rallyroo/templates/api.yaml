@@ -35,7 +35,7 @@ spec:
         checksum/runtime-config: {{ include (print $.Template.BasePath "/runtime-config.yaml") . | sha256sum }}
       {{- end }}
     spec:
-      {{- if or .Values.postgres.credentialsSecret .Values.providerSecrets.stytch }}
+      {{- if or .Values.postgres.credentialsSecret .Values.providerSecrets.stytch .Values.providerSecrets.calendarEncryption }}
       securityContext:
         fsGroup: 1000
       {{- end }}
@@ -95,6 +95,10 @@ spec:
             - name: STYTCH_SECRET_FILE
               value: /run/secrets/stytch/secret
             {{- end }}
+            {{- if .Values.providerSecrets.calendarEncryption }}
+            - name: CALENDAR_SOURCE_ENCRYPTION_KEY_FILE
+              value: /run/secrets/calendar-encryption/key
+            {{- end }}
           ports:
             - name: http
               containerPort: 3000
@@ -112,7 +116,7 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
-          {{- if or .Values.postgres.credentialsSecret .Values.providerSecrets.stytch }}
+          {{- if or .Values.postgres.credentialsSecret .Values.providerSecrets.stytch .Values.providerSecrets.calendarEncryption }}
           volumeMounts:
             {{- if .Values.postgres.credentialsSecret }}
             {{- include "rallyroo.postgresPasswordVolumeMount" . | nindent 12 }}
@@ -122,8 +126,13 @@ spec:
               mountPath: /run/secrets/stytch
               readOnly: true
             {{- end }}
+            {{- if .Values.providerSecrets.calendarEncryption }}
+            - name: calendar-encryption
+              mountPath: /run/secrets/calendar-encryption
+              readOnly: true
+            {{- end }}
           {{- end }}
-      {{- if or .Values.postgres.credentialsSecret .Values.providerSecrets.stytch }}
+      {{- if or .Values.postgres.credentialsSecret .Values.providerSecrets.stytch .Values.providerSecrets.calendarEncryption }}
       volumes:
         {{- if .Values.postgres.credentialsSecret }}
         {{- include "rallyroo.postgresPasswordVolume" . | nindent 8 }}
@@ -136,5 +145,14 @@ spec:
             items:
               - key: STYTCH_SECRET
                 path: secret
+        {{- end }}
+        {{- if .Values.providerSecrets.calendarEncryption }}
+        - name: calendar-encryption
+          secret:
+            secretName: {{ .Values.providerSecrets.calendarEncryption }}
+            defaultMode: 288
+            items:
+              - key: CALENDAR_SOURCE_ENCRYPTION_KEY
+                path: key
         {{- end }}
       {{- end }}

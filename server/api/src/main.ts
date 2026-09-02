@@ -21,6 +21,7 @@ import { PostgresRallyrooRepository } from "./postgres-repository.js";
 import { NoopPushNotificationProvider } from "./push-notification-provider.js";
 import { RedisCache } from "./redis-cache.js";
 import { ResendInvitationEmailSender } from "./resend-invitation-email-sender.js";
+import { configuredSecret } from "./runtime-configuration.js";
 import { StytchIdentityProvider } from "./stytch-identity-provider.js";
 
 const databaseConfiguration = await databasePoolConfiguration();
@@ -41,7 +42,7 @@ const locationProvider: LocationSearchProvider = googlePlacesAPIKey
   : new EmptyLocationSearchProvider();
 
 const repository = PostgresRallyrooRepository.fromConfiguration(databaseConfiguration);
-const calendarEncryptionKey = process.env.CALENDAR_SOURCE_ENCRYPTION_KEY;
+const calendarEncryptionKey = configuredSecret("CALENDAR_SOURCE_ENCRYPTION_KEY");
 const calendarSources = calendarEncryptionKey
   ? new CalendarSourceModule({
     repository,

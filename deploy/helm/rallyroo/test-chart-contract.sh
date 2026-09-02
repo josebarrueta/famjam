@@ -21,7 +21,8 @@ helm template rallyroo "$CHART" --values "$VALUES" --is-upgrade \
   --set runtimeConfig.apns.bundleID=dev.rallyroo.app \
   --set runtimeConfig.apns.environment=production \
   --set postgres.credentialsSecret=rallyroo-postgres \
-  --set providerSecrets.stytch=rallyroo-stytch >"$rendered"
+  --set providerSecrets.stytch=rallyroo-stytch \
+  --set providerSecrets.calendarEncryption=rallyroo-calendar-encryption >"$rendered"
 helm package "$CHART" --destination "$tmp" --version "0.1.1+deadbeef" >/dev/null
 helm template rallyroo "$tmp/rallyroo-0.1.1+deadbeef.tgz" \
   --values "$VALUES" --is-upgrade >"$flux_rendered"
@@ -58,6 +59,9 @@ grep -q 'defaultMode: 288' "$rendered"
 grep -q 'name: STYTCH_SECRET_FILE' "$rendered"
 grep -q 'value: /run/secrets/stytch/secret' "$rendered"
 grep -q 'secretName: rallyroo-stytch' "$rendered"
+grep -q 'name: CALENDAR_SOURCE_ENCRYPTION_KEY_FILE' "$rendered"
+grep -q 'value: /run/secrets/calendar-encryption/key' "$rendered"
+grep -q 'secretName: rallyroo-calendar-encryption' "$rendered"
 if grep -q 'name: DATABASE_URL' "$rendered"; then
   echo "Production workloads must not receive DATABASE_URL" >&2
   exit 1

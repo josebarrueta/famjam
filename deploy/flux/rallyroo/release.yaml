@@ -34,6 +34,7 @@ spec:
   values:
     providerSecrets:
       stytch: rallyroo-stytch
+      calendarEncryption: rallyroo-calendar-encryption
     runtimeConfig:
       enabled: true
       stytch:
