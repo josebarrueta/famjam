@@ -16,7 +16,7 @@ struct FamilyActivityCoordinatorApp: App {
     private let calendarSourceStore: (any CalendarSourceStore)?
     private let changeMonitor: (any FamilyChangeMonitor)?
     private let deviceRegistrationStore: (any DeviceRegistrationStore)?
-    private let allowsSignOut: Bool
+    private let dataIsSynced: Bool
 
     init() {
         let configuration: AppConfiguration
@@ -26,7 +26,7 @@ struct FamilyActivityCoordinatorApp: App {
             fatalError("Invalid Rallyroo configuration: \(error)")
         }
 
-        allowsSignOut = configuration.dataMode == .remote
+        dataIsSynced = configuration.dataMode == .remote
         switch configuration.dataMode {
         case .local:
             AppStorage.resetForUnifiedFamilyMembersIfNeeded()
@@ -96,7 +96,7 @@ struct FamilyActivityCoordinatorApp: App {
                             .tabItem { Label("Alerts", systemImage: "bell") }
                     }
                     SettingsView(
-                        allowsSignOut: allowsSignOut,
+                        dataIsSynced: dataIsSynced,
                         calendarSourceStore: session.role == .parent ? calendarSourceStore : nil,
                         memberStore: session.role == .parent ? memberStore : nil,
                         onSignOut: signOut

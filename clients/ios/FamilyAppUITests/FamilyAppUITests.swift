@@ -18,6 +18,24 @@ final class FamilyAppUITests: XCTestCase {
         XCTAssertFalse(app.textFields["Invitation code (optional)"].exists)
     }
 
+    func testUserCanSignOutFromSettings() {
+        let app = XCUIApplication()
+        app.launchEnvironment["RALLYROO_DATA_MODE"] = "local"
+        app.launch()
+
+        XCTAssertTrue(app.navigationBars["Rallyroo"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Settings"].tap()
+
+        let signOut = app.buttons["Sign Out"]
+        XCTAssertTrue(signOut.waitForExistence(timeout: 5))
+        signOut.tap()
+
+        let confirmation = app.sheets.buttons["Sign Out"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        confirmation.tap()
+        XCTAssertTrue(app.staticTexts["Welcome to Rallyroo"].waitForExistence(timeout: 5))
+    }
+
     func testParentCanOpenTheLocalScheduleAndFamilyTabs() {
         let app = XCUIApplication()
         app.launchEnvironment["RALLYROO_DATA_MODE"] = "local"

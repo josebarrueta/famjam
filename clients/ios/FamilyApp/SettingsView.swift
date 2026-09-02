@@ -2,24 +2,25 @@ import SwiftUI
 import FamilyCore
 
 struct SettingsView: View {
-    let allowsSignOut: Bool
+    let dataIsSynced: Bool
     let onSignOut: SignOutAction
     private let calendarSourceStore: (any CalendarSourceStore)?
     private let memberStore: (any FamilyMemberStore)?
     private let preferences = ConflictAlertPreferences()
 
     init(
-        allowsSignOut: Bool = false,
+        dataIsSynced: Bool = false,
         calendarSourceStore: (any CalendarSourceStore)? = nil,
         memberStore: (any FamilyMemberStore)? = nil,
         onSignOut: SignOutAction = SignOutAction({})
     ) {
-        self.allowsSignOut = allowsSignOut
+        self.dataIsSynced = dataIsSynced
         self.calendarSourceStore = calendarSourceStore
         self.memberStore = memberStore
         self.onSignOut = onSignOut
     }
     @State private var conflictAlertsEnabled = true
+    @State private var isConfirmingSignOut = false
 
     var body: some View {
         NavigationStack {
@@ -50,18 +51,29 @@ struct SettingsView: View {
 
                 Section("About") {
                     LabeledContent("App", value: "Rallyroo")
-                    LabeledContent("Data", value: allowsSignOut ? "Synced" : "Stored on this device")
-                }
-
-                if allowsSignOut {
-                    Section("Account") {
-                        Button("Sign Out", role: .destructive) {
-                            onSignOut.perform()
-                        }
-                    }
+                    LabeledContent("Data", value: dataIsSynced ? "Synced" : "Stored on this device")
                 }
             }
             .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Sign Out", role: .destructive) {
+                        isConfirmingSignOut = true
+                    }
+                }
+            }
+            .confirmationDialog(
+                "Sign out of Rallyroo?",
+                isPresented: $isConfirmingSignOut,
+                titleVisibility: .visible
+            ) {
+                Button("Sign Out", role: .destructive) {
+                    onSignOut.perform()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You can sign in again at any time.")
+            }
             .onAppear {
                 conflictAlertsEnabled = preferences.areConflictAlertsEnabled
             }
