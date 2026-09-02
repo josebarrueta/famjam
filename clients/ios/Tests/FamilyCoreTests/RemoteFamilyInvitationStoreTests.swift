@@ -15,14 +15,20 @@ final class RemoteFamilyInvitationStoreTests: XCTestCase {
             transport: transport
         )
 
-        let invitation = try await store.create(role: .kid, recipientEmail: "kid@example.com")
+        let invitation = try await store.create(
+            role: .kid,
+            recipientEmail: "kid@example.com",
+            guardianConsent: true
+        )
 
         XCTAssertEqual(invitation.id, "invite-1")
         let requests = await transport.recordedRequests()
         XCTAssertEqual(requests.first?.method, .post)
         XCTAssertEqual(requests.first?.url.path, "/v1/invitations")
-        let body = try JSONSerialization.jsonObject(with: requests.first!.body!) as? [String: String]
-        XCTAssertEqual(body, ["role": "kid", "email": "kid@example.com"])
+        let body = try JSONSerialization.jsonObject(with: requests.first!.body!) as? [String: Any]
+        XCTAssertEqual(body?["role"] as? String, "kid")
+        XCTAssertEqual(body?["email"] as? String, "kid@example.com")
+        XCTAssertEqual(body?["guardianConsent"] as? Bool, true)
     }
 
     func testListsPendingInvitationsFromTheRemoteAPI() async throws {

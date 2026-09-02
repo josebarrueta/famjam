@@ -36,7 +36,11 @@ final class LiveAPIContractTests: XCTestCase {
         let savedEvents = try await events.events()
         XCTAssertEqual(savedEvents.map(\.id), [event.id])
 
-        let invitation = try await invitations.create(role: .kid, recipientEmail: "kid@example.com")
+        let invitation = try await invitations.create(
+            role: .kid,
+            recipientEmail: "kid@example.com",
+            guardianConsent: true
+        )
         XCTAssertFalse(invitation.code.isEmpty)
         let pending = try await invitations.pending()
         XCTAssertEqual(pending.map(\.id), [invitation.id])

@@ -127,6 +127,11 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
           [row.family_id, row.member_id],
         );
         await client.query(
+          `UPDATE family_invitations SET guardian_member_id = NULL
+           WHERE family_id = $1 AND guardian_member_id = $2`,
+          [row.family_id, row.member_id],
+        );
+        await client.query(
           `UPDATE events SET participant_ids = array_remove(participant_ids, $2),
                             kid_id = CASE WHEN kid_id = $2 THEN NULL ELSE kid_id END
            WHERE family_id = $1`,
@@ -154,8 +159,10 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
 
   async saveInvitation(invitation: FamilyInvitation): Promise<void> {
     await this.pool.query(
-      `INSERT INTO family_invitations (id, code_hash, family_id, recipient_email, role, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO family_invitations (
+         id, code_hash, family_id, recipient_email, role, expires_at,
+         guardian_consent_at, guardian_member_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         invitation.id,
         invitation.codeHash,
@@ -163,6 +170,8 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
         invitation.recipientEmail,
         invitation.role,
         invitation.expiresAt,
+        invitation.guardianConsentAt ?? null,
+        invitation.guardianMemberID ?? null,
       ],
     );
   }

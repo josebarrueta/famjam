@@ -13,6 +13,8 @@ export interface FamilyInvitation {
   recipientEmail: string | null;
   role: AccountRole;
   expiresAt: string;
+  guardianConsentAt?: string | null;
+  guardianMemberID?: string | null;
 }
 
 export interface Account {

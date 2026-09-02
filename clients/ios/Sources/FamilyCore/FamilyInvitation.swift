@@ -50,7 +50,11 @@ public struct PendingFamilyInvitation: Codable, Equatable, Identifiable, Sendabl
 }
 
 public protocol FamilyInvitationStore: Sendable {
-    func create(role: FamilyMemberRole, recipientEmail: String) async throws -> FamilyInvitation
+    func create(
+        role: FamilyMemberRole,
+        recipientEmail: String,
+        guardianConsent: Bool
+    ) async throws -> FamilyInvitation
     func pending() async throws -> [PendingFamilyInvitation]
     func cancel(id: String) async throws
     func resend(id: String) async throws -> FamilyInvitation
@@ -60,6 +64,7 @@ public actor RemoteFamilyInvitationStore: FamilyInvitationStore {
     private struct CreateRequest: Encodable {
         let role: FamilyMemberRole
         let email: String
+        let guardianConsent: Bool
     }
 
     private let invitationsURL: URL
@@ -99,12 +104,20 @@ public actor RemoteFamilyInvitationStore: FamilyInvitationStore {
         return try decoder.decode(FamilyInvitation.self, from: response.body)
     }
 
-    public func create(role: FamilyMemberRole, recipientEmail: String) async throws -> FamilyInvitation {
+    public func create(
+        role: FamilyMemberRole,
+        recipientEmail: String,
+        guardianConsent: Bool
+    ) async throws -> FamilyInvitation {
         let response = try await transport.send(HTTPRequest(
             method: .post,
             url: invitationsURL,
             headers: ["Content-Type": "application/json"],
-            body: try encoder.encode(CreateRequest(role: role, email: recipientEmail))
+            body: try encoder.encode(CreateRequest(
+                role: role,
+                email: recipientEmail,
+                guardianConsent: guardianConsent
+            ))
         ))
         try response.requireSuccess()
         return try decoder.decode(FamilyInvitation.self, from: response.body)

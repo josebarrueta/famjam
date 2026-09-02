@@ -77,9 +77,11 @@ schedule. Recurrences are expanded into bounded schedule occurrences.
 ## Family invitations
 
 - `POST /v1/invitations` with
-  `{ "role": "parent" | "kid", "email": "recipient@example.com" }` creates
-  and emails a single-use, seven-day invitation. Parent authorization is required;
-  kid sessions receive `403`.
+  `{ "role": "parent" | "kid", "email": "recipient@example.com", "guardianConsent": true | false }`
+  creates and emails a single-use, seven-day invitation. Parent authorization is
+  required; kid sessions receive `403`. Kid invitations require explicit parent or
+  legal-guardian authorization, and the server records when and which family member
+  supplied it.
 - `GET /v1/invitations` lists pending invitations without exposing their hashed codes.
 - `DELETE /v1/invitations/{id}` cancels an invitation in the parent's family.
 - `POST /v1/invitations/{id}/resend` rotates its code, extends expiration by seven days,

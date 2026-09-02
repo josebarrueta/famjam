@@ -140,8 +140,12 @@ struct FamilyMembersView: View {
                 FamilyMemberEditor(member: member, onSave: viewModel.save, onDelete: viewModel.delete)
             }
             .sheet(item: $invitationRequest) { request in
-                InvitationEmailSheet(role: request.role) { email in
-                    try await viewModel.invite(role: request.role, recipientEmail: email)
+                InvitationEmailSheet(role: request.role) { email, guardianConsent in
+                    try await viewModel.invite(
+                        role: request.role,
+                        recipientEmail: email,
+                        guardianConsent: guardianConsent
+                    )
                 }
             }
             .alert("Invitation sent", isPresented: Binding(
@@ -192,8 +196,16 @@ final class FamilyMembersViewModel: ObservableObject {
     func delete(_ member: FamilyMember) async throws { try await deletionService.delete(member); await load() }
     var canInvite: Bool { invitationStore != nil }
     func saveEvent(_ event: FamilyEvent) async throws -> [EventConflict] { try await eventStore.save(event) }
-    func invite(role: FamilyMemberRole, recipientEmail: String) async throws {
-        _ = try await invitationStore?.create(role: role, recipientEmail: recipientEmail)
+    func invite(
+        role: FamilyMemberRole,
+        recipientEmail: String,
+        guardianConsent: Bool
+    ) async throws {
+        _ = try await invitationStore?.create(
+            role: role,
+            recipientEmail: recipientEmail,
+            guardianConsent: guardianConsent
+        )
         invitationSentTo = recipientEmail
         await load()
     }
@@ -215,10 +227,11 @@ private struct InvitationRequest: Identifiable {
 
 private struct InvitationEmailSheet: View {
     let role: FamilyMemberRole
-    let onSend: (String) async throws -> Void
+    let onSend: (String, Bool) async throws -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var email = ""
     @State private var isSending = false
+    @State private var hasGuardianConsent = false
     @State private var errorMessage: String?
 
     private var normalizedEmail: String {
@@ -237,6 +250,18 @@ private struct InvitationEmailSheet: View {
                 } footer: {
                     Text("Rallyroo will email a secure, single-use link that expires in seven days.")
                 }
+                if role == .kid {
+                    Section {
+                        Toggle(
+                            "I am this child's parent or legal guardian, or I have their authorization",
+                            isOn: $hasGuardianConsent
+                        )
+                    } header: {
+                        Text("Parent or guardian authorization")
+                    } footer: {
+                        Text("This confirms permission for Rallyroo to process the child's account and family schedule information.")
+                    }
+                }
                 if let errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(.red)
@@ -252,7 +277,7 @@ private struct InvitationEmailSheet: View {
                         isSending = true
                         Task {
                             do {
-                                try await onSend(normalizedEmail)
+                                try await onSend(normalizedEmail, role == .kid && hasGuardianConsent)
                                 dismiss()
                             } catch {
                                 errorMessage = "We couldn't send the invitation. Please try again."
@@ -260,7 +285,11 @@ private struct InvitationEmailSheet: View {
                             }
                         }
                     }
-                    .disabled(isSending || !normalizedEmail.contains("@"))
+                    .disabled(
+                        isSending ||
+                        !normalizedEmail.contains("@") ||
+                        (role == .kid && !hasGuardianConsent)
+                    )
                 }
             }
         }

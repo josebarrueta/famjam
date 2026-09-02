@@ -60,6 +60,7 @@ const oauthSessionSchema = z.object({
 const invitationSchema = z.object({
   role: z.enum(["parent", "kid"]),
   email: z.email().transform((email) => email.toLowerCase()),
+  guardianConsent: z.boolean().default(false),
 });
 
 const memberSchema = z.object({
@@ -277,6 +278,9 @@ export function buildApp({
     if (!account) return;
     const parsed = invitationSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_invitation" });
+    if (parsed.data.role === "kid" && !parsed.data.guardianConsent) {
+      return reply.code(400).send({ error: "guardian_consent_required" });
+    }
     const code = randomBytes(24).toString("base64url");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const id = randomUUID();
@@ -287,6 +291,8 @@ export function buildApp({
       recipientEmail: parsed.data.email,
       role: parsed.data.role,
       expiresAt,
+      guardianConsentAt: parsed.data.role === "kid" ? new Date().toISOString() : null,
+      guardianMemberID: parsed.data.role === "kid" ? account.memberID : null,
     });
     const members = await repository.membersForFamily(account.familyID);
     const inviterName = members.find((member) => member.id === account.memberID)?.name

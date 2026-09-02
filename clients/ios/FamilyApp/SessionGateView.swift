@@ -123,6 +123,7 @@ struct SignOutAction {
 
 private struct SignInView: View {
     @ObservedObject var viewModel: SessionGateViewModel
+    @State private var hasConfirmedAdultAccount = false
 
     var body: some View {
         NavigationStack {
@@ -141,10 +142,14 @@ private struct SignInView: View {
                 }
                 let code = viewModel.invitationCode.trimmingCharacters(in: .whitespacesAndNewlines)
                 if code.isEmpty {
-                    Text("Signing in without an invitation creates a new family for you.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                    VStack(spacing: 14) {
+                        Text("Signing in without an invitation creates a new family for you.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Toggle("I am 18 or older", isOn: $hasConfirmedAdultAccount)
+                            .font(.subheadline.weight(.semibold))
+                    }
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Family invitation ready", systemImage: "person.2.badge.plus")
@@ -170,6 +175,7 @@ private struct SignInView: View {
                         }
                     }
                     .frame(height: 48)
+                    .disabled(code.isEmpty && !hasConfirmedAdultAccount)
 
                     Button {
                         Task {
@@ -187,6 +193,7 @@ private struct SignInView: View {
                     }
                     .buttonStyle(OAuthButtonStyle(background: AppTheme.coral))
                     .font(.title3)
+                    .disabled(code.isEmpty && !hasConfirmedAdultAccount)
                 }
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)

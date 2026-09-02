@@ -278,6 +278,21 @@ describe("Rallyroo API", () => {
     await app.close();
   });
 
+  it("requires guardian authorization before inviting a kid", async () => {
+    const app = buildApp({ identityProvider, repository: repository() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer parent-token" },
+      payload: { role: "kid", email: "kid@example.com" },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "guardian_consent_required" });
+    await app.close();
+  });
+
   it("lets only a parent send a family invitation email", async () => {
     const deliveries: Array<{ recipientEmail: string; role: string; invitationURL: string }> = [];
     const invitationEmailSender: InvitationEmailSender = {
@@ -299,7 +314,7 @@ describe("Rallyroo API", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer parent-token" },
-      payload: { role: "kid", email: "NewKid@Example.com" },
+      payload: { role: "kid", email: "NewKid@Example.com", guardianConsent: true },
     });
     const forbidden = await app.inject({
       method: "POST",
@@ -344,7 +359,7 @@ describe("Rallyroo API", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer parent-token" },
-      payload: { role: "kid", email: "kid@example.com" },
+      payload: { role: "kid", email: "kid@example.com", guardianConsent: true },
     });
     const pending = await app.inject({
       method: "GET",
@@ -364,7 +379,7 @@ describe("Rallyroo API", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer parent-token" },
-      payload: { role: "kid", email: "sam@example.com" },
+      payload: { role: "kid", email: "sam@example.com", guardianConsent: true },
     });
     expect(invitation.statusCode).toBe(201);
     const invitationCode = invitation.json().code as string;
@@ -389,7 +404,7 @@ describe("Rallyroo API", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer parent-token" },
-      payload: { role: "kid", email: "kid@example.com" },
+      payload: { role: "kid", email: "kid@example.com", guardianConsent: true },
     });
 
     const pending = await app.inject({
@@ -459,7 +474,7 @@ describe("Rallyroo API", () => {
       method: "POST",
       url: "/v1/invitations",
       headers: { authorization: "Bearer parent-token" },
-      payload: { role: "kid", email: "kid@example.com" },
+      payload: { role: "kid", email: "kid@example.com", guardianConsent: true },
     });
 
     const resent = await app.inject({
