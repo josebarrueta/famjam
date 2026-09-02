@@ -256,10 +256,11 @@ rendered into `rallyroo-runtime-config`.
 
 | Variable | Production value or source |
 |---|---|
-| `STYTCH_PROJECT_ID` | Stytch Live Project ID |
-| `STYTCH_PUBLIC_TOKEN` | Stytch Live Public token |
+| `STYTCH_PROJECT_ID` | `project-live-9211da89-0aa2-4ee9-a661-ebc8d68ae4b5` |
+| `STYTCH_PUBLIC_TOKEN` | `public-token-live-7ce8cefc-8580-4e62-a385-035e81e9918d` |
 | `STYTCH_OAUTH_CALLBACK_URL` | `rallyroo://oauth-callback` |
 | `STYTCH_ENV` | `live` |
+| `STYTCH_CUSTOM_BASE_URL` | `https://login.rallyroo.dev` |
 | `INVITATION_EMAIL_FROM` | Sender on the verified Resend domain |
 | `APNS_TEAM_ID` | Apple Developer Team ID (`5LS29Z8553`) |
 | `APNS_BUNDLE_ID` | `dev.rallyroo.app` |

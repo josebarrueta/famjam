@@ -13,10 +13,15 @@ helm lint "$CHART" --values "$VALUES"
 helm template rallyroo "$CHART" --values "$VALUES" --is-upgrade \
   --set migrations.postUpgrade.enabled=true \
   --set runtimeConfig.enabled=true \
+  --set runtimeConfig.stytch.projectID=project-live-test \
+  --set runtimeConfig.stytch.publicToken=public-token-live-test \
+  --set runtimeConfig.stytch.environment=live \
+  --set runtimeConfig.stytch.customBaseURL=https://login.rallyroo.dev \
   --set runtimeConfig.apns.teamID=5LS29Z8553 \
   --set runtimeConfig.apns.bundleID=dev.rallyroo.app \
   --set runtimeConfig.apns.environment=production \
-  --set postgres.credentialsSecret=rallyroo-postgres >"$rendered"
+  --set postgres.credentialsSecret=rallyroo-postgres \
+  --set providerSecrets.stytch=rallyroo-stytch >"$rendered"
 helm package "$CHART" --destination "$tmp" --version "0.1.1+deadbeef" >/dev/null
 helm template rallyroo "$tmp/rallyroo-0.1.1+deadbeef.tgz" \
   --values "$VALUES" --is-upgrade >"$flux_rendered"
@@ -35,16 +40,24 @@ grep -q '"helm.sh/hook": test' "$rendered"
 grep -q 'http://rallyroo-api:3000/ready' "$rendered"
 grep -q 'repository: rallyroo-api' "$VALUES"
 grep -q 'name: rallyroo-runtime-config' "$rendered"
+grep -q 'STYTCH_PROJECT_ID: "project-live-test"' "$rendered"
+grep -q 'STYTCH_PUBLIC_TOKEN: "public-token-live-test"' "$rendered"
+grep -q 'STYTCH_OAUTH_CALLBACK_URL: "rallyroo://oauth-callback"' "$rendered"
+grep -q 'STYTCH_ENV: "live"' "$rendered"
+grep -q 'STYTCH_CUSTOM_BASE_URL: "https://login.rallyroo.dev"' "$rendered"
 grep -q 'APNS_TEAM_ID: "5LS29Z8553"' "$rendered"
 grep -q 'APNS_BUNDLE_ID: "dev.rallyroo.app"' "$rendered"
 grep -q 'APNS_ENV: "production"' "$rendered"
 grep -q 'checksum/runtime-config:' "$rendered"
-grep -A3 'configMapKeyRef:' "$rendered" | grep -q 'name: rallyroo-runtime-config'
+grep -A2 'configMapRef:' "$rendered" | grep -q 'name: rallyroo-runtime-config'
 grep -q 'name: POSTGRES_PASSWORD_FILE' "$rendered"
 grep -q 'value: /run/secrets/postgres/password' "$rendered"
 grep -q 'name: PGHOST' "$rendered"
 grep -q 'secretName: rallyroo-postgres' "$rendered"
 grep -q 'defaultMode: 288' "$rendered"
+grep -q 'name: STYTCH_SECRET_FILE' "$rendered"
+grep -q 'value: /run/secrets/stytch/secret' "$rendered"
+grep -q 'secretName: rallyroo-stytch' "$rendered"
 if grep -q 'name: DATABASE_URL' "$rendered"; then
   echo "Production workloads must not receive DATABASE_URL" >&2
   exit 1

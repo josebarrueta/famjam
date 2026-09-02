@@ -32,6 +32,25 @@ function provider() {
 }
 
 describe("StytchIdentityProvider", () => {
+  it("uses the configured custom domain for public OAuth authorization", () => {
+    const configured = StytchIdentityProvider.fromEnvironment({
+      STYTCH_PROJECT_ID: "project-live-test",
+      STYTCH_SECRET_FILE: "/run/secrets/stytch/secret",
+      STYTCH_PUBLIC_TOKEN: "public-token-live-test",
+      STYTCH_OAUTH_CALLBACK_URL: "rallyroo://oauth-callback",
+      STYTCH_ENV: "live",
+      STYTCH_CUSTOM_BASE_URL: "https://login.rallyroo.dev",
+    }, (path) => {
+      expect(path).toBe("/run/secrets/stytch/secret");
+      return "secret-live-test";
+    });
+
+    const url = new URL(configured.googleAuthorizationURL(codeChallenge));
+    expect(`${url.origin}${url.pathname}`).toBe(
+      "https://login.rallyroo.dev/v1/public/oauth/google/start",
+    );
+  });
+
   it("builds the backend-owned Google authorization URL", () => {
     const url = new URL(provider().googleAuthorizationURL(codeChallenge));
     expect(`${url.origin}${url.pathname}`).toBe("https://test.stytch.com/v1/public/oauth/google/start");

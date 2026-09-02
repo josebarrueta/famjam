@@ -14,10 +14,19 @@ api:
 
 runtimeSecret: rallyroo-runtime
 
+providerSecrets:
+  stytch: ""
+
 runtimeConfig:
   # Production enables this through Flux. Local development continues reading
   # provider configuration from server/api/.env through the runtime Secret.
   enabled: false
+  stytch:
+    projectID: ""
+    publicToken: ""
+    oauthCallbackURL: rallyroo://oauth-callback
+    environment: test
+    customBaseURL: ""
   apns:
     teamID: ""
     bundleID: dev.rallyroo.app

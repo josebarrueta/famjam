@@ -1,6 +1,7 @@
 import { Client, envs } from "stytch";
 import type { Identity } from "./domain.js";
 import type { IdentityProvider, IssuedIdentitySession } from "./identity-provider.js";
+import { configuredSecret, type SecretFileReader } from "./runtime-configuration.js";
 
 export interface StytchSessionClient {
   authenticate(request: { session_token: string }): Promise<{
@@ -76,9 +77,12 @@ export class StytchIdentityProvider implements IdentityProvider {
     await this.configuration.sessions.revoke({ session_token: token });
   }
 
-  static fromEnvironment(environment: NodeJS.ProcessEnv = process.env): StytchIdentityProvider {
+  static fromEnvironment(
+    environment: NodeJS.ProcessEnv = process.env,
+    readSecretFile?: SecretFileReader,
+  ): StytchIdentityProvider {
     const projectID = environment.STYTCH_PROJECT_ID;
-    const secret = environment.STYTCH_SECRET;
+    const secret = configuredSecret("STYTCH_SECRET", environment, readSecretFile);
     const publicToken = environment.STYTCH_PUBLIC_TOKEN;
     const callbackURL = environment.STYTCH_OAUTH_CALLBACK_URL;
     if (!projectID || !secret || !publicToken || !callbackURL) {
@@ -86,8 +90,12 @@ export class StytchIdentityProvider implements IdentityProvider {
         "STYTCH_PROJECT_ID, STYTCH_SECRET, STYTCH_PUBLIC_TOKEN, and STYTCH_OAUTH_CALLBACK_URL are required",
       );
     }
-    const environmentURL = environment.STYTCH_ENV === "live" ? envs.live : envs.test;
-    const client = new Client({ project_id: projectID, secret, env: environmentURL });
+    const apiEnvironmentURL = environment.STYTCH_ENV === "live" ? envs.live : envs.test;
+    const environmentURL = authorizationBaseURL(
+      environment.STYTCH_CUSTOM_BASE_URL,
+      apiEnvironmentURL,
+    );
+    const client = new Client({ project_id: projectID, secret, env: apiEnvironmentURL });
     return new StytchIdentityProvider({
       publicToken,
       callbackURL,
@@ -96,6 +104,15 @@ export class StytchIdentityProvider implements IdentityProvider {
       oauth: client.oauth,
     });
   }
+}
+
+function authorizationBaseURL(customBaseURL: string | undefined, fallback: string): string {
+  if (!customBaseURL) return fallback;
+  const parsed = new URL(customBaseURL);
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error("STYTCH_CUSTOM_BASE_URL must be an HTTPS origin");
+  }
+  return `${parsed.origin}/`;
 }
 
 function identity(subject: string, displayName: string = subject): Identity {

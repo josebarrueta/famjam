@@ -32,8 +32,16 @@ spec:
     enable: true
     ignoreFailures: false
   values:
+    providerSecrets:
+      stytch: rallyroo-stytch
     runtimeConfig:
       enabled: true
+      stytch:
+        projectID: project-live-9211da89-0aa2-4ee9-a661-ebc8d68ae4b5
+        publicToken: public-token-live-7ce8cefc-8580-4e62-a385-035e81e9918d
+        oauthCallbackURL: rallyroo://oauth-callback
+        environment: live
+        customBaseURL: https://login.rallyroo.dev
       apns:
         teamID: 5LS29Z8553
         bundleID: dev.rallyroo.app

@@ -16,6 +16,8 @@ grep -q '^  name: rallyroo-deployment-alert-webhook$' "$FLUX_DIR/onepassword-ite
 grep -q '^  itemPath: vaults/rallyroo-prod/items/rallyroo-deployment-alert-webhook$' "$FLUX_DIR/onepassword-items.yaml"
 grep -q '^  name: rallyroo-postgres$' "$FLUX_DIR/onepassword-items.yaml"
 grep -q '^  itemPath: vaults/rallyroo-prod/items/rallyroo-postgres$' "$FLUX_DIR/onepassword-items.yaml"
+grep -q '^  name: rallyroo-stytch$' "$FLUX_DIR/onepassword-items.yaml"
+grep -q '^  itemPath: vaults/rallyroo-prod/items/rallyroo-stytch$' "$FLUX_DIR/onepassword-items.yaml"
 if grep -Eq '(token|address):[[:space:]]+[^[:space:]]' "$FLUX_DIR/onepassword-items.yaml"; then
   echo "OnePasswordItem manifests must contain references, never secret values" >&2
   exit 1

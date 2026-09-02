@@ -6,6 +6,11 @@ metadata:
   labels:
     {{- include "rallyroo.labels" . | nindent 4 }}
 data:
+  STYTCH_PROJECT_ID: {{ required "runtimeConfig.stytch.projectID is required when runtimeConfig is enabled" .Values.runtimeConfig.stytch.projectID | quote }}
+  STYTCH_PUBLIC_TOKEN: {{ required "runtimeConfig.stytch.publicToken is required when runtimeConfig is enabled" .Values.runtimeConfig.stytch.publicToken | quote }}
+  STYTCH_OAUTH_CALLBACK_URL: {{ required "runtimeConfig.stytch.oauthCallbackURL is required when runtimeConfig is enabled" .Values.runtimeConfig.stytch.oauthCallbackURL | quote }}
+  STYTCH_ENV: {{ required "runtimeConfig.stytch.environment is required when runtimeConfig is enabled" .Values.runtimeConfig.stytch.environment | quote }}
+  STYTCH_CUSTOM_BASE_URL: {{ required "runtimeConfig.stytch.customBaseURL is required when runtimeConfig is enabled" .Values.runtimeConfig.stytch.customBaseURL | quote }}
   APNS_TEAM_ID: {{ required "runtimeConfig.apns.teamID is required when runtimeConfig is enabled" .Values.runtimeConfig.apns.teamID | quote }}
   APNS_BUNDLE_ID: {{ required "runtimeConfig.apns.bundleID is required when runtimeConfig is enabled" .Values.runtimeConfig.apns.bundleID | quote }}
   APNS_ENV: {{ required "runtimeConfig.apns.environment is required when runtimeConfig is enabled" .Values.runtimeConfig.apns.environment | quote }}
