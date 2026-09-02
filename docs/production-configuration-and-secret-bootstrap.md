@@ -237,9 +237,11 @@ In 1Password.com, open Developer Tools / Service Accounts and create
 with no create, edit, delete, archive, or share permissions. Save the token when it
 is displayed because it cannot be recovered later.
 
-Create `onepassword-system/onepassword-service-account-token` before Helm
-installation without printing the value or putting it in command arguments.
-Install pinned chart `2.4.1` with Operator `1.12.0`, `connect.create=false`,
+Create both `onepassword-system` and the watched `rallyroo` namespace before Helm
+installation; the chart creates a RoleBinding in the watched namespace. Then create
+`onepassword-system/onepassword-service-account-token` without printing the value
+or putting it in command arguments. Install pinned chart `2.4.1` with Operator
+`1.12.0`, `connect.create=false`,
 `operator.authMethod=service-account`, `operator.watchNamespace={rallyroo}`, and
 automatic workload restart enabled. The Operator has no Ingress or public service.
 
