@@ -3,6 +3,7 @@ import { APNSPushNotificationProvider } from "./apns-push-notification-provider.
 import { buildApp } from "./app.js";
 import { calendarURLProtection, fetchPublicCalendarFeed } from "./calendar-source-adapters.js";
 import { CalendarSourceModule } from "./calendar-source-module.js";
+import { databasePoolConfiguration } from "./database-configuration.js";
 import { InMemoryCache, type Cache } from "./cache.js";
 import { CachedIdentityProvider } from "./cached-identity-provider.js";
 import { CachedLocationSearchProvider } from "./cached-location-search-provider.js";
@@ -22,8 +23,7 @@ import { RedisCache } from "./redis-cache.js";
 import { ResendInvitationEmailSender } from "./resend-invitation-email-sender.js";
 import { StytchIdentityProvider } from "./stytch-identity-provider.js";
 
-const databaseURL = process.env.DATABASE_URL;
-if (!databaseURL) throw new Error("DATABASE_URL is required");
+const databaseConfiguration = await databasePoolConfiguration();
 
 const cache: Cache = process.env.REDIS_URL
   ? await RedisCache.connect(process.env.REDIS_URL)
@@ -40,7 +40,7 @@ const locationProvider: LocationSearchProvider = googlePlacesAPIKey
   ? new GooglePlacesLocationSearchProvider(googlePlacesAPIKey)
   : new EmptyLocationSearchProvider();
 
-const repository = PostgresRallyrooRepository.fromConnectionString(databaseURL);
+const repository = PostgresRallyrooRepository.fromConfiguration(databaseConfiguration);
 const calendarEncryptionKey = process.env.CALENDAR_SOURCE_ENCRYPTION_KEY;
 const calendarSources = calendarEncryptionKey
   ? new CalendarSourceModule({

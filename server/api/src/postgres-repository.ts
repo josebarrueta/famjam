@@ -18,9 +18,12 @@ import type {
 export class PostgresRallyrooRepository implements RallyrooRepository, CalendarSourceRepository {
   constructor(private readonly pool: Pool) {}
 
-  static fromConnectionString(connectionString: string): PostgresRallyrooRepository {
-    const config: PoolConfig = { connectionString, max: 20 };
+  static fromConfiguration(config: PoolConfig): PostgresRallyrooRepository {
     return new PostgresRallyrooRepository(new Pool(config));
+  }
+
+  static fromConnectionString(connectionString: string): PostgresRallyrooRepository {
+    return PostgresRallyrooRepository.fromConfiguration({ connectionString, max: 20 });
   }
 
   async checkReadiness(): Promise<void> {

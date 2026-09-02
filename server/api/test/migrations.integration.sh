@@ -27,7 +27,30 @@ run_migrations() {
     "$ROOT/scripts/migrate.sh" "$1"
 }
 
-run_migrations pre >/dev/null
+node - "$DATABASE_URL" "$tmp" <<'JS'
+const fs = require("node:fs");
+const [databaseURL, directory] = process.argv.slice(2);
+const parsed = new URL(databaseURL);
+fs.writeFileSync(`${directory}/pg-host`, parsed.hostname);
+fs.writeFileSync(`${directory}/pg-port`, parsed.port || "5432");
+fs.writeFileSync(`${directory}/pg-database`, parsed.pathname.slice(1));
+fs.writeFileSync(`${directory}/pg-user`, decodeURIComponent(parsed.username));
+fs.writeFileSync(`${directory}/pg-password`, decodeURIComponent(parsed.password), { mode: 0o600 });
+JS
+
+run_structured_migrations() {
+  env -u DATABASE_URL \
+    MIGRATIONS_ROOT="${MIGRATIONS_ROOT:-$ROOT/migrations}" \
+    APPLICATION_VERSION="${APPLICATION_VERSION:-test-release}" \
+    PGHOST="$(cat "$tmp/pg-host")" \
+    PGPORT="$(cat "$tmp/pg-port")" \
+    PGDATABASE="$(cat "$tmp/pg-database")" \
+    PGUSER="$(cat "$tmp/pg-user")" \
+    POSTGRES_PASSWORD_FILE="$tmp/pg-password" \
+    "$ROOT/scripts/migrate.sh" "$1"
+}
+
+run_structured_migrations pre >/dev/null
 
 ledger=$(psql "$DATABASE_URL" -Atc \
   "SELECT version || '|' || name || '|' || app_version || '|' || length(checksum) FROM schema_migrations ORDER BY version")

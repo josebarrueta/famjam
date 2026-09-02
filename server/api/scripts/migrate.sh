@@ -1,8 +1,63 @@
 #!/bin/sh
 set -eu
 
-: "${DATABASE_URL:?DATABASE_URL is required}"
 : "${APPLICATION_VERSION:?APPLICATION_VERSION is required}"
+
+pgpass_file=""
+plan=""
+cleanup() {
+  [ -z "$pgpass_file" ] || rm -f "$pgpass_file"
+  [ -z "$plan" ] || rm -f "$plan"
+}
+trap cleanup EXIT
+
+structured_database=false
+if [ -n "${POSTGRES_PASSWORD_FILE:-}" ]; then
+  : "${PGHOST:?PGHOST is required}"
+  : "${PGPORT:?PGPORT is required}"
+  : "${PGDATABASE:?PGDATABASE is required}"
+  : "${PGUSER:?PGUSER is required}"
+  [ -r "$POSTGRES_PASSWORD_FILE" ] || {
+    echo "POSTGRES_PASSWORD_FILE is not readable" >&2
+    exit 2
+  }
+  case "$PGPORT" in
+    *[!0-9]*|'') echo "PGPORT must be numeric" >&2; exit 2 ;;
+  esac
+  [ "$PGPORT" -ge 1 ] && [ "$PGPORT" -le 65535 ] || {
+    echo "PGPORT must be between 1 and 65535" >&2
+    exit 2
+  }
+  password=$(cat "$POSTGRES_PASSWORD_FILE")
+  [ -n "$password" ] || { echo "POSTGRES_PASSWORD_FILE is empty" >&2; exit 2; }
+  escaped_password=$(printf '%s' "$password" | sed 's/\\/\\\\/g; s/:/\\:/g')
+  unset password
+  umask 077
+  pgpass_file=$(mktemp)
+  printf '%s:%s:%s:%s:%s\n' \
+    "$PGHOST" "$PGPORT" "$PGDATABASE" "$PGUSER" "$escaped_password" >"$pgpass_file"
+  unset escaped_password
+  export PGPASSFILE="$pgpass_file"
+  structured_database=true
+else
+  : "${DATABASE_URL:?POSTGRES_PASSWORD_FILE or DATABASE_URL is required}"
+fi
+
+database_ready() {
+  if [ "$structured_database" = true ]; then
+    pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE"
+  else
+    pg_isready -d "$DATABASE_URL"
+  fi
+}
+
+run_psql() {
+  if [ "$structured_database" = true ]; then
+    psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" "$@"
+  else
+    psql "$DATABASE_URL" "$@"
+  fi
+}
 
 stage=${1:-pre}
 case "$stage" in
@@ -45,13 +100,12 @@ for migration in "$MIGRATIONS_ROOT"/pre/*.sql "$MIGRATIONS_ROOT"/post/*.sql; do
   versions="$versions $version"
 done
 
-until pg_isready -d "$DATABASE_URL" >/dev/null 2>&1; do
+until database_ready >/dev/null 2>&1; do
   echo "Waiting for PostgreSQL..."
   sleep 2
 done
 
 plan=$(mktemp)
-trap 'rm -f "$plan"' EXIT
 cat >"$plan" <<'SQL'
 BEGIN;
 SELECT pg_advisory_xact_lock(hashtext('rallyroo_schema_migrations'));
@@ -116,4 +170,4 @@ ALTER TABLE schema_migrations ALTER COLUMN app_version SET NOT NULL;
 COMMIT;
 SQL
 
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$plan"
+run_psql -v ON_ERROR_STOP=1 -f "$plan"

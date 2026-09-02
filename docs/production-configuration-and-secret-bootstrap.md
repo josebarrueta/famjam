@@ -295,8 +295,14 @@ accounts, events, invitations, device tokens, calendar connections, and migratio
 history. Redis cache data can also be discarded. Cloudflare, 1Password, Stytch,
 Resend, APNs, and bundled iOS data are unaffected.
 
-The official PostgreSQL image applies `POSTGRES_PASSWORD` only when its data
-directory is empty; changing the environment variable does not modify an existing
+The production chart mounts `rallyroo-postgres/POSTGRES_PASSWORD` as a read-only
+file. PostgreSQL consumes it through `POSTGRES_PASSWORD_FILE`; the API builds a
+structured pool configuration in memory; migration Jobs build a temporary mode
+`0600` `PGPASSFILE`. Local development retains `.env`-based `DATABASE_URL` support.
+No production workload receives a password-bearing `DATABASE_URL`.
+
+The official PostgreSQL image applies the password or password-file content only
+when its data directory is empty; changing the Secret does not modify an existing
 database. Source: [Docker Official Image for PostgreSQL](https://github.com/docker-library/docs/blob/master/postgres/README.md#environment-variables).
 
 ### Preconditions
@@ -317,14 +323,16 @@ Do not begin until all boxes are true:
 ### Reset sequence
 
 1. Suspend Flux reconciliation so it cannot recreate workloads during teardown.
-2. Stop the Rallyroo Helm release and verify API/PostgreSQL pods are stopped.
-3. Delete the isolated Kind cluster with `deploy/local/delete-local.sh`.
+2. Stop the Rallyroo Helm release and verify API/PostgreSQL/Redis pods are stopped.
+3. Delete the isolated Kind cluster with `deploy/local/delete-local.sh`; verify the
+   dedicated `kind-rallyroo` context is gone before touching host-path data.
 4. Move, rather than immediately delete, the old PostgreSQL and Redis host-path
    directories to timestamped quarantine paths.
 5. Create empty `postgres` and `redis` data directories.
 6. Bootstrap the isolated cluster and 1Password Operator.
 7. Wait for every required `OnePasswordItem` to report Ready and validate Secret
-   **key names only**.
+   **key names only**. Confirm the legacy `rallyroo-runtime` Secret has no
+   `DATABASE_URL` or `POSTGRES_PASSWORD` keys before starting the API.
 8. Install Rallyroo. PostgreSQL initializes the empty directory with the new
    password, then migration versions 1–8 run.
 9. Enable Flux reconciliation and wait for the Helm test.

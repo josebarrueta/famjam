@@ -32,6 +32,10 @@ spec:
         {{- include "rallyroo.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: postgres
     spec:
+      {{- if .Values.postgres.credentialsSecret }}
+      securityContext:
+        fsGroup: 70
+      {{- end }}
       containers:
         - name: postgres
           image: {{ .Values.postgres.image }}
@@ -40,11 +44,16 @@ spec:
               value: {{ .Values.postgres.database | quote }}
             - name: POSTGRES_USER
               value: {{ .Values.postgres.user | quote }}
+            {{- if .Values.postgres.credentialsSecret }}
+            - name: POSTGRES_PASSWORD_FILE
+              value: /run/secrets/postgres/password
+            {{- else }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.runtimeSecret }}
                   key: POSTGRES_PASSWORD
+            {{- end }}
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
           ports:
@@ -60,12 +69,20 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
-      {{- if eq .Values.postgres.persistence.mode "hostPath" }}
+            {{- if .Values.postgres.credentialsSecret }}
+            {{- include "rallyroo.postgresPasswordVolumeMount" . | nindent 12 }}
+            {{- end }}
+      {{- if or .Values.postgres.credentialsSecret (eq .Values.postgres.persistence.mode "hostPath") }}
       volumes:
+        {{- if .Values.postgres.credentialsSecret }}
+        {{- include "rallyroo.postgresPasswordVolume" . | nindent 8 }}
+        {{- end }}
+        {{- if eq .Values.postgres.persistence.mode "hostPath" }}
         - name: data
           hostPath:
             path: {{ required "postgres.persistence.hostPath is required for hostPath mode" .Values.postgres.persistence.hostPath }}
             type: DirectoryOrCreate
+        {{- end }}
       {{- end }}
   {{- if eq .Values.postgres.persistence.mode "pvc" }}
   volumeClaimTemplates:

@@ -35,23 +35,35 @@ spec:
         checksum/runtime-config: {{ include (print $.Template.BasePath "/runtime-config.yaml") . | sha256sum }}
       {{- end }}
     spec:
+      {{- if .Values.postgres.credentialsSecret }}
+      securityContext:
+        fsGroup: 1000
+      {{- end }}
       initContainers:
         - name: migrate
           image: "{{ .Values.api.image.repository }}:{{ include "rallyroo.apiImageTag" . }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           command: ["/app/scripts/migrate.sh"]
           args: ["pre"]
+          {{- if not .Values.postgres.credentialsSecret }}
           envFrom:
             - secretRef:
                 name: {{ .Values.runtimeSecret }}
+          {{- end }}
           env:
             - name: APPLICATION_VERSION
               value: {{ include "rallyroo.apiImageTag" . | quote }}
+            {{- if .Values.postgres.credentialsSecret }}
+            {{- include "rallyroo.postgresConnectionEnv" . | nindent 12 }}
+          volumeMounts:
+            {{- include "rallyroo.postgresPasswordVolumeMount" . | nindent 12 }}
+            {{- else }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.runtimeSecret }}
                   key: DATABASE_URL
+            {{- end }}
       containers:
         - name: api
           image: "{{ .Values.api.image.repository }}:{{ include "rallyroo.apiImageTag" . }}"
@@ -64,11 +76,15 @@ spec:
               value: 0.0.0.0
             - name: PORT
               value: "3000"
+            {{- if .Values.postgres.credentialsSecret }}
+            {{- include "rallyroo.postgresConnectionEnv" . | nindent 12 }}
+            {{- else }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.runtimeSecret }}
                   key: DATABASE_URL
+            {{- end }}
             - name: REDIS_URL
               value: redis://{{ .Release.Name }}-redis:6379
             {{- if .Values.runtimeConfig.enabled }}
@@ -105,3 +121,11 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
+          {{- if .Values.postgres.credentialsSecret }}
+          volumeMounts:
+            {{- include "rallyroo.postgresPasswordVolumeMount" . | nindent 12 }}
+          {{- end }}
+      {{- if .Values.postgres.credentialsSecret }}
+      volumes:
+        {{- include "rallyroo.postgresPasswordVolume" . | nindent 8 }}
+      {{- end }}

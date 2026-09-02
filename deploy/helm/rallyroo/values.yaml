@@ -43,6 +43,9 @@ tests:
 
 postgres:
   image: postgres:17-alpine
+  # Empty preserves local .env-based development. Production points this to
+  # the narrowly scoped Secret synchronized by the 1Password Operator.
+  credentialsSecret: ""
   database: rallyroo
   user: rallyroo
   persistence:

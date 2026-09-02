@@ -39,6 +39,7 @@ spec:
         bundleID: dev.rallyroo.app
         environment: production
     postgres:
+      credentialsSecret: rallyroo-postgres
       persistence:
         mode: hostPath
         hostPath: /var/local/rallyroo/postgres
