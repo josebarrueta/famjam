@@ -23,8 +23,8 @@ export class APNSPushNotificationProvider implements PushNotificationProvider {
     const keyID = configuredSecret("APNS_KEY_ID", environment, readSecretFile);
     const teamID = environment.APNS_TEAM_ID;
     const bundleID = environment.APNS_BUNDLE_ID;
-    const privateKey = configuredSecret("APNS_PRIVATE_KEY", environment, readSecretFile)
-      ?.replaceAll("\\n", "\n");
+    const privateKeyValue = configuredSecret("APNS_PRIVATE_KEY", environment, readSecretFile);
+    const privateKey = privateKeyValue ? normalizeAPNSPrivateKey(privateKeyValue) : undefined;
     if (!keyID || !teamID || !bundleID || !privateKey) return null;
     return new APNSPushNotificationProvider({
       keyID,
@@ -97,4 +97,18 @@ export class APNSPushNotificationProvider implements PushNotificationProvider {
       }));
     });
   }
+}
+
+export function normalizeAPNSPrivateKey(value: string): string {
+  const expanded = value.replaceAll("\\n", "\n").trim();
+  const keyLabel = "PRIVATE KEY";
+  const beginMarker = `-----BEGIN ${keyLabel}-----`;
+  const endMarker = `-----END ${keyLabel}-----`;
+  if (!expanded.startsWith(beginMarker) || !expanded.endsWith(endMarker)) return expanded;
+  const body = expanded
+    .slice(beginMarker.length, -endMarker.length)
+    .replaceAll(/\s/g, "");
+  if (!body) return expanded;
+  const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
+  return `${beginMarker}\n${wrapped}\n${endMarker}\n`;
 }
