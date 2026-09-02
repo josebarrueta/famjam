@@ -6,7 +6,7 @@ CONTEXT="kind-$CLUSTER_NAME"
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 LOCAL_KUBECONFIG=${RALLYROO_KUBECONFIG:-$HOME/.rallyroo/kubeconfig}
 
-for command in flux kubectl; do
+for command in flux kubectl jq; do
   command -v "$command" >/dev/null || { echo "$command is required" >&2; exit 1; }
 done
 [[ -f "$LOCAL_KUBECONFIG" ]] || { echo "Missing $LOCAL_KUBECONFIG" >&2; exit 1; }
@@ -24,24 +24,38 @@ flux install \
   --network-policy=true
 
 kubectl --context "$CONTEXT" apply -f "$ROOT/deploy/flux/rallyroo/namespace.yaml"
-alert_url=${RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL:-}
-alert_hmac_secret=${RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET:-}
-if [[ -n "$alert_url" || -n "$alert_hmac_secret" ]]; then
-  [[ -n "$alert_url" && -n "$alert_hmac_secret" ]] || {
-    echo "Both deployment alert URL and HMAC secret are required" >&2
+
+# Provider Secrets are owned exclusively by the 1Password Operator. Apply and
+# validate them before creating the HelmRelease so workloads cannot race secret
+# synchronization or fall back to a manually managed catch-all Secret.
+kubectl --context "$CONTEXT" get crd onepassworditems.onepassword.com >/dev/null 2>&1 || {
+  echo "Install the 1Password Operator before enabling Flux" >&2
+  exit 1
+}
+kubectl --context "$CONTEXT" apply -f "$ROOT/deploy/flux/rallyroo/onepassword-items.yaml"
+onepassword_items=$(kubectl --context "$CONTEXT" -n rallyroo get onepassworditems \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+for item in $onepassword_items; do
+  kubectl --context "$CONTEXT" -n rallyroo wait "onepassworditem/$item" \
+    --for=condition=Ready --timeout=2m
+  case "$item" in
+    rallyroo-deployment-alert-webhook) expected_keys='address,token' ;;
+    rallyroo-postgres) expected_keys='POSTGRES_PASSWORD' ;;
+    rallyroo-stytch) expected_keys='STYTCH_SECRET' ;;
+    rallyroo-calendar-encryption) expected_keys='CALENDAR_SOURCE_ENCRYPTION_KEY' ;;
+    rallyroo-google-places) expected_keys='GOOGLE_PLACES_API_KEY' ;;
+    rallyroo-resend-invitations) expected_keys='RESEND_API_KEY' ;;
+    rallyroo-apns) expected_keys='APNS_KEY_ID,APNS_PRIVATE_KEY' ;;
+    rallyroo-observability) expected_keys='METRICS_BEARER_TOKEN' ;;
+    *) echo "No expected Secret key contract for $item" >&2; exit 1 ;;
+  esac
+  keys=$(kubectl --context "$CONTEXT" -n rallyroo get secret "$item" -o json | \
+    jq -r '.data | keys | sort | join(",")')
+  [[ "$keys" == "$expected_keys" ]] || {
+    echo "Unexpected Secret keys for $item: $keys" >&2
     exit 1
   }
-  [[ "$alert_url" == https://* ]] || {
-    echo "RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL must use HTTPS" >&2
-    exit 1
-  }
-  kubectl --context "$CONTEXT" -n rallyroo create secret generic rallyroo-deployment-alert-webhook \
-    --from-literal=address="$alert_url" \
-    --from-literal=token="$alert_hmac_secret" \
-    --dry-run=client -o yaml | kubectl --context "$CONTEXT" apply -f -
-elif ! kubectl --context "$CONTEXT" -n rallyroo get secret rallyroo-deployment-alert-webhook >/dev/null 2>&1; then
-  echo "Warning: deployment failure alerts are not delivered until the alert setup wizard is completed." >&2
-fi
+done
 
 kubectl --context "$CONTEXT" apply -k "$ROOT/deploy/flux/rallyroo"
 kubectl --context "$CONTEXT" -n rallyroo wait ocirepository/rallyroo-chart \
@@ -51,4 +65,4 @@ kubectl --context "$CONTEXT" -n rallyroo wait helmrelease/rallyroo \
 
 kubectl --context "$CONTEXT" -n rallyroo get ocirepository,helmrelease
 "$ROOT/deploy/local/test-http-contract.sh"
-echo "Flux now tracks Rallyroo patch releases in the 0.1 series."
+echo "Flux now tracks Rallyroo patch releases in the 0.2 series."

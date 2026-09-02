@@ -92,16 +92,19 @@ helm install rallyroo oci://ghcr.io/josebarrueta/charts/rallyroo \
   --create-namespace
 ```
 
-The chart expects the `rallyroo-runtime` Secret to exist before installation.
-The API image and chart packages must be public for anonymous Kubernetes pulls;
+Local chart installs expect the `.env`-derived `rallyroo-runtime` Secret.
+Production uses `rallyroo-runtime-config` plus provider-scoped Secrets synchronized
+by the 1Password Operator; it does not reference the catch-all Secret. The API
+image and chart packages must be public for anonymous Kubernetes pulls;
 package visibility is configured once from their GHCR package settings.
 
 ## Automatic patch releases with Flux
 
 Flux polls the public OCI chart and upgrades to patch releases in the configured
 minor series. It uses outbound HTTPS only; no deployment webhook is exposed.
-Before enabling it, deploy locally once so the runtime Secret and persistent data
-paths exist, then install the Flux CLI and run:
+Before enabling production reconciliation, create the isolated Kind cluster and
+persistent data paths, install the 1Password Operator, and confirm every production
+item exists. Then install the Flux CLI and run:
 
 ```bash
 brew install fluxcd/tap/flux
@@ -122,8 +125,8 @@ Worker endpoint and shared HMAC key in the
 `rallyroo-deployment-alert-webhook` Kubernetes Secret. The Worker accepts only
 signed Rallyroo HelmRelease errors and converts them into Resend's
 `deployment.failed` custom event. Resend owns the published template, Automation
-run history, and delivery. If the wizard has not run, reconciliation still works
-but `enable-flux.sh` warns that outbound alerts are not active.
+run history, and delivery. Production bootstrap blocks until the Operator has
+synchronized the alert webhook Secret with its exact `address,token` key contract.
 
 The script installs Flux's source, Helm, and notification controllers, applies the
 namespace-scoped reconciler in `deploy/flux/rallyroo/`, adopts the existing

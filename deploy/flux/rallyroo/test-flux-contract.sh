@@ -6,9 +6,12 @@ FLUX_DIR="$ROOT/deploy/flux/rallyroo"
 ENABLE_SCRIPT="$ROOT/deploy/local/enable-flux.sh"
 
 grep -q 'notification-controller' "$ENABLE_SCRIPT"
-grep -q 'RALLYROO_DEPLOYMENT_ALERT_WEBHOOK_URL' "$ENABLE_SCRIPT"
-grep -q 'RALLYROO_DEPLOYMENT_ALERT_HMAC_SECRET' "$ENABLE_SCRIPT"
-grep -q -- '--from-literal=token=' "$ENABLE_SCRIPT"
+grep -q 'wait "onepassworditem/$item"' "$ENABLE_SCRIPT"
+grep -q 'semver: ">=0.2.0 <0.3.0"' "$FLUX_DIR/source.yaml"
+if grep -q 'create secret generic rallyroo-deployment-alert-webhook' "$ENABLE_SCRIPT"; then
+  echo "Flux bootstrap must not overwrite the Operator-managed alert Secret" >&2
+  exit 1
+fi
 grep -q 'notification.yaml' "$FLUX_DIR/kustomization.yaml"
 grep -q 'onepassword-items.yaml' "$FLUX_DIR/kustomization.yaml"
 grep -q '^kind: OnePasswordItem$' "$FLUX_DIR/onepassword-items.yaml"
