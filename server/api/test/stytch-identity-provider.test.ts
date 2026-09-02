@@ -28,6 +28,12 @@ function provider() {
         };
       },
     },
+    users: {
+      async delete({ user_id }) {
+        expect(user_id).toBe("user-test-123");
+        return {};
+      },
+    },
   });
 }
 
@@ -49,6 +55,7 @@ describe("StytchIdentityProvider", () => {
       return {
         sessions: { async authenticate() { throw new Error("not called"); }, async revoke() {} },
         oauth: { async authenticate() { throw new Error("not called"); } },
+        users: { async delete() {} },
       };
     });
 
@@ -83,6 +90,10 @@ describe("StytchIdentityProvider", () => {
       identity: { subject: "user-test-123", displayName: "Sam Rivera" },
       accessToken: "stytch-session-token",
     });
+  });
+
+  it("deletes a Stytch identity by its provider-neutral subject", async () => {
+    await expect(provider().deleteIdentity("user-test-123")).resolves.toBeUndefined();
   });
 
   it("verifies a Stytch session JWT and returns its user identity", async () => {

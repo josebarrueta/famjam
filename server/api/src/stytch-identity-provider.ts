@@ -10,6 +10,10 @@ export interface StytchSessionClient {
   revoke(request: { session_token: string }): Promise<unknown>;
 }
 
+export interface StytchUserClient {
+  delete(request: { user_id: string }): Promise<unknown>;
+}
+
 export interface StytchOAuthClient {
   authenticate(request: {
     token: string;
@@ -34,6 +38,7 @@ interface StytchClientConfiguration {
 type StytchClientFactory = (configuration: StytchClientConfiguration) => {
   sessions: StytchSessionClient;
   oauth: StytchOAuthClient;
+  users: StytchUserClient;
 };
 
 interface StytchIdentityProviderConfiguration {
@@ -42,6 +47,7 @@ interface StytchIdentityProviderConfiguration {
   environmentURL: string;
   sessions: StytchSessionClient;
   oauth: StytchOAuthClient;
+  users: StytchUserClient;
 }
 
 export class StytchIdentityProvider implements IdentityProvider {
@@ -89,6 +95,10 @@ export class StytchIdentityProvider implements IdentityProvider {
     await this.configuration.sessions.revoke({ session_token: token });
   }
 
+  async deleteIdentity(subject: string): Promise<void> {
+    await this.configuration.users.delete({ user_id: subject });
+  }
+
   static fromEnvironment(
     environment: NodeJS.ProcessEnv = process.env,
     readSecretFile?: SecretFileReader,
@@ -120,6 +130,7 @@ export class StytchIdentityProvider implements IdentityProvider {
       environmentURL,
       sessions: client.sessions,
       oauth: client.oauth,
+      users: client.users,
     });
   }
 }

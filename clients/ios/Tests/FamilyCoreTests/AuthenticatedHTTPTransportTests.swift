@@ -41,4 +41,5 @@ private actor TokenAuthentication: Authentication {
         try await currentSession()!
     }
     func signOut() async throws {}
+    func deleteAccount() async throws {}
 }

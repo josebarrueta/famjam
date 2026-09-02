@@ -37,6 +37,7 @@ public protocol Authentication: Sendable {
         invitationCode: String?
     ) async throws -> AuthSession
     func signOut() async throws
+    func deleteAccount() async throws
 }
 
 public extension Authentication {
@@ -69,6 +70,10 @@ public actor LocalAuthentication: Authentication {
     }
 
     public func signOut() async throws {
+        session = nil
+    }
+
+    public func deleteAccount() async throws {
         session = nil
     }
 

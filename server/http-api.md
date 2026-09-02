@@ -156,5 +156,12 @@ validates the opaque Stytch session through its provider adapter, loads the Rall
 account, and applies family and role authorization. `DELETE /v1/sessions` revokes
 the hosted session.
 
+`DELETE /v1/account` permanently deletes the authenticated hosted identity and its
+Rallyroo account. When another authenticated account remains in the family, shared
+family records remain and references to the deleted member are removed. When the
+deleted account is the family's last authenticated account, the backend deletes the
+entire family dataset, including members, events, invitations, device tokens, and
+connected calendar sources.
+
 No Stytch secret, SDK, configuration, or provider-specific type exists in the iOS
 code. The browser only interacts with Stytch after following the Rallyroo redirect.

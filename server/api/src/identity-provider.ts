@@ -12,4 +12,5 @@ export interface IdentityProvider {
   authenticateOAuthToken(token: string, codeVerifier: string): Promise<IssuedIdentitySession>;
   verifySession(token: string): Promise<Identity>;
   revokeSession(token: string): Promise<void>;
+  deleteIdentity(subject: string): Promise<void>;
 }

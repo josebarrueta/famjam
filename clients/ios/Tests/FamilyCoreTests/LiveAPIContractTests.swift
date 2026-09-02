@@ -78,4 +78,5 @@ private actor ContractAuthentication: Authentication {
         invitationCode: String?
     ) async throws -> AuthSession { session }
     func signOut() async throws {}
+    func deleteAccount() async throws {}
 }

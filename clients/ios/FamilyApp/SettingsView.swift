@@ -4,6 +4,7 @@ import FamilyCore
 struct SettingsView: View {
     let dataIsSynced: Bool
     let onSignOut: SignOutAction
+    let onDeleteAccount: DeleteAccountAction
     private let calendarSourceStore: (any CalendarSourceStore)?
     private let memberStore: (any FamilyMemberStore)?
     private let preferences = ConflictAlertPreferences()
@@ -12,15 +13,20 @@ struct SettingsView: View {
         dataIsSynced: Bool = false,
         calendarSourceStore: (any CalendarSourceStore)? = nil,
         memberStore: (any FamilyMemberStore)? = nil,
-        onSignOut: SignOutAction = SignOutAction({})
+        onSignOut: SignOutAction = SignOutAction({}),
+        onDeleteAccount: DeleteAccountAction = DeleteAccountAction({})
     ) {
         self.dataIsSynced = dataIsSynced
         self.calendarSourceStore = calendarSourceStore
         self.memberStore = memberStore
         self.onSignOut = onSignOut
+        self.onDeleteAccount = onDeleteAccount
     }
     @State private var conflictAlertsEnabled = true
     @State private var isConfirmingSignOut = false
+    @State private var isConfirmingAccountDeletion = false
+    @State private var isDeletingAccount = false
+    @State private var accountDeletionError: String?
 
     var body: some View {
         NavigationStack {
@@ -53,15 +59,20 @@ struct SettingsView: View {
                     LabeledContent("App", value: "Rallyroo")
                     LabeledContent("Data", value: dataIsSynced ? "Synced" : "Stored on this device")
                 }
-            }
-            .navigationTitle("Settings")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Sign Out", role: .destructive) {
+
+                Section("Account") {
+                    Button("Sign Out") {
                         isConfirmingSignOut = true
+                    }
+                    if dataIsSynced {
+                        Button("Delete Account", role: .destructive) {
+                            isConfirmingAccountDeletion = true
+                        }
+                        .disabled(isDeletingAccount)
                     }
                 }
             }
+            .navigationTitle("Settings")
             .confirmationDialog(
                 "Sign out of Rallyroo?",
                 isPresented: $isConfirmingSignOut,
@@ -75,8 +86,44 @@ struct SettingsView: View {
             } message: {
                 Text("You can sign in again at any time.")
             }
+            .confirmationDialog(
+                "Permanently delete your account?",
+                isPresented: $isConfirmingAccountDeletion,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Account", role: .destructive) {
+                    deleteAccount()
+                }
+                .accessibilityIdentifier("confirm-delete-account")
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Your profile and login will be permanently deleted. If yours is the family's last account, its events and connected calendars will also be deleted.")
+            }
+            .alert(
+                "Account Not Deleted",
+                isPresented: Binding(
+                    get: { accountDeletionError != nil },
+                    set: { if !$0 { accountDeletionError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(accountDeletionError ?? "Please try again.")
+            }
             .onAppear {
                 conflictAlertsEnabled = preferences.areConflictAlertsEnabled
+            }
+        }
+    }
+
+    private func deleteAccount() {
+        isDeletingAccount = true
+        Task {
+            defer { isDeletingAccount = false }
+            do {
+                try await onDeleteAccount.perform()
+            } catch {
+                accountDeletionError = "We couldn't confirm account deletion. Please contact Rallyroo support before signing in again."
             }
         }
     }

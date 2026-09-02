@@ -48,6 +48,41 @@ export class InMemoryRallyrooRepository implements RallyrooRepository {
     return account;
   }
 
+  async deleteAccount(subject: string): Promise<void> {
+    const accountIndex = this.accounts.findIndex((account) => account.identitySubject === subject);
+    if (accountIndex < 0) return;
+    const account = this.accounts[accountIndex]!;
+    const isLastAccount = this.accounts.filter(
+      (candidate) => candidate.familyID === account.familyID,
+    ).length === 1;
+
+    if (isLastAccount) {
+      removeWhere(this.accounts, (candidate) => candidate.familyID === account.familyID);
+      removeWhere(this.members, (member) => member.familyID === account.familyID);
+      removeWhere(this.events, (event) => event.familyID === account.familyID);
+      removeWhere(this.invitations, (invitation) => invitation.familyID === account.familyID);
+      this.changeVersions.delete(account.familyID);
+      for (const [token, device] of this.devices) {
+        if (device.familyID === account.familyID) this.devices.delete(token);
+      }
+      return;
+    }
+
+    this.accounts.splice(accountIndex, 1);
+    removeWhere(
+      this.members,
+      (member) => member.familyID === account.familyID && member.id === account.memberID,
+    );
+    for (const event of this.events.filter((candidate) => candidate.familyID === account.familyID)) {
+      event.participantIDs = event.participantIDs.filter((id) => id !== account.memberID);
+      if (event.kidID === account.memberID) event.kidID = null;
+    }
+    for (const [token, device] of this.devices) {
+      if (device.memberID === account.memberID) this.devices.delete(token);
+    }
+    await this.markFamilyChanged(account.familyID);
+  }
+
   async saveInvitation(invitation: FamilyInvitation): Promise<void> {
     this.invitations.push(invitation);
   }
@@ -167,5 +202,11 @@ export class InMemoryRallyrooRepository implements RallyrooRepository {
   async deleteMember(familyID: string, memberID: string): Promise<void> {
     const index = this.members.findIndex((member) => member.familyID === familyID && member.id === memberID);
     if (index >= 0) this.members.splice(index, 1);
+  }
+}
+
+function removeWhere<T>(values: T[], predicate: (value: T) => boolean): void {
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    if (predicate(values[index]!)) values.splice(index, 1);
   }
 }

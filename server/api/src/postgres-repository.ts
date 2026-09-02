@@ -82,6 +82,76 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
     }
   }
 
+  async deleteAccount(subject: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const accountResult = await client.query<AccountRow>(
+        `SELECT identity_subject, family_id, member_id, role
+         FROM accounts WHERE identity_subject = $1 FOR UPDATE`,
+        [subject],
+      );
+      const row = accountResult.rows[0];
+      if (!row) {
+        await client.query("COMMIT");
+        return;
+      }
+      const familyAccounts = await client.query<{ identity_subject: string }>(
+        "SELECT identity_subject FROM accounts WHERE family_id = $1 FOR UPDATE",
+        [row.family_id],
+      );
+
+      if (familyAccounts.rowCount === 1) {
+        await client.query("DELETE FROM calendar_sources WHERE family_id = $1", [row.family_id]);
+        await client.query("DELETE FROM device_tokens WHERE family_id = $1", [row.family_id]);
+        await client.query("DELETE FROM family_invitations WHERE family_id = $1", [row.family_id]);
+        await client.query("DELETE FROM events WHERE family_id = $1", [row.family_id]);
+        await client.query("DELETE FROM family_change_versions WHERE family_id = $1", [row.family_id]);
+        await client.query("DELETE FROM accounts WHERE family_id = $1", [row.family_id]);
+        await client.query("DELETE FROM family_members WHERE family_id = $1", [row.family_id]);
+      } else {
+        await client.query("DELETE FROM accounts WHERE identity_subject = $1", [subject]);
+        await client.query(
+          `DELETE FROM calendar_sources
+           WHERE family_id = $1 AND cardinality(array_remove(participant_ids, $2)) = 0`,
+          [row.family_id, row.member_id],
+        );
+        await client.query(
+          `UPDATE calendar_sources SET participant_ids = array_remove(participant_ids, $2)
+           WHERE family_id = $1 AND $2 = ANY(participant_ids)`,
+          [row.family_id, row.member_id],
+        );
+        await client.query(
+          `UPDATE imported_calendar_events SET participant_ids = array_remove(participant_ids, $2)
+           WHERE family_id = $1 AND $2 = ANY(participant_ids)`,
+          [row.family_id, row.member_id],
+        );
+        await client.query(
+          `UPDATE events SET participant_ids = array_remove(participant_ids, $2),
+                            kid_id = CASE WHEN kid_id = $2 THEN NULL ELSE kid_id END
+           WHERE family_id = $1`,
+          [row.family_id, row.member_id],
+        );
+        await client.query(
+          "DELETE FROM family_members WHERE family_id = $1 AND id = $2",
+          [row.family_id, row.member_id],
+        );
+        await client.query(
+          `INSERT INTO family_change_versions (family_id, version) VALUES ($1, 1)
+           ON CONFLICT (family_id) DO UPDATE
+           SET version = family_change_versions.version + 1, updated_at = now()`,
+          [row.family_id],
+        );
+      }
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async saveInvitation(invitation: FamilyInvitation): Promise<void> {
     await this.pool.query(
       `INSERT INTO family_invitations (id, code_hash, family_id, recipient_email, role, expires_at)

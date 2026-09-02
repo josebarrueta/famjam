@@ -74,7 +74,7 @@ struct FamilyActivityCoordinatorApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SessionGateView(authentication: authentication) { session, signOut in
+            SessionGateView(authentication: authentication) { session, signOut, deleteAccount in
                 TabView {
                     WeeklyScheduleView(
                         eventStore: eventStore,
@@ -99,7 +99,8 @@ struct FamilyActivityCoordinatorApp: App {
                         dataIsSynced: dataIsSynced,
                         calendarSourceStore: session.role == .parent ? calendarSourceStore : nil,
                         memberStore: session.role == .parent ? memberStore : nil,
-                        onSignOut: signOut
+                        onSignOut: signOut,
+                        onDeleteAccount: deleteAccount
                     )
                     .tabItem { Label("Settings", systemImage: "gearshape") }
                 }

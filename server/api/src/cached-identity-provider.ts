@@ -62,6 +62,10 @@ export class CachedIdentityProvider implements IdentityProvider {
     await this.observeProvider(() => this.provider.revokeSession(token));
   }
 
+  async deleteIdentity(subject: string): Promise<void> {
+    await this.observeProvider(() => this.provider.deleteIdentity(subject));
+  }
+
   private async observeProvider<T>(operation: () => Promise<T>): Promise<T> {
     const started = process.hrtime.bigint();
     let result: ProviderResult = "success";

@@ -14,6 +14,7 @@ public actor RemoteAuthentication: Authentication {
 
     private let authorizationBaseURL: URL
     private let sessionsURL: URL
+    private let accountURL: URL
     private let transport: any HTTPTransport
     private let webSession: any OAuthWebSession
     private let sessionStore: any AuthSessionStore
@@ -27,6 +28,7 @@ public actor RemoteAuthentication: Authentication {
     ) {
         authorizationBaseURL = baseURL.appending(path: "v1/auth")
         sessionsURL = baseURL.appending(path: "v1/sessions")
+        accountURL = baseURL.appending(path: "v1/account")
         self.transport = transport
         self.webSession = webSession
         self.sessionStore = sessionStore
@@ -118,6 +120,28 @@ public actor RemoteAuthentication: Authentication {
         let response = try await transport.send(HTTPRequest(
             method: .delete,
             url: sessionsURL,
+            headers: headers
+        ))
+        try response.requireSuccess()
+        try await sessionStore.delete()
+        self.session = nil
+    }
+
+    public func deleteAccount() async throws {
+        let activeSession: AuthSession?
+        if let session {
+            activeSession = session
+        } else {
+            activeSession = try await sessionStore.load()
+        }
+        guard let activeSession else {
+            try await sessionStore.delete()
+            return
+        }
+        let headers = activeSession.accessToken.map { ["Authorization": "Bearer \($0)"] } ?? [:]
+        let response = try await transport.send(HTTPRequest(
+            method: .delete,
+            url: accountURL,
             headers: headers
         ))
         try response.requireSuccess()

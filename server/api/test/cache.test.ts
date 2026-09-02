@@ -21,6 +21,7 @@ describe("server caches", () => {
         return { subject: "user-1", displayName: "Alex" };
       },
       revokeSession: async () => {},
+      deleteIdentity: async () => {},
     };
     const metrics = new RallyrooMetrics();
     const cached = new CachedIdentityProvider(provider, new InMemoryCache(), 60, metrics);

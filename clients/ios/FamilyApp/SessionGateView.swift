@@ -4,11 +4,15 @@ import FamilyCore
 
 struct SessionGateView<Content: View>: View {
     @StateObject private var viewModel: SessionGateViewModel
-    private let content: (AuthSession, SignOutAction) -> Content
+    private let content: (AuthSession, SignOutAction, DeleteAccountAction) -> Content
 
     init(
         authentication: any Authentication,
-        @ViewBuilder content: @escaping (AuthSession, SignOutAction) -> Content
+        @ViewBuilder content: @escaping (
+            AuthSession,
+            SignOutAction,
+            DeleteAccountAction
+        ) -> Content
     ) {
         _viewModel = StateObject(wrappedValue: SessionGateViewModel(authentication: authentication))
         self.content = content
@@ -17,9 +21,15 @@ struct SessionGateView<Content: View>: View {
     var body: some View {
         Group {
             if let session = viewModel.session {
-                content(session, SignOutAction {
-                    Task { await viewModel.signOut() }
-                })
+                content(
+                    session,
+                    SignOutAction {
+                        Task { await viewModel.signOut() }
+                    },
+                    DeleteAccountAction {
+                        try await viewModel.deleteAccount()
+                    }
+                )
             } else if viewModel.isLoading {
                 ProgressView("Getting the family together…")
                     .tint(AppTheme.coral)
@@ -58,6 +68,12 @@ final class SessionGateViewModel: ObservableObject {
         }
     }
 
+    func deleteAccount() async throws {
+        try await authentication.deleteAccount()
+        session = nil
+        errorMessage = nil
+    }
+
     func acceptInvitationURL(_ url: URL) {
         guard let invitation = FamilyInvitationLink(url: url) else { return }
         invitationCode = invitation.code
@@ -86,6 +102,14 @@ final class SessionGateViewModel: ObservableObject {
                 ? "We couldn't sign you in. Please try again."
                 : "This invitation may have expired or already been used. Ask a parent to resend it."
         }
+    }
+}
+
+struct DeleteAccountAction {
+    let perform: () async throws -> Void
+
+    init(_ perform: @escaping () async throws -> Void) {
+        self.perform = perform
     }
 }
 

@@ -16,6 +16,7 @@ const identityProvider: IdentityProvider = {
     return { subject: "contract-parent", displayName: "Alex" };
   },
   async revokeSession() {},
+  async deleteIdentity() {},
 };
 
 const repository = new InMemoryRallyrooRepository({

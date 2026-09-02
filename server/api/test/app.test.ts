@@ -11,6 +11,8 @@ import { InMemoryCalendarSourceRepository } from "../src/in-memory-calendar-sour
 const codeChallenge = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
 const codeVerifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
 
+const deletedIdentitySubjects: string[] = [];
+
 const identityProvider: IdentityProvider = {
   googleAuthorizationURL(challenge) {
     if (challenge !== codeChallenge) throw new Error("invalid challenge");
@@ -43,6 +45,9 @@ const identityProvider: IdentityProvider = {
     throw new Error("invalid session");
   },
   async revokeSession() {},
+  async deleteIdentity(subject) {
+    deletedIdentitySubjects.push(subject);
+  },
 };
 
 const locationSearchProvider: LocationSearchProvider = {
@@ -212,6 +217,45 @@ describe("Rallyroo API", () => {
     const account = await data.accountForIdentity("new-parent-subject");
     expect(account?.role).toBe("parent");
     expect(await data.membersForFamily(account!.familyID)).toHaveLength(1);
+    await app.close();
+  });
+
+  it("deletes an authenticated identity and its Rallyroo account", async () => {
+    deletedIdentitySubjects.length = 0;
+    const data = repository();
+    const app = buildApp({ identityProvider, repository: data });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/account",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(deletedIdentitySubjects).toEqual(["parent-subject"]);
+    expect(await data.accountForIdentity("parent-subject")).toBeNull();
+    expect(await data.membersForFamily("family-1")).toEqual([
+      expect.objectContaining({ id: "kid-1" }),
+      expect.objectContaining({ id: "kid-2" }),
+    ]);
+    await app.close();
+  });
+
+  it("deletes all family data when the last account is deleted", async () => {
+    deletedIdentitySubjects.length = 0;
+    const data = repository();
+    const app = buildApp({ identityProvider, repository: data });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/account",
+      headers: { authorization: "Bearer other-parent-token" },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(deletedIdentitySubjects).toEqual(["other-parent-subject"]);
+    expect(await data.accountForIdentity("other-parent-subject")).toBeNull();
+    expect(await data.membersForFamily("family-2")).toEqual([]);
     await app.close();
   });
 

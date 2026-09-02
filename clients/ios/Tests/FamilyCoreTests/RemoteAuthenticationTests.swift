@@ -54,6 +54,38 @@ final class RemoteAuthenticationTests: XCTestCase {
         XCTAssertEqual(webRequest.challenge, expectedChallenge)
     }
 
+    func testDeletesTheRemoteAccountAndClearsTheStoredSession() async throws {
+        let storedSession = AuthSession(
+            accountID: "account-1",
+            displayName: "Alex",
+            role: .parent,
+            accessToken: "secret-token"
+        )
+        let sessionStore = TestAuthSessionStore()
+        try await sessionStore.save(storedSession)
+        let transport = AuthenticationHTTPTransport(responses: [
+            HTTPResponse(statusCode: 204, body: Data())
+        ])
+        let authentication: any Authentication = RemoteAuthentication(
+            baseURL: URL(string: "https://api.example.com")!,
+            transport: transport,
+            webSession: StubOAuthWebSession(
+                callbackURL: URL(string: "rallyroo://oauth-callback")!
+            ),
+            sessionStore: sessionStore
+        )
+
+        try await authentication.deleteAccount()
+
+        let savedSession = try await sessionStore.load()
+        XCTAssertNil(savedSession)
+        let requests = await transport.recordedRequests()
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(request.method, .delete)
+        XCTAssertEqual(request.url.path, "/v1/account")
+        XCTAssertEqual(request.headers["Authorization"], "Bearer secret-token")
+    }
+
     func testSignsInWithAppleThroughTheBackendOwnedOAuthFlow() async throws {
         let expectedSession = AuthSession(
             accountID: "account-1",

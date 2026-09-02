@@ -48,6 +48,7 @@ const identityProvider: IdentityProvider = {
     return identity;
   },
   async revokeSession() {},
+  async deleteIdentity() {},
 };
 
 describe.skipIf(!adminURL)("PostgreSQL HTTP integration", () => {
@@ -257,5 +258,29 @@ describe.skipIf(!adminURL)("PostgreSQL HTTP integration", () => {
     });
     expect(pending.json()).toEqual([]);
     await app.close();
+  });
+
+  it("deletes the complete PostgreSQL family dataset for its last account", async () => {
+    const data = repositoryForTest();
+    const account = await data.provisionParentAccount("deletion-subject", "Delete Me");
+    await data.saveEvent({
+      id: "00000000-0000-4000-8000-000000000199",
+      familyID: account.familyID,
+      title: "Delete this event",
+      kidID: null,
+      participantIDs: [account.memberID],
+      startTime: "2026-09-20T18:00:00Z",
+      endTime: "2026-09-20T19:00:00Z",
+      location: null,
+      driver: null,
+      source: "manual",
+      status: "confirmed",
+    });
+
+    await data.deleteAccount("deletion-subject");
+
+    expect(await data.accountForIdentity("deletion-subject")).toBeNull();
+    expect(await data.membersForFamily(account.familyID)).toEqual([]);
+    expect(await data.eventsForFamily(account.familyID)).toEqual([]);
   });
 });

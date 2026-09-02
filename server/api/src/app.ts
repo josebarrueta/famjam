@@ -263,6 +263,13 @@ export function buildApp({
     return reply.code(204).send();
   });
 
+  app.delete("/v1/account", async (request, reply) => {
+    const account = requiredAccount(request);
+    await identityProvider.deleteIdentity(account.identitySubject);
+    await repository.deleteAccount(account.identitySubject);
+    return reply.code(204).send();
+  });
+
   app.post("/v1/invitations", {
     config: { rateLimit: limits.invitations },
   }, async (request, reply) => {

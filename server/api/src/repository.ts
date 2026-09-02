@@ -3,6 +3,7 @@ import type { Account, FamilyEvent, FamilyInvitation, FamilyMember } from "./dom
 export interface RallyrooRepository {
   accountForIdentity(subject: string): Promise<Account | null>;
   provisionParentAccount(subject: string, displayName: string): Promise<Account>;
+  deleteAccount(subject: string): Promise<void>;
   saveInvitation(invitation: FamilyInvitation): Promise<void>;
   pendingInvitations(familyID: string): Promise<FamilyInvitation[]>;
   cancelInvitation(familyID: string, invitationID: string): Promise<boolean>;
