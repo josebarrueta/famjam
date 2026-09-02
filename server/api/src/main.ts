@@ -36,7 +36,7 @@ const identityProvider = new CachedIdentityProvider(
   60,
   metrics,
 );
-const googlePlacesAPIKey = process.env.GOOGLE_PLACES_API_KEY;
+const googlePlacesAPIKey = configuredSecret("GOOGLE_PLACES_API_KEY");
 const locationProvider: LocationSearchProvider = googlePlacesAPIKey
   ? new GooglePlacesLocationSearchProvider(googlePlacesAPIKey)
   : new EmptyLocationSearchProvider();

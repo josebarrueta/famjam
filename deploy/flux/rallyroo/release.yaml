@@ -35,6 +35,7 @@ spec:
     providerSecrets:
       stytch: rallyroo-stytch
       calendarEncryption: rallyroo-calendar-encryption
+      googlePlaces: rallyroo-google-places
     runtimeConfig:
       enabled: true
       stytch:

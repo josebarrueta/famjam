@@ -17,6 +17,7 @@ runtimeSecret: rallyroo-runtime
 providerSecrets:
   stytch: ""
   calendarEncryption: ""
+  googlePlaces: ""
 
 runtimeConfig:
   # Production enables this through Flux. Local development continues reading
