@@ -51,6 +51,14 @@ jobs:
     environment: production-site
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install pinned Wrangler
+        working-directory: site
+        run: npm ci
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_SITE_API_TOKEN }}
