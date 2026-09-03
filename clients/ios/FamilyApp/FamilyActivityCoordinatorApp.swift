@@ -97,6 +97,7 @@ struct FamilyActivityCoordinatorApp: App {
                     }
                     SettingsView(
                         dataIsSynced: dataIsSynced,
+                        currentMemberID: session.accountID,
                         calendarSourceStore: session.role == .parent ? calendarSourceStore : nil,
                         memberStore: session.role == .parent ? memberStore : nil,
                         onSignOut: signOut,

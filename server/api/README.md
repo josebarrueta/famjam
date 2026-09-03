@@ -73,13 +73,19 @@ activate parent-managed iCalendar imports. Store this key in the runtime secret,
 not Helm values or Git, and retain it across deployments: losing it makes existing
 feed URLs unreadable. Rotation requires decrypting and re-encrypting stored URLs.
 
-The iCalendar adapter supports TeamSnap and other HTTPS subscription feeds. It
-expands bounded recurrences, atomically replaces each source snapshot, preserves
-the last good snapshot on failure, and consolidates exact cross-source duplicates
-while combining participants and provenance. Imported events are read-only and
-participate in conflict detection. User-supplied URLs are protected against
-private-network access, redirects to private hosts, oversized responses, and slow
-requests.
+The iCalendar adapter supports TeamSnap and other HTTPS subscription feeds. A
+new connection immediately attempts its complete initial snapshot import. It
+expands recurrences from one year before synchronization through two years after
+it, caps snapshots at 5,000 events and recurrence scans at 50,000 candidates,
+atomically replaces each source snapshot, and preserves the last good snapshot
+on failure.
+
+Each source is either Personal to its owning parent or Shared with family. Access
+is filtered before exact cross-source deduplication and conflict detection, so a
+personal event cannot leak through provenance, conflicts, notifications, or family
+change cursors. Imported events remain read-only. User-supplied URLs are protected
+against private-network access, redirects to private hosts, oversized responses,
+and slow requests.
 
 ## Production operations
 

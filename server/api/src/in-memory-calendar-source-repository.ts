@@ -52,6 +52,13 @@ export class InMemoryCalendarSourceRepository implements CalendarSourceRepositor
   async calendarEventsForFamily(familyID: string): Promise<ImportedCalendarEvent[]> {
     return this.events
       .filter((event) => event.familyID === familyID)
-      .map((event) => structuredClone(event));
+      .map((event) => {
+        const source = this.sources.find((candidate) => candidate.id === event.sourceID);
+        return structuredClone({
+          ...event,
+          sourceOwnerMemberID: source?.ownerMemberID ?? event.sourceOwnerMemberID,
+          sourceVisibility: source?.visibility ?? event.sourceVisibility,
+        });
+      });
   }
 }

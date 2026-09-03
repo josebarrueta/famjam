@@ -71,12 +71,17 @@ const memberSchema = z.object({
   colorTag: z.string().min(1),
 });
 
+const calendarSourceVisibilitySchema = z.object({
+  visibility: z.enum(["personal", "family"]),
+});
+
 const calendarSourceSchema = z.object({
   name: z.string().trim().min(1).max(100),
   url: z.string()
     .transform((url) => url.replace(/^webcal:/i, "https:"))
     .pipe(z.url().refine((url) => new URL(url).protocol === "https:", "HTTPS is required")),
   participantIDs: z.array(z.string().min(1)).min(1),
+  visibility: z.enum(["personal", "family"]).default("family"),
 });
 
 interface RouteRateLimit {
@@ -408,17 +413,37 @@ export function buildApp({
     if (parsed.data.participantIDs.some((memberID) => !memberIDs.has(memberID))) {
       return reply.code(400).send({ error: "unknown_participant" });
     }
-    return reply.code(201).send(await calendarSources.create({
+    const source = await calendarSources.connect({
       familyID: account.familyID,
+      ownerMemberID: account.memberID,
       ...parsed.data,
-    }));
+    });
+    if (source.visibility === "family") await repository.markFamilyChanged(account.familyID);
+    return reply.code(201).send(source);
   });
 
   app.get("/v1/calendar-sources", async (request, reply) => {
     const account = await requireParent(request, reply);
     if (!account) return;
     if (!calendarSources) return reply.code(503).send({ error: "calendar_sources_unavailable" });
-    return calendarSources.list(account.familyID);
+    return calendarSources.list(account.familyID, account.memberID);
+  });
+
+  app.patch("/v1/calendar-sources/:id", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    if (!calendarSources) return reply.code(503).send({ error: "calendar_sources_unavailable" });
+    const parsed = calendarSourceVisibilitySchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_calendar_source_visibility" });
+    const source = await calendarSources.updateVisibility(
+      account.familyID,
+      (request.params as { id: string }).id,
+      account.memberID,
+      parsed.data.visibility,
+    );
+    if (!source) return reply.code(404).send({ error: "calendar_source_not_found" });
+    await repository.markFamilyChanged(account.familyID);
+    return source;
   });
 
   app.delete("/v1/calendar-sources/:id", async (request, reply) => {
@@ -428,9 +453,10 @@ export function buildApp({
     const deleted = await calendarSources.delete(
       account.familyID,
       (request.params as { id: string }).id,
+      account.memberID,
     );
     if (!deleted) return reply.code(404).send({ error: "calendar_source_not_found" });
-    await repository.markFamilyChanged(account.familyID);
+    if (deleted.visibility === "family") await repository.markFamilyChanged(account.familyID);
     return reply.code(204).send();
   });
 
@@ -442,9 +468,10 @@ export function buildApp({
       const source = await calendarSources.sync(
         account.familyID,
         (request.params as { id: string }).id,
+        account.memberID,
       );
       if (!source) return reply.code(404).send({ error: "calendar_source_not_found" });
-      await repository.markFamilyChanged(account.familyID);
+      if (source.visibility === "family") await repository.markFamilyChanged(account.familyID);
       return source;
     } catch {
       return reply.code(502).send({ error: "calendar_source_sync_failed" });
@@ -487,7 +514,7 @@ export function buildApp({
     const account = requiredAccount(request);
     const events = [
       ...await repository.eventsForFamily(account.familyID),
-      ...(calendarSources ? await calendarSources.events(account.familyID) : []),
+      ...(calendarSources ? await calendarSources.events(account.familyID, account.memberID) : []),
     ];
     const visible = account.role === "parent"
       ? events
@@ -502,7 +529,7 @@ export function buildApp({
     if (!parsed.success) return reply.code(400).send({ error: "invalid_event", details: parsed.error.issues });
     const routeID = (request.params as { id: string }).id;
     if (routeID !== parsed.data.id) return reply.code(400).send({ error: "event_id_mismatch" });
-    if (calendarSources && (await calendarSources.events(account.familyID)).some((event) => event.id === routeID)) {
+    if (calendarSources && (await calendarSources.events(account.familyID, account.memberID)).some((event) => event.id === routeID)) {
       return reply.code(409).send({ error: "imported_event_read_only" });
     }
     const familyMembers = await repository.membersForFamily(account.familyID);
@@ -520,18 +547,28 @@ export function buildApp({
       familyID: account.familyID,
       ...(recurrence !== undefined ? { recurrence } : {}),
     };
-    const existing = [
-      ...await repository.eventsForFamily(account.familyID),
-      ...(calendarSources ? await calendarSources.events(account.familyID) : []),
-    ];
-    const conflicts = detectConflicts(event, existing.filter((candidate) => candidate.id !== event.id));
+    const nativeEvents = await repository.eventsForFamily(account.familyID);
+    const visibleImportedEvents = calendarSources
+      ? await calendarSources.events(account.familyID, account.memberID)
+      : [];
+    const sharedImportedEvents = calendarSources
+      ? await calendarSources.sharedEvents(account.familyID)
+      : [];
+    const conflicts = detectConflicts(
+      event,
+      [...nativeEvents, ...visibleImportedEvents].filter((candidate) => candidate.id !== event.id),
+    );
+    const familyVisibleConflicts = detectConflicts(
+      event,
+      [...nativeEvents, ...sharedImportedEvents].filter((candidate) => candidate.id !== event.id),
+    );
     await repository.saveEvent(event);
     await repository.markFamilyChanged(account.familyID);
     const deviceTokens = await repository.deviceTokensForFamily(account.familyID);
     try {
       await pushNotificationProvider.send(deviceTokens, {
         title: event.title,
-        body: conflicts.length > 0
+        body: familyVisibleConflicts.length > 0
           ? "Schedule conflict detected. Open Rallyroo to review."
           : "Your family schedule was updated.",
         data: { eventID: event.id },
@@ -546,7 +583,7 @@ export function buildApp({
     const account = await requireParent(request, reply);
     if (!account) return;
     const eventID = (request.params as { id: string }).id;
-    if (calendarSources && (await calendarSources.events(account.familyID)).some((event) => event.id === eventID)) {
+    if (calendarSources && (await calendarSources.events(account.familyID, account.memberID)).some((event) => event.id === eventID)) {
       return reply.code(409).send({ error: "imported_event_read_only" });
     }
     await repository.deleteEvent(account.familyID, eventID);

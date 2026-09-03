@@ -61,18 +61,32 @@ and location; participant IDs and provenance are combined.
 
 Authenticated parents can manage read-only iCalendar subscriptions:
 
-- `POST /v1/calendar-sources` with `{ "name", "url", "participantIDs" }` creates
-  a connection. HTTPS links are required; `webcal:` subscription links are normalized
-  to HTTPS. Participant IDs must belong to the family.
-- `GET /v1/calendar-sources` lists connection metadata without revealing feed URLs.
+- `POST /v1/calendar-sources` with
+  `{ "name", "url", "participantIDs", "visibility": "personal" | "family" }`
+  creates a connection and attempts its complete initial import before returning.
+  The response remains `201` with `status: "error"` when the connection is saved but
+  its first import fails, so the parent can retry. HTTPS links are required;
+  `webcal:` links are normalized to HTTPS. Participant IDs must belong to the family.
+- `GET /v1/calendar-sources` lists family-shared connections plus personal
+  connections owned by the requesting parent, without revealing feed URLs.
+- `PATCH /v1/calendar-sources/{id}` with
+  `{ "visibility": "personal" | "family" }` changes visibility. Only the parent
+  who connected the source can change it.
 - `POST /v1/calendar-sources/{id}/sync` atomically refreshes imported events.
 - `DELETE /v1/calendar-sources/{id}` removes the connection and its imported events.
 
+Personal source metadata, events, provenance, conflict signals, notifications, and
+change cursors are hidden from other family accounts. Family visibility is not
+internet publication. New events inherit their source visibility automatically,
+and exact deduplication occurs only after access filtering.
+
 Kid sessions receive `403`. Feed URLs are bearer-style secrets encrypted in
-PostgreSQL. The reference adapter rejects private-network destinations, limits
-redirects, response size, recurrence expansion, and request duration. A failed
-refresh returns `502`, marks the connection as failed, and preserves the last good
-schedule. Recurrences are expanded into bounded schedule occurrences.
+PostgreSQL. The reference adapter rejects private-network destinations and limits
+redirects, response size, request duration, imported snapshots to 5,000 events, and
+recurrence iteration to 50,000 candidates. Non-recurring events in a valid feed are
+imported; recurring events are expanded from one year before synchronization through
+two years after it. A failed refresh returns `502`, marks the connection as failed,
+and preserves the last good schedule.
 
 ## Family invitations
 

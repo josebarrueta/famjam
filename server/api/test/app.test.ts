@@ -41,6 +41,7 @@ const identityProvider: IdentityProvider = {
   async verifySession(token) {
     if (token === "parent-token") return { subject: "parent-subject", displayName: "Alex" };
     if (token === "kid-token") return { subject: "kid-subject", displayName: "Emma" };
+    if (token === "family-parent-token") return { subject: "family-parent-subject", displayName: "Jamie" };
     if (token === "other-parent-token") return { subject: "other-parent-subject", displayName: "Jordan" };
     throw new Error("invalid session");
   },
@@ -64,12 +65,14 @@ function repository() {
     accounts: [
       { identitySubject: "parent-subject", familyID: "family-1", memberID: "parent-1", role: "parent" },
       { identitySubject: "kid-subject", familyID: "family-1", memberID: "kid-1", role: "kid" },
+      { identitySubject: "family-parent-subject", familyID: "family-1", memberID: "parent-3", role: "parent" },
       { identitySubject: "other-parent-subject", familyID: "family-2", memberID: "parent-2", role: "parent" },
     ],
     members: [
       { id: "parent-1", familyID: "family-1", name: "Alex", role: "parent", colorTag: "blue" },
       { id: "kid-1", familyID: "family-1", name: "Emma", role: "kid", colorTag: "purple" },
       { id: "kid-2", familyID: "family-1", name: "Noah", role: "kid", colorTag: "orange" },
+      { id: "parent-3", familyID: "family-1", name: "Jamie", role: "parent", colorTag: "teal" },
       { id: "parent-2", familyID: "family-2", name: "Jordan", role: "parent", colorTag: "green" },
     ],
     events: [{
@@ -237,6 +240,7 @@ describe("Rallyroo API", () => {
     expect(await data.membersForFamily("family-1")).toEqual([
       expect.objectContaining({ id: "kid-1" }),
       expect.objectContaining({ id: "kid-2" }),
+      expect.objectContaining({ id: "parent-3" }),
     ]);
     await app.close();
   });
@@ -630,12 +634,382 @@ describe("Rallyroo API", () => {
     expect(created.statusCode).toBe(201);
     expect(created.json()).toMatchObject({
       name: "Emma TeamSnap",
+      ownerMemberID: "parent-1",
+      visibility: "family",
       participantIDs: ["kid-1"],
-      status: "pending",
+      status: "ready",
     });
     expect(created.json()).not.toHaveProperty("url");
     expect(forbidden.statusCode).toBe(403);
     expect(listed.json()).toEqual([created.json()]);
+    await app.close();
+  });
+
+  it("imports a calendar's complete initial snapshot when it is connected", async () => {
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:first@example",
+        "SUMMARY:First imported activity",
+        "DTSTART:20260912T180000Z",
+        "DTEND:20260912T190000Z",
+        "END:VEVENT",
+        "BEGIN:VEVENT",
+        "UID:second@example",
+        "SUMMARY:Second imported activity",
+        "DTSTART:20260913T180000Z",
+        "DTEND:20260913T190000Z",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n") }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+
+    const connected = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "Activities",
+        url: "https://ical.example/activities.ics",
+        participantIDs: ["kid-1"],
+        visibility: "family",
+      },
+    });
+    const schedule = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(connected.statusCode).toBe(201);
+    expect(connected.json()).toMatchObject({ status: "ready", visibility: "family" });
+    expect(schedule.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: "First imported activity" }),
+      expect.objectContaining({ title: "Second imported activity" }),
+    ]));
+    await app.close();
+  });
+
+  it("rejects an initial calendar snapshot above the 5,000-event safety limit", async () => {
+    const eventLines = Array.from({ length: 5_001 }, (_, index) => [
+      "BEGIN:VEVENT",
+      `UID:large-${index}@example`,
+      `SUMMARY:Imported activity ${index}`,
+      "DTSTART:20260912T180000Z",
+      "DTEND:20260912T190000Z",
+      "END:VEVENT",
+    ].join("\r\n"));
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        ...eventLines,
+        "END:VCALENDAR",
+      ].join("\r\n") }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+
+    const connected = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "Oversized calendar",
+        url: "https://ical.example/oversized.ics",
+        participantIDs: ["kid-1"],
+        visibility: "family",
+      },
+    });
+
+    expect(connected.statusCode).toBe(201);
+    expect(connected.json()).toMatchObject({ status: "error", lastError: "sync_failed" });
+    await app.close();
+  });
+
+  it("keeps a failed initial calendar connection available for retry", async () => {
+    let feedBody = "not a calendar";
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: feedBody }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+
+    const connected = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "Retry calendar",
+        url: "https://ical.example/retry.ics",
+        participantIDs: ["kid-1"],
+        visibility: "family",
+      },
+    });
+    expect(connected.statusCode).toBe(201);
+    expect(connected.json()).toMatchObject({ status: "error", lastError: "sync_failed" });
+
+    feedBody = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:retried@example",
+      "SUMMARY:Imported after retry",
+      "DTSTART:20260912T180000Z",
+      "DTEND:20260912T190000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const retried = await app.inject({
+      method: "POST",
+      url: `/v1/calendar-sources/${connected.json().id}/sync`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const schedule = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(retried.statusCode).toBe(200);
+    expect(retried.json()).toMatchObject({ status: "ready", lastError: null });
+    expect(schedule.body).toContain("Imported after retry");
+    await app.close();
+  });
+
+  it("keeps a personal calendar and its events private to the parent who connected it", async () => {
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:private-work@example",
+        "SUMMARY:Private work meeting",
+        "DTSTART:20260912T180000Z",
+        "DTEND:20260912T190000Z",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n") }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+    const familyVersionBefore = await app.inject({
+      method: "GET",
+      url: "/v1/changes",
+      headers: { authorization: "Bearer family-parent-token" },
+    });
+    const connected = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "Work",
+        url: "https://ical.example/work.ics",
+        participantIDs: ["parent-1"],
+        visibility: "personal",
+      },
+    });
+    const sourceID = connected.json().id;
+    const familyVersionAfter = await app.inject({
+      method: "GET",
+      url: "/v1/changes",
+      headers: { authorization: "Bearer family-parent-token" },
+    });
+
+    const ownerSources = await app.inject({
+      method: "GET",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const ownerEvents = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer parent-token" },
+    });
+    const familySources = await app.inject({
+      method: "GET",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer family-parent-token" },
+    });
+    const familyEvents = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer family-parent-token" },
+    });
+    const unrelatedParentEdit = await app.inject({
+      method: "PUT",
+      url: "/v1/events/00000000-0000-4000-8000-000000000078",
+      headers: { authorization: "Bearer family-parent-token" },
+      payload: {
+        id: "00000000-0000-4000-8000-000000000078",
+        title: "Family activity",
+        kidID: "parent-1",
+        participantIDs: ["parent-1"],
+        startTime: "2026-09-12T18:30:00Z",
+        endTime: "2026-09-12T19:30:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed",
+      },
+    });
+    const forbiddenSync = await app.inject({
+      method: "POST",
+      url: `/v1/calendar-sources/${sourceID}/sync`,
+      headers: { authorization: "Bearer family-parent-token" },
+    });
+    const forbiddenDelete = await app.inject({
+      method: "DELETE",
+      url: `/v1/calendar-sources/${sourceID}`,
+      headers: { authorization: "Bearer family-parent-token" },
+    });
+
+    expect(familyVersionAfter.json()).toEqual(familyVersionBefore.json());
+    expect(ownerSources.json()).toEqual([expect.objectContaining({
+      id: sourceID,
+      ownerMemberID: "parent-1",
+      visibility: "personal",
+    })]);
+    expect(ownerEvents.body).toContain("Private work meeting");
+    expect(familySources.json()).toEqual([]);
+    expect(familyEvents.body).not.toContain("Private work meeting");
+    expect(unrelatedParentEdit.json().conflicts).toEqual([]);
+    expect(forbiddenSync.statusCode).toBe(404);
+    expect(forbiddenDelete.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("does not reveal personal-calendar conflicts in family push notifications", async () => {
+    const pushedBodies: string[] = [];
+    const pushNotificationProvider: PushNotificationProvider = {
+      async send(_tokens, notification) {
+        pushedBodies.push(notification.body);
+      },
+    };
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:private-conflict@example",
+        "SUMMARY:Private meeting",
+        "DTSTART:20260912T180000Z",
+        "DTEND:20260912T190000Z",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n") }),
+    });
+    const app = buildApp({
+      identityProvider,
+      repository: repository(),
+      calendarSources,
+      pushNotificationProvider,
+    });
+    await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "Work",
+        url: "https://ical.example/work.ics",
+        participantIDs: ["parent-1"],
+        visibility: "personal",
+      },
+    });
+
+    const saved = await app.inject({
+      method: "PUT",
+      url: "/v1/events/00000000-0000-4000-8000-000000000079",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: "00000000-0000-4000-8000-000000000079",
+        title: "Family activity",
+        kidID: "parent-1",
+        participantIDs: ["parent-1"],
+        startTime: "2026-09-12T18:30:00Z",
+        endTime: "2026-09-12T19:30:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed",
+      },
+    });
+
+    expect(saved.json().conflicts).toEqual([
+      expect.objectContaining({ kind: "overlapping_participant", memberID: "parent-1" }),
+    ]);
+    expect(pushedBodies).toEqual(["Your family schedule was updated."]);
+    await app.close();
+  });
+
+  it("lets only the source owner change calendar visibility", async () => {
+    const calendarSources = new CalendarSourceModule({
+      repository: new InMemoryCalendarSourceRepository(),
+      protectURL: (url) => url,
+      revealURL: (url) => url,
+      fetchFeed: async () => ({ body: [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:visibility@example",
+        "SUMMARY:Visibility test",
+        "DTSTART:20260912T180000Z",
+        "DTEND:20260912T190000Z",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n") }),
+    });
+    const app = buildApp({ identityProvider, repository: repository(), calendarSources });
+    const connected = await app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        name: "Work",
+        url: "https://ical.example/work.ics",
+        participantIDs: ["parent-1"],
+        visibility: "personal",
+      },
+    });
+    const sourceURL = `/v1/calendar-sources/${connected.json().id}`;
+
+    const forbidden = await app.inject({
+      method: "PATCH",
+      url: sourceURL,
+      headers: { authorization: "Bearer family-parent-token" },
+      payload: { visibility: "family" },
+    });
+    const shared = await app.inject({
+      method: "PATCH",
+      url: sourceURL,
+      headers: { authorization: "Bearer parent-token" },
+      payload: { visibility: "family" },
+    });
+    const familyEvents = await app.inject({
+      method: "GET",
+      url: "/v1/events",
+      headers: { authorization: "Bearer family-parent-token" },
+    });
+
+    expect(forbidden.statusCode).toBe(404);
+    expect(shared.statusCode).toBe(200);
+    expect(shared.json()).toMatchObject({ visibility: "family" });
+    expect(familyEvents.body).toContain("Visibility test");
     await app.close();
   });
 

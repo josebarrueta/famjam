@@ -110,6 +110,24 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
         await client.query("DELETE FROM accounts WHERE family_id = $1", [row.family_id]);
         await client.query("DELETE FROM family_members WHERE family_id = $1", [row.family_id]);
       } else {
+        await client.query(
+          `DELETE FROM calendar_sources
+           WHERE family_id = $1 AND owner_member_id = $2 AND visibility = 'personal'`,
+          [row.family_id, row.member_id],
+        );
+        await client.query(
+          `UPDATE calendar_sources
+           SET owner_member_id = (
+             SELECT account.member_id
+             FROM accounts account
+             WHERE account.family_id = $1 AND account.identity_subject <> $3
+             ORDER BY CASE WHEN account.role = 'parent' THEN 0 ELSE 1 END,
+                      account.identity_subject
+             LIMIT 1
+           )
+           WHERE family_id = $1 AND owner_member_id = $2 AND visibility = 'family'`,
+          [row.family_id, row.member_id, subject],
+        );
         await client.query("DELETE FROM accounts WHERE identity_subject = $1", [subject]);
         await client.query(
           `DELETE FROM calendar_sources
@@ -370,26 +388,28 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
   async saveCalendarSource(source: CalendarSource): Promise<void> {
     await this.pool.query(
       `INSERT INTO calendar_sources (
-         family_id, id, name, feed_url_ciphertext, participant_ids, status,
-         last_synced_at, last_error, etag, last_modified
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         family_id, id, owner_member_id, visibility, name, feed_url_ciphertext,
+         participant_ids, status, last_synced_at, last_error, etag, last_modified
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (family_id, id) DO UPDATE SET
+         owner_member_id=EXCLUDED.owner_member_id, visibility=EXCLUDED.visibility,
          name=EXCLUDED.name, feed_url_ciphertext=EXCLUDED.feed_url_ciphertext,
          participant_ids=EXCLUDED.participant_ids, status=EXCLUDED.status,
          last_synced_at=EXCLUDED.last_synced_at, last_error=EXCLUDED.last_error,
          etag=EXCLUDED.etag, last_modified=EXCLUDED.last_modified`,
       [
-        source.familyID, source.id, source.name, source.protectedURL,
-        source.participantIDs, source.status, source.lastSyncedAt, source.lastError,
-        source.etag, source.lastModified,
+        source.familyID, source.id, source.ownerMemberID, source.visibility,
+        source.name, source.protectedURL, source.participantIDs, source.status,
+        source.lastSyncedAt, source.lastError, source.etag, source.lastModified,
       ],
     );
   }
 
   async calendarSource(familyID: string, sourceID: string): Promise<CalendarSource | null> {
     const result = await this.pool.query<CalendarSourceRow>(
-      `SELECT family_id, id::text, name, feed_url_ciphertext, participant_ids,
-              status, last_synced_at, last_error, etag, last_modified
+      `SELECT family_id, id::text, owner_member_id, visibility, name,
+              feed_url_ciphertext, participant_ids, status, last_synced_at,
+              last_error, etag, last_modified
        FROM calendar_sources WHERE family_id = $1 AND id = $2`,
       [familyID, sourceID],
     );
@@ -398,8 +418,9 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
 
   async calendarSourcesForFamily(familyID: string): Promise<CalendarSource[]> {
     const result = await this.pool.query<CalendarSourceRow>(
-      `SELECT family_id, id::text, name, feed_url_ciphertext, participant_ids,
-              status, last_synced_at, last_error, etag, last_modified
+      `SELECT family_id, id::text, owner_member_id, visibility, name,
+              feed_url_ciphertext, participant_ids, status, last_synced_at,
+              last_error, etag, last_modified
        FROM calendar_sources WHERE family_id = $1 ORDER BY name, id`,
       [familyID],
     );
@@ -442,13 +463,14 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
       }
       await client.query(
         `UPDATE calendar_sources SET
-           name=$3, feed_url_ciphertext=$4, participant_ids=$5, status=$6,
-           last_synced_at=$7, last_error=$8, etag=$9, last_modified=$10
+           owner_member_id=$3, visibility=$4, name=$5, feed_url_ciphertext=$6,
+           participant_ids=$7, status=$8, last_synced_at=$9, last_error=$10,
+           etag=$11, last_modified=$12
          WHERE family_id=$1 AND id=$2`,
         [
-          source.familyID, source.id, source.name, source.protectedURL,
-          source.participantIDs, source.status, source.lastSyncedAt, source.lastError,
-          source.etag, source.lastModified,
+          source.familyID, source.id, source.ownerMemberID, source.visibility,
+          source.name, source.protectedURL, source.participantIDs, source.status,
+          source.lastSyncedAt, source.lastError, source.etag, source.lastModified,
         ],
       );
       await client.query("COMMIT");
@@ -463,6 +485,8 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
   async calendarEventsForFamily(familyID: string): Promise<ImportedCalendarEvent[]> {
     const result = await this.pool.query<ImportedCalendarEventRow>(
       `SELECT event.family_id, event.source_id::text, source.name AS source_name,
+              source.owner_member_id AS source_owner_member_id,
+              source.visibility AS source_visibility,
               event.external_uid, event.title, event.start_time, event.end_time,
               event.location, event.participant_ids, event.fingerprint
        FROM imported_calendar_events event
@@ -475,6 +499,8 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
       familyID: row.family_id,
       sourceID: row.source_id,
       sourceName: row.source_name,
+      sourceOwnerMemberID: row.source_owner_member_id,
+      sourceVisibility: row.source_visibility,
       externalUID: row.external_uid,
       title: row.title,
       startTime: asISOString(row.start_time),
@@ -561,6 +587,8 @@ interface EventRow {
 interface CalendarSourceRow {
   family_id: string;
   id: string;
+  owner_member_id: string;
+  visibility: CalendarSource["visibility"];
   name: string;
   feed_url_ciphertext: string;
   participant_ids: string[];
@@ -575,6 +603,8 @@ interface ImportedCalendarEventRow {
   family_id: string;
   source_id: string;
   source_name: string;
+  source_owner_member_id: string;
+  source_visibility: CalendarSource["visibility"];
   external_uid: string;
   title: string;
   start_time: Date | string;
@@ -597,6 +627,8 @@ function calendarSourceFromRow(row: CalendarSourceRow): CalendarSource {
   return {
     familyID: row.family_id,
     id: row.id,
+    ownerMemberID: row.owner_member_id,
+    visibility: row.visibility,
     name: row.name,
     protectedURL: row.feed_url_ciphertext,
     participantIDs: row.participant_ids,

@@ -1,5 +1,10 @@
 import Foundation
 
+public enum CalendarSourceVisibility: String, Codable, Equatable, Sendable {
+    case personal
+    case family
+}
+
 public enum CalendarSourceStatus: String, Codable, Sendable {
     case pending
     case ready
@@ -8,6 +13,8 @@ public enum CalendarSourceStatus: String, Codable, Sendable {
 
 public struct CalendarSourceConnection: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
+    public let ownerMemberID: String
+    public let visibility: CalendarSourceVisibility
     public let name: String
     public let participantIDs: [KidID]
     public let status: CalendarSourceStatus
@@ -16,6 +23,8 @@ public struct CalendarSourceConnection: Codable, Equatable, Identifiable, Sendab
 
     public init(
         id: UUID,
+        ownerMemberID: String,
+        visibility: CalendarSourceVisibility,
         name: String,
         participantIDs: [KidID],
         status: CalendarSourceStatus,
@@ -23,6 +32,8 @@ public struct CalendarSourceConnection: Codable, Equatable, Identifiable, Sendab
         lastError: String? = nil
     ) {
         self.id = id
+        self.ownerMemberID = ownerMemberID
+        self.visibility = visibility
         self.name = name
         self.participantIDs = participantIDs
         self.status = status
@@ -33,7 +44,16 @@ public struct CalendarSourceConnection: Codable, Equatable, Identifiable, Sendab
 
 public protocol CalendarSourceStore: Sendable {
     func sources() async throws -> [CalendarSourceConnection]
-    func create(name: String, url: URL, participantIDs: [KidID]) async throws -> CalendarSourceConnection
+    func connect(
+        name: String,
+        url: URL,
+        participantIDs: [KidID],
+        visibility: CalendarSourceVisibility
+    ) async throws -> CalendarSourceConnection
+    func updateVisibility(
+        _ source: CalendarSourceConnection,
+        visibility: CalendarSourceVisibility
+    ) async throws -> CalendarSourceConnection
     func synchronize(_ source: CalendarSourceConnection) async throws -> CalendarSourceConnection
     func delete(_ source: CalendarSourceConnection) async throws
 }
@@ -59,10 +79,11 @@ public actor RemoteCalendarSourceStore: CalendarSourceStore {
         return try decoder.decode([CalendarSourceConnection].self, from: response.body)
     }
 
-    public func create(
+    public func connect(
         name: String,
         url: URL,
-        participantIDs: [KidID]
+        participantIDs: [KidID],
+        visibility: CalendarSourceVisibility
     ) async throws -> CalendarSourceConnection {
         let response = try await transport.send(HTTPRequest(
             method: .post,
@@ -71,8 +92,23 @@ public actor RemoteCalendarSourceStore: CalendarSourceStore {
             body: try encoder.encode(CreateCalendarSourceRequest(
                 name: name,
                 url: url.absoluteString,
-                participantIDs: participantIDs
+                participantIDs: participantIDs,
+                visibility: visibility
             ))
+        ))
+        try response.requireSuccess()
+        return try decoder.decode(CalendarSourceConnection.self, from: response.body)
+    }
+
+    public func updateVisibility(
+        _ source: CalendarSourceConnection,
+        visibility: CalendarSourceVisibility
+    ) async throws -> CalendarSourceConnection {
+        let response = try await transport.send(HTTPRequest(
+            method: .patch,
+            url: sourcesURL.appending(path: source.id.uuidString),
+            headers: ["Content-Type": "application/json"],
+            body: try encoder.encode(UpdateCalendarSourceVisibilityRequest(visibility: visibility))
         ))
         try response.requireSuccess()
         return try decoder.decode(CalendarSourceConnection.self, from: response.body)
@@ -96,8 +132,13 @@ public actor RemoteCalendarSourceStore: CalendarSourceStore {
     }
 }
 
+private struct UpdateCalendarSourceVisibilityRequest: Codable {
+    let visibility: CalendarSourceVisibility
+}
+
 private struct CreateCalendarSourceRequest: Codable {
     let name: String
     let url: String
     let participantIDs: [KidID]
+    let visibility: CalendarSourceVisibility
 }

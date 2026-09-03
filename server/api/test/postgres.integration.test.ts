@@ -29,6 +29,16 @@ const identityProvider: IdentityProvider = {
       "oauth-token": { subject: "integration-parent", displayName: "Alex", accessToken: "integration-token" },
       "child-oauth-token": { subject: "integration-child", displayName: "Sam", accessToken: "child-token" },
       "other-oauth-token": { subject: "other-parent", displayName: "Jordan", accessToken: "other-token" },
+      "deleting-owner-oauth-token": {
+        subject: "deleting-calendar-owner",
+        displayName: "Taylor",
+        accessToken: "deleting-owner-token",
+      },
+      "successor-oauth-token": {
+        subject: "calendar-owner-successor",
+        displayName: "Morgan",
+        accessToken: "successor-token",
+      },
     };
     const identity = identities[token];
     if (!identity) throw new Error("invalid OAuth token");
@@ -42,6 +52,8 @@ const identityProvider: IdentityProvider = {
       "integration-token": { subject: "integration-parent", displayName: "Alex" },
       "child-token": { subject: "integration-child", displayName: "Sam" },
       "other-token": { subject: "other-parent", displayName: "Jordan" },
+      "deleting-owner-token": { subject: "deleting-calendar-owner", displayName: "Taylor" },
+      "successor-token": { subject: "calendar-owner-successor", displayName: "Morgan" },
     };
     const identity = identities[token];
     if (!identity) throw new Error("invalid session");
@@ -171,14 +183,15 @@ describe.skipIf(!adminURL)("PostgreSQL HTTP integration", () => {
         name: "TeamSnap",
         url: "https://ical.example/team.ics",
         participantIDs: [(await writerRepository.accountForIdentity("integration-parent"))!.memberID],
+        visibility: "family",
       },
     });
     expect(created.statusCode).toBe(201);
-    expect((await writer.inject({
-      method: "POST",
-      url: `/v1/calendar-sources/${created.json().id}/sync`,
-      headers: { authorization: "Bearer integration-token" },
-    })).statusCode).toBe(200);
+    expect(created.json()).toMatchObject({
+      ownerMemberID: (await writerRepository.accountForIdentity("integration-parent"))!.memberID,
+      visibility: "family",
+      status: "ready",
+    });
     await writer.close();
 
     const readerRepository = repositoryForTest();
@@ -198,7 +211,7 @@ describe.skipIf(!adminURL)("PostgreSQL HTTP integration", () => {
       headers: { authorization: "Bearer integration-token" },
     });
     expect(sources.json()).toEqual([
-      expect.objectContaining({ name: "TeamSnap", status: "ready" }),
+      expect.objectContaining({ name: "TeamSnap", visibility: "family", status: "ready" }),
     ]);
     expect(events.json()).toEqual(expect.arrayContaining([
       expect.objectContaining({ title: "Persisted team practice", source: "calendar", readOnly: true }),
@@ -257,6 +270,74 @@ describe.skipIf(!adminURL)("PostgreSQL HTTP integration", () => {
       headers: { authorization: "Bearer integration-token" },
     });
     expect(pending.json()).toEqual([]);
+    await app.close();
+  });
+
+  it("deletes personal calendars and transfers shared calendars when their owner deletes their account", async () => {
+    const data = repositoryForTest();
+    const calendarSources = new CalendarSourceModule({
+      repository: data,
+      protectURL: (url) => `encrypted:${url}`,
+      revealURL: (url) => url.replace(/^encrypted:/, ""),
+      fetchFeed: async () => ({ body: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n" }),
+    });
+    const app = buildApp({ identityProvider, repository: data, calendarSources });
+    const ownerSession = await app.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: {
+        oauthToken: "deleting-owner-oauth-token",
+        codeVerifier: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq",
+      },
+    });
+    const invitation = await app.inject({
+      method: "POST",
+      url: "/v1/invitations",
+      headers: { authorization: "Bearer deleting-owner-token" },
+      payload: { role: "parent", email: "successor@example.com" },
+    });
+    const successorSession = await app.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: {
+        oauthToken: "successor-oauth-token",
+        codeVerifier: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq",
+        invitationCode: invitation.json().code,
+      },
+    });
+    const participantIDs = [ownerSession.json().accountID, successorSession.json().accountID];
+    const connect = (name: string, visibility: "personal" | "family") => app.inject({
+      method: "POST",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer deleting-owner-token" },
+      payload: {
+        name,
+        url: `https://ical.example/${name.toLowerCase()}.ics`,
+        participantIDs,
+        visibility,
+      },
+    });
+    await connect("Personal", "personal");
+    await connect("Shared", "family");
+
+    expect((await app.inject({
+      method: "DELETE",
+      url: "/v1/account",
+      headers: { authorization: "Bearer deleting-owner-token" },
+    })).statusCode).toBe(204);
+    const remaining = await app.inject({
+      method: "GET",
+      url: "/v1/calendar-sources",
+      headers: { authorization: "Bearer successor-token" },
+    });
+
+    expect(remaining.json()).toEqual([
+      expect.objectContaining({
+        name: "Shared",
+        visibility: "family",
+        ownerMemberID: successorSession.json().accountID,
+      }),
+    ]);
     await app.close();
   });
 

@@ -64,9 +64,11 @@ Minimal v1 schema — expected to evolve:
 - Weekly view, color-coded per kid
 - Data synced across family devices through a lightweight family change cursor;
   clients refresh automatically when the cursor advances or the app becomes active
-- Parent-managed HTTPS iCalendar subscriptions for TeamSnap, school, and sports
-  schedules, with read-only provenance, recurrence expansion, conflict participation,
-  and deterministic exact deduplication across family members' feeds
+- Parent-managed HTTPS iCalendar subscriptions for TeamSnap, school, work, and
+  sports schedules. Connecting a source imports its initial snapshot; each source
+  is Personal to its owning parent or Shared with family. Access filtering precedes
+  read-only provenance, recurrence expansion, conflict detection, notifications,
+  and deterministic exact deduplication so personal details cannot leak.
 
 ## 7. Agentic Features (v2+)
 

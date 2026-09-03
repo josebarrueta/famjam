@@ -2,9 +2,15 @@ import { createHash, randomUUID } from "node:crypto";
 import ICAL from "ical.js";
 import type { FamilyEvent } from "./domain.js";
 
+const MAX_IMPORTED_EVENTS = 5_000;
+
+export type CalendarSourceVisibility = "personal" | "family";
+
 export interface CalendarSource {
   id: string;
   familyID: string;
+  ownerMemberID: string;
+  visibility: CalendarSourceVisibility;
   name: string;
   protectedURL: string;
   participantIDs: string[];
@@ -17,6 +23,8 @@ export interface CalendarSource {
 
 export interface PublicCalendarSource {
   id: string;
+  ownerMemberID: string;
+  visibility: CalendarSourceVisibility;
   name: string;
   participantIDs: string[];
   status: CalendarSource["status"];
@@ -28,6 +36,8 @@ export interface ImportedCalendarEvent {
   familyID: string;
   sourceID: string;
   sourceName: string;
+  sourceOwnerMemberID: string;
+  sourceVisibility: CalendarSourceVisibility;
   externalUID: string;
   title: string;
   startTime: string;
@@ -77,8 +87,10 @@ interface CalendarSourceModuleDependencies {
 export class CalendarSourceModule {
   constructor(private readonly dependencies: CalendarSourceModuleDependencies) {}
 
-  async create(input: {
+  async connect(input: {
     familyID: string;
+    ownerMemberID: string;
+    visibility: CalendarSourceVisibility;
     name: string;
     url: string;
     participantIDs: string[];
@@ -86,6 +98,8 @@ export class CalendarSourceModule {
     const source: CalendarSource = {
       id: randomUUID(),
       familyID: input.familyID,
+      ownerMemberID: input.ownerMemberID,
+      visibility: input.visibility,
       name: input.name,
       protectedURL: this.dependencies.protectURL(input.url),
       participantIDs: [...new Set(input.participantIDs)].sort(),
@@ -96,21 +110,51 @@ export class CalendarSourceModule {
       lastModified: null,
     };
     await this.dependencies.repository.saveCalendarSource(source);
-    return publicCalendarSource(source);
+    try {
+      return (await this.sync(source.familyID, source.id, source.ownerMemberID))!;
+    } catch {
+      const failed = await this.dependencies.repository.calendarSource(source.familyID, source.id);
+      return publicCalendarSource(failed ?? { ...source, status: "error", lastError: "sync_failed" });
+    }
   }
 
-  async list(familyID: string): Promise<PublicCalendarSource[]> {
+  async list(familyID: string, viewerMemberID: string): Promise<PublicCalendarSource[]> {
     return (await this.dependencies.repository.calendarSourcesForFamily(familyID))
+      .filter((source) => canAccessSource(source, viewerMemberID))
       .map(publicCalendarSource);
   }
 
-  async delete(familyID: string, sourceID: string): Promise<boolean> {
-    return this.dependencies.repository.deleteCalendarSource(familyID, sourceID);
+  async updateVisibility(
+    familyID: string,
+    sourceID: string,
+    requesterMemberID: string,
+    visibility: CalendarSourceVisibility,
+  ): Promise<PublicCalendarSource | null> {
+    const source = await this.dependencies.repository.calendarSource(familyID, sourceID);
+    if (!source || source.ownerMemberID !== requesterMemberID) return null;
+    const updated = { ...source, visibility };
+    await this.dependencies.repository.saveCalendarSource(updated);
+    return publicCalendarSource(updated);
   }
 
-  async sync(familyID: string, sourceID: string): Promise<PublicCalendarSource | null> {
+  async delete(
+    familyID: string,
+    sourceID: string,
+    requesterMemberID: string,
+  ): Promise<PublicCalendarSource | null> {
     const source = await this.dependencies.repository.calendarSource(familyID, sourceID);
-    if (!source) return null;
+    if (!source || !canAccessSource(source, requesterMemberID)) return null;
+    const deleted = await this.dependencies.repository.deleteCalendarSource(familyID, sourceID);
+    return deleted ? publicCalendarSource(source) : null;
+  }
+
+  async sync(
+    familyID: string,
+    sourceID: string,
+    requesterMemberID: string,
+  ): Promise<PublicCalendarSource | null> {
+    const source = await this.dependencies.repository.calendarSource(familyID, sourceID);
+    if (!source || !canAccessSource(source, requesterMemberID)) return null;
     try {
       const response = await this.dependencies.fetchFeed(
         this.dependencies.revealURL(source.protectedURL),
@@ -136,6 +180,8 @@ export class CalendarSourceModule {
         familyID,
         sourceID: source.id,
         sourceName: source.name,
+        sourceOwnerMemberID: source.ownerMemberID,
+        sourceVisibility: source.visibility,
         participantIDs: source.participantIDs,
         fingerprint: eventFingerprint(event),
       }));
@@ -151,11 +197,17 @@ export class CalendarSourceModule {
     }
   }
 
-  async events(familyID: string): Promise<FamilyEvent[]> {
-    return deduplicateEvents(
-      familyID,
-      await this.dependencies.repository.calendarEventsForFamily(familyID),
-    );
+  async events(familyID: string, viewerMemberID: string): Promise<FamilyEvent[]> {
+    const visibleEvents = (await this.dependencies.repository.calendarEventsForFamily(familyID))
+      .filter((event) => event.sourceVisibility === "family"
+        || event.sourceOwnerMemberID === viewerMemberID);
+    return deduplicateEvents(familyID, visibleEvents);
+  }
+
+  async sharedEvents(familyID: string): Promise<FamilyEvent[]> {
+    const sharedEvents = (await this.dependencies.repository.calendarEventsForFamily(familyID))
+      .filter((event) => event.sourceVisibility === "family");
+    return deduplicateEvents(familyID, sharedEvents);
   }
 }
 
@@ -191,7 +243,7 @@ function parseCalendar(body: string): Array<Pick<
     let recurrence;
     while ((recurrence = iterator.next())) {
       iterationCount += 1;
-      if (iterationCount > 50_000 || result.length > 5_000) {
+      if (iterationCount > 50_000) {
         throw new Error("Calendar recurrence exceeds the expansion limit");
       }
       const details = event.getOccurrenceDetails(recurrence);
@@ -223,6 +275,9 @@ function appendOccurrence(
 ): void {
   if (!event.summary?.trim() || end <= start) {
     throw new Error("Calendar contains an invalid event");
+  }
+  if (result.length >= MAX_IMPORTED_EVENTS) {
+    throw new Error("Calendar exceeds the event import limit");
   }
   result.push({
     externalUID,
@@ -307,9 +362,15 @@ function deterministicUUID(value: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+function canAccessSource(source: CalendarSource, memberID: string): boolean {
+  return source.visibility === "family" || source.ownerMemberID === memberID;
+}
+
 function publicCalendarSource(source: CalendarSource): PublicCalendarSource {
   return {
     id: source.id,
+    ownerMemberID: source.ownerMemberID,
+    visibility: source.visibility,
     name: source.name,
     participantIDs: source.participantIDs,
     status: source.status,

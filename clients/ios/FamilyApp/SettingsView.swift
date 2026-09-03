@@ -5,18 +5,21 @@ struct SettingsView: View {
     let dataIsSynced: Bool
     let onSignOut: SignOutAction
     let onDeleteAccount: DeleteAccountAction
+    private let currentMemberID: String?
     private let calendarSourceStore: (any CalendarSourceStore)?
     private let memberStore: (any FamilyMemberStore)?
     private let preferences = ConflictAlertPreferences()
 
     init(
         dataIsSynced: Bool = false,
+        currentMemberID: String? = nil,
         calendarSourceStore: (any CalendarSourceStore)? = nil,
         memberStore: (any FamilyMemberStore)? = nil,
         onSignOut: SignOutAction = SignOutAction({}),
         onDeleteAccount: DeleteAccountAction = DeleteAccountAction({})
     ) {
         self.dataIsSynced = dataIsSynced
+        self.currentMemberID = currentMemberID
         self.calendarSourceStore = calendarSourceStore
         self.memberStore = memberStore
         self.onSignOut = onSignOut
@@ -46,7 +49,8 @@ struct SettingsView: View {
                         NavigationLink("Connected calendars") {
                             CalendarSourcesView(
                                 store: calendarSourceStore,
-                                memberStore: memberStore
+                                memberStore: memberStore,
+                                currentMemberID: currentMemberID
                             )
                         }
                         Text("Add TeamSnap, school, sports, or other iCalendar subscription links.")
@@ -132,6 +136,7 @@ struct SettingsView: View {
 private struct CalendarSourcesView: View {
     let store: any CalendarSourceStore
     let memberStore: any FamilyMemberStore
+    let currentMemberID: String?
     @State private var sources: [CalendarSourceConnection] = []
     @State private var members: [FamilyMember] = []
     @State private var isAdding = false
@@ -149,6 +154,12 @@ private struct CalendarSourcesView: View {
                     Text(participantNames(for: source))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    Label(
+                        source.visibility == .personal ? "Personal" : "Shared with family",
+                        systemImage: source.visibility == .personal ? "person" : "person.2"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     Label(statusText(source), systemImage: statusIcon(source.status))
                         .font(.caption)
                         .foregroundStyle(source.status == .error ? .red : .secondary)
@@ -156,6 +167,12 @@ private struct CalendarSourcesView: View {
                 .swipeActions(edge: .leading) {
                     Button("Sync") { Task { await synchronize(source) } }
                         .tint(AppTheme.purple)
+                    if source.ownerMemberID == currentMemberID {
+                        Button(source.visibility == .personal ? "Share" : "Make Personal") {
+                            Task { await toggleVisibility(source) }
+                        }
+                        .tint(AppTheme.mint)
+                    }
                 }
                 .swipeActions {
                     Button("Delete", role: .destructive) {
@@ -171,13 +188,13 @@ private struct CalendarSourcesView: View {
         }
         .task { await load() }
         .sheet(isPresented: $isAdding) {
-            AddCalendarSourceView(members: members) { name, url, participantIDs in
-                let source = try await store.create(
+            AddCalendarSourceView(members: members) { name, url, participantIDs, visibility in
+                _ = try await store.connect(
                     name: name,
                     url: url,
-                    participantIDs: participantIDs
+                    participantIDs: participantIDs,
+                    visibility: visibility
                 )
-                _ = try? await store.synchronize(source)
                 await load()
                 NotificationCenter.default.post(name: .familyDataDidChange, object: nil)
             }
@@ -205,6 +222,19 @@ private struct CalendarSourcesView: View {
         } catch {
             await load()
             errorMessage = "The calendar could not be synchronized."
+        }
+    }
+
+    private func toggleVisibility(_ source: CalendarSourceConnection) async {
+        do {
+            _ = try await store.updateVisibility(
+                source,
+                visibility: source.visibility == .personal ? .family : .personal
+            )
+            await load()
+            NotificationCenter.default.post(name: .familyDataDidChange, object: nil)
+        } catch {
+            errorMessage = "Calendar visibility could not be changed."
         }
     }
 
@@ -243,11 +273,12 @@ private struct CalendarSourcesView: View {
 
 private struct AddCalendarSourceView: View {
     let members: [FamilyMember]
-    let onAdd: (String, URL, [KidID]) async throws -> Void
+    let onAdd: (String, URL, [KidID], CalendarSourceVisibility) async throws -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var urlText = ""
     @State private var participantIDs = Set<KidID>()
+    @State private var visibility = CalendarSourceVisibility.family
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -260,6 +291,18 @@ private struct AddCalendarSourceView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
+                }
+                Section("Visibility") {
+                    Picker("Who can see imported events?", selection: $visibility) {
+                        Text("Personal").tag(CalendarSourceVisibility.personal)
+                        Text("Shared with family").tag(CalendarSourceVisibility.family)
+                    }
+                    .pickerStyle(.segmented)
+                    Text(visibility == .personal
+                         ? "Only you can see events imported from this calendar."
+                         : "Everyone in your family can see imported events.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Section("Family members") {
                     ForEach(members) { member in
@@ -276,13 +319,13 @@ private struct AddCalendarSourceView: View {
                     Text(errorMessage).foregroundStyle(.red)
                 }
             }
-            .navigationTitle("Add Calendar")
+            .navigationTitle("Import Calendar")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { add() }
+                    Button(isSaving ? "Importing…" : "Import") { add() }
                         .disabled(validatedURL == nil || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || participantIDs.isEmpty || isSaving)
                 }
             }
@@ -309,7 +352,8 @@ private struct AddCalendarSourceView: View {
                 try await onAdd(
                     name.trimmingCharacters(in: .whitespacesAndNewlines),
                     validatedURL,
-                    Array(participantIDs)
+                    Array(participantIDs),
+                    visibility
                 )
                 dismiss()
             } catch {
