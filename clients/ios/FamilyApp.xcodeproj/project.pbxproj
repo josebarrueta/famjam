@@ -310,7 +310,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyApp/FamilyApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 5LS29Z8553;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = FamilyApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -318,6 +318,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.rallyroo.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				RALLYROO_DATA_MODE = local;
+				RALLYROO_REMOTE_BASE_URL = "https://api.rallyroo.dev";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -335,7 +337,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyApp/FamilyApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 5LS29Z8553;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = FamilyApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -343,6 +345,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.rallyroo.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				RALLYROO_DATA_MODE = remote;
+				RALLYROO_REMOTE_BASE_URL = "https://api.rallyroo.dev";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;

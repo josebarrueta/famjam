@@ -19,6 +19,32 @@ final class AppConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.remoteBaseURL?.absoluteString, "https://api.example.com")
     }
 
+    func testLoadsBundledRemoteConfigurationWhenProcessEnvironmentIsEmpty() throws {
+        let configuration = try AppConfiguration.load(
+            environment: [:],
+            bundledValues: [
+                "RALLYROO_DATA_MODE": "remote",
+                "RALLYROO_REMOTE_BASE_URL": "https://api.rallyroo.dev"
+            ]
+        )
+
+        XCTAssertEqual(configuration.dataMode, .remote)
+        XCTAssertEqual(configuration.remoteBaseURL?.absoluteString, "https://api.rallyroo.dev")
+    }
+
+    func testProcessEnvironmentOverridesBundledConfiguration() throws {
+        let configuration = try AppConfiguration.load(
+            environment: ["RALLYROO_DATA_MODE": "local"],
+            bundledValues: [
+                "RALLYROO_DATA_MODE": "remote",
+                "RALLYROO_REMOTE_BASE_URL": "https://api.rallyroo.dev"
+            ]
+        )
+
+        XCTAssertEqual(configuration.dataMode, .local)
+        XCTAssertNil(configuration.remoteBaseURL)
+    }
+
     func testRejectsRemoteModeWithoutABaseURL() {
         XCTAssertThrowsError(try AppConfiguration.load(environment: [
             "RALLYROO_DATA_MODE": "remote"

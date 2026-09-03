@@ -16,9 +16,12 @@ public struct AppConfiguration: Equatable, Sendable {
     public let remoteBaseURL: URL?
 
     public static func load(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        bundledValues: [String: String] = Bundle.main.infoDictionary?.compactMapValues { $0 as? String } ?? [:]
     ) throws -> AppConfiguration {
-        let rawMode = environment["RALLYROO_DATA_MODE"] ?? DataMode.local.rawValue
+        let rawMode = environment["RALLYROO_DATA_MODE"]
+            ?? bundledValues["RALLYROO_DATA_MODE"]
+            ?? DataMode.local.rawValue
         guard let dataMode = DataMode(rawValue: rawMode.lowercased()) else {
             throw AppConfigurationError.unsupportedDataMode(rawMode)
         }
@@ -26,7 +29,8 @@ public struct AppConfiguration: Equatable, Sendable {
         guard dataMode == .remote else {
             return AppConfiguration(dataMode: .local, remoteBaseURL: nil)
         }
-        guard let rawURL = environment["RALLYROO_REMOTE_BASE_URL"] else {
+        guard let rawURL = environment["RALLYROO_REMOTE_BASE_URL"]
+            ?? bundledValues["RALLYROO_REMOTE_BASE_URL"] else {
             throw AppConfigurationError.missingRemoteBaseURL
         }
         guard let url = URL(string: rawURL), url.scheme != nil, url.host != nil else {
