@@ -172,6 +172,86 @@ final class EventStoreTests: XCTestCase {
         ])
     }
 
+    func testRenamingARecurringEventDoesNotConflictWithTheSameSeries() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
+        let eventID = UUID(uuidString: "ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEA")!
+        let start = Date(timeIntervalSince1970: 1_735_848_800)
+        let recurrence = EventRecurrence(
+            frequency: .weekly,
+            endDate: start.addingTimeInterval(12 * 7 * 24 * 60 * 60)
+        )
+        let original = FamilyEvent(
+            id: eventID,
+            title: "Weekly practice",
+            kidID: KidID(rawValue: "jake"),
+            startTime: start,
+            endTime: start.addingTimeInterval(3_600),
+            source: .manual,
+            status: .confirmed,
+            recurrence: recurrence
+        )
+        let renamed = FamilyEvent(
+            id: eventID,
+            title: "Renamed weekly practice",
+            kidID: KidID(rawValue: "jake"),
+            startTime: start,
+            endTime: start.addingTimeInterval(3_600),
+            source: .manual,
+            status: .confirmed,
+            recurrence: recurrence
+        )
+        try await repository.save(original)
+
+        let conflicts = try await repository.save(renamed)
+
+        let savedEvents = try await repository.events()
+        XCTAssertEqual(conflicts, [])
+        XCTAssertEqual(savedEvents, [renamed])
+    }
+
+    func testEditingAnEventStillReportsAConflictWithASeparateEvent() async throws {
+        let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
+        let kidID = KidID(rawValue: "jake")
+        let existing = FamilyEvent(
+            title: "Soccer practice",
+            kidID: kidID,
+            startTime: Date(timeIntervalSince1970: 1_735_841_600),
+            endTime: Date(timeIntervalSince1970: 1_735_845_200),
+            source: .manual,
+            status: .confirmed
+        )
+        let eventID = UUID(uuidString: "ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEB")!
+        let original = FamilyEvent(
+            id: eventID,
+            title: "Doctor appointment",
+            kidID: kidID,
+            startTime: Date(timeIntervalSince1970: 1_735_848_800),
+            endTime: Date(timeIntervalSince1970: 1_735_852_400),
+            source: .manual,
+            status: .confirmed
+        )
+        let edited = FamilyEvent(
+            id: eventID,
+            title: "Earlier doctor appointment",
+            kidID: kidID,
+            startTime: Date(timeIntervalSince1970: 1_735_843_400),
+            endTime: Date(timeIntervalSince1970: 1_735_847_000),
+            source: .manual,
+            status: .confirmed
+        )
+        try await repository.save(existing)
+        try await repository.save(original)
+
+        let conflicts = try await repository.save(edited)
+
+        XCTAssertEqual(conflicts, [
+            EventConflict(
+                kind: .overlappingKidActivity(kidID),
+                eventIDs: [existing.id, edited.id]
+            ),
+        ])
+    }
+
     func testUpdatesAnEventWithTheSameID() async throws {
         let repository: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
         let eventID = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!

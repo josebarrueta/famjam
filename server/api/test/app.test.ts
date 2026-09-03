@@ -1228,12 +1228,14 @@ describe("Rallyroo API", () => {
     });
     const imported = schedule.json().find((event: { source: string }) => event.source === "calendar");
 
+    const uppercaseImportedID = imported.id.toUpperCase();
     const edited = await app.inject({
       method: "PUT",
-      url: `/v1/events/${imported.id}`,
+      url: `/v1/events/${uppercaseImportedID}`,
       headers: { authorization: "Bearer parent-token" },
       payload: {
         ...imported,
+        id: uppercaseImportedID,
         title: "Changed locally",
         source: "manual",
         readOnly: undefined,
@@ -1242,7 +1244,7 @@ describe("Rallyroo API", () => {
     });
     const deleted = await app.inject({
       method: "DELETE",
-      url: `/v1/events/${imported.id}`,
+      url: `/v1/events/${uppercaseImportedID}`,
       headers: { authorization: "Bearer parent-token" },
     });
 
@@ -1468,6 +1470,143 @@ describe("Rallyroo API", () => {
     });
     expect(response.statusCode).toBe(400);
     expect(response.json().error).toBe("unknown_participant");
+    await app.close();
+  });
+
+  it("does not conflict with the same event when Swift sends an uppercase UUID", async () => {
+    const data = repository();
+    const eventID = "abcdefab-cdef-4abc-8def-abcdefabcdef";
+    await data.saveEvent({
+      id: eventID,
+      familyID: "family-1",
+      title: "Soccer practice",
+      kidID: "kid-1",
+      participantIDs: ["kid-1"],
+      startTime: "2026-08-23T18:00:00Z",
+      endTime: "2026-08-23T19:00:00Z",
+      location: null,
+      driver: null,
+      source: "manual",
+      status: "confirmed",
+    });
+    const app = buildApp({ identityProvider, repository: data });
+    const response = await app.inject({
+      method: "PUT",
+      url: `/v1/events/${eventID.toUpperCase()}`,
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: eventID.toUpperCase(),
+        title: "Renamed soccer practice",
+        kidID: "kid-1",
+        participantIDs: ["kid-1"],
+        startTime: "2026-08-23T18:00:00Z",
+        endTime: "2026-08-23T19:00:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().conflicts).toEqual([]);
+    const matchingEvents = (await data.eventsForFamily("family-1"))
+      .filter((event) => event.id.toLowerCase() === eventID);
+    expect(matchingEvents).toHaveLength(1);
+    expect(matchingEvents[0]?.title).toBe("Renamed soccer practice");
+    await app.close();
+  });
+
+  it("still reports a separate event when an edit introduces a conflict", async () => {
+    const data = repository();
+    const eventID = "abcdefab-cdef-4abc-8def-abcdefabcdeb";
+    await data.saveEvent({
+      id: eventID,
+      familyID: "family-1",
+      title: "Doctor appointment",
+      kidID: "kid-1",
+      participantIDs: ["kid-1"],
+      startTime: "2026-08-23T18:00:00Z",
+      endTime: "2026-08-23T19:00:00Z",
+      location: null,
+      driver: null,
+      source: "manual",
+      status: "confirmed",
+    });
+    const app = buildApp({ identityProvider, repository: data });
+    const response = await app.inject({
+      method: "PUT",
+      url: `/v1/events/${eventID.toUpperCase()}`,
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: eventID.toUpperCase(),
+        title: "Earlier doctor appointment",
+        kidID: "kid-1",
+        participantIDs: ["kid-1"],
+        startTime: "2026-08-23T16:30:00Z",
+        endTime: "2026-08-23T17:30:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().conflicts).toEqual([
+      expect.objectContaining({
+        kind: "overlapping_participant",
+        memberID: "kid-1",
+        eventIDs: ["00000000-0000-4000-8000-000000000001", eventID],
+      }),
+    ]);
+    await app.close();
+  });
+
+  it("does not conflict with the same recurring series when it is renamed", async () => {
+    const data = repository();
+    const eventID = "abcdefab-cdef-4abc-8def-abcdefabcdea";
+    const recurrence = {
+      frequency: "weekly" as const,
+      interval: 1,
+      endDate: "2026-12-31T23:59:59Z",
+    };
+    await data.saveEvent({
+      id: eventID,
+      familyID: "family-1",
+      title: "Weekly practice",
+      kidID: "kid-1",
+      participantIDs: ["kid-1"],
+      startTime: "2026-08-23T18:00:00Z",
+      endTime: "2026-08-23T19:00:00Z",
+      location: null,
+      driver: null,
+      source: "manual",
+      status: "confirmed",
+      recurrence,
+    });
+    const app = buildApp({ identityProvider, repository: data });
+    const response = await app.inject({
+      method: "PUT",
+      url: `/v1/events/${eventID.toUpperCase()}`,
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: eventID.toUpperCase(),
+        title: "Renamed weekly practice",
+        kidID: "kid-1",
+        participantIDs: ["kid-1"],
+        startTime: "2026-08-23T18:00:00Z",
+        endTime: "2026-08-23T19:00:00Z",
+        location: null,
+        driver: null,
+        source: "manual",
+        status: "confirmed",
+        recurrence,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().conflicts).toEqual([]);
     await app.close();
   });
 

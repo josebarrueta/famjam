@@ -527,9 +527,10 @@ export function buildApp({
     if (!account) return;
     const parsed = eventSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_event", details: parsed.error.issues });
-    const routeID = (request.params as { id: string }).id;
-    if (routeID !== parsed.data.id) return reply.code(400).send({ error: "event_id_mismatch" });
-    if (calendarSources && (await calendarSources.events(account.familyID, account.memberID)).some((event) => event.id === routeID)) {
+    const routeID = (request.params as { id: string }).id.toLowerCase();
+    const eventID = parsed.data.id.toLowerCase();
+    if (routeID !== eventID) return reply.code(400).send({ error: "event_id_mismatch" });
+    if (calendarSources && (await calendarSources.events(account.familyID, account.memberID)).some((event) => event.id.toLowerCase() === eventID)) {
       return reply.code(409).send({ error: "imported_event_read_only" });
     }
     const familyMembers = await repository.membersForFamily(account.familyID);
@@ -544,6 +545,7 @@ export function buildApp({
     const { recurrence, ...eventData } = parsed.data;
     const event: FamilyEvent = {
       ...eventData,
+      id: eventID,
       familyID: account.familyID,
       ...(recurrence !== undefined ? { recurrence } : {}),
     };
@@ -582,8 +584,8 @@ export function buildApp({
   app.delete("/v1/events/:id", async (request, reply) => {
     const account = await requireParent(request, reply);
     if (!account) return;
-    const eventID = (request.params as { id: string }).id;
-    if (calendarSources && (await calendarSources.events(account.familyID, account.memberID)).some((event) => event.id === eventID)) {
+    const eventID = (request.params as { id: string }).id.toLowerCase();
+    if (calendarSources && (await calendarSources.events(account.familyID, account.memberID)).some((event) => event.id.toLowerCase() === eventID)) {
       return reply.code(409).send({ error: "imported_event_read_only" });
     }
     await repository.deleteEvent(account.familyID, eventID);
