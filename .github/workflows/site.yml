@@ -59,7 +59,7 @@ jobs:
       - name: Install pinned Wrangler
         working-directory: site
         run: npm ci
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_SITE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
