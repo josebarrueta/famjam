@@ -1,0 +1,59 @@
+name: Rallyroo Site
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "site/**"
+      - ".github/workflows/site.yml"
+      - "deploy/helm/rallyroo/**"
+      - "deploy/README.md"
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/site.yml"
+      - "deploy/helm/rallyroo/**"
+      - "deploy/README.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rallyroo-site-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - uses: azure/setup-helm@v5
+      - run: npm ci
+      - run: npm test
+      - run: npm run deploy:dry-run
+      - name: Verify website is absent from the API chart
+        working-directory: .
+        run: ./deploy/helm/rallyroo/test-chart-contract.sh
+
+  deploy:
+    if: vars.CLOUDFLARE_SITE_DEPLOY_ENABLED == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production-site
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_SITE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: deploy

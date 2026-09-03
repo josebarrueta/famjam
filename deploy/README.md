@@ -155,11 +155,15 @@ forwarding `api.rallyroo.dev` to NGINX at `127.0.0.1:8080`. No router ports are
 opened. Never expose PostgreSQL, Redis, Kubernetes, or the Docker socket—only
 NGINX through the tunnel.
 
-The same NGINX edge serves a tracker-free product and legal site from
-`deploy/helm/rallyroo/files/site/`. Configure `rallyroo.dev` and
-`www.rallyroo.dev` as additional public hostnames on the same tunnel, both
-forwarding to `http://127.0.0.1:8080`. NGINX selects the site by hostname while
-preserving the branded `404` contract at the API root and unknown API paths.
+Cloudflare Workers Static Assets independently hosts the tracker-free product
+and legal site from [`site/public/`](../site/public/). The `Rallyroo Site`
+workflow validates pull requests and deploys changes from `main` to
+`rallyroo.dev` and `www.rallyroo.dev`. Those hostnames must not be attached to
+the home tunnel; only `api.rallyroo.dev` reaches NGINX. The API root and unknown
+API paths retain their branded HTML `404` response.
 
-Before using the public URLs in Google Auth Platform or App Store Connect,
-configure and verify Cloudflare Email Routing for `support@rallyroo.dev`.
+Website deployment uses a narrowly scoped `CLOUDFLARE_SITE_API_TOKEN` GitHub
+Actions secret and the readable `CLOUDFLARE_ACCOUNT_ID` repository variable.
+The Worker keeps `workers.dev` and preview URLs disabled. Before using the
+public URLs in Google Auth Platform or App Store Connect, configure and verify
+Cloudflare Email Routing for `support@rallyroo.dev`.
