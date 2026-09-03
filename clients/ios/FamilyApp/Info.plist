@@ -22,6 +22,8 @@
     <string>$(RALLYROO_DATA_MODE)</string>
     <key>RALLYROO_REMOTE_BASE_URL</key>
     <string>$(RALLYROO_REMOTE_BASE_URL)</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>
