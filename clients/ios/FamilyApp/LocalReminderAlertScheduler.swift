@@ -3,7 +3,9 @@ import Foundation
 import UserNotifications
 
 actor LocalReminderAlertScheduler: ReminderAlertScheduler {
-    private let notificationCenter = UNUserNotificationCenter.current()
+    // UNUserNotificationCenter is a thread-safe singleton; nonisolated(unsafe) lets Swift 6
+    // know it is safe to reference across the actor boundary without copying.
+    nonisolated(unsafe) private let notificationCenter = UNUserNotificationCenter.current()
 
     func schedule(_ reminder: FamilyReminder) async throws {
         await cancel(reminder)
