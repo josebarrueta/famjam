@@ -65,4 +65,4 @@ kubectl --context "$CONTEXT" -n rallyroo wait helmrelease/rallyroo \
 
 kubectl --context "$CONTEXT" -n rallyroo get ocirepository,helmrelease
 "$ROOT/deploy/local/test-http-contract.sh"
-echo "Flux now tracks Rallyroo patch releases in the 0.4 series."
+echo "Flux now tracks Rallyroo patch releases in the 0.5 series."
