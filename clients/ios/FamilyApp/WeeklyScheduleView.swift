@@ -66,6 +66,7 @@ struct WeeklyScheduleView: View {
                     onDelete: { try await viewModel.deleteEvent($0) }
                 )
             }
+             .tint(AppTheme.purple)
         }
     }
 

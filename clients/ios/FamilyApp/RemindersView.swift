@@ -61,6 +61,7 @@ struct RemindersView: View {
                     await load()
                 }
             }
+              .tint(AppTheme.purple)
         }
     }
 
@@ -253,6 +254,7 @@ private struct ReminderEditorSheet: View {
                             || assigneeIDs.isEmpty || isSaving)
                 }
             }
+                   .tint(AppTheme.purple)
         }
     }
 

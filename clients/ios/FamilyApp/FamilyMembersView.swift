@@ -169,6 +169,7 @@ struct FamilyMembersView: View {
                     onSave: viewModel.saveEvent
                 )
             }
+             .tint(AppTheme.purple)
         }
     }
 }
@@ -352,6 +353,7 @@ private struct FamilyMemberEditor: View {
             }
             .confirmationDialog("Delete this family member?", isPresented: $confirmDelete) { Button("Delete", role: .destructive) { delete() } }
             .alert("Family member", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }
+            .tint(AppTheme.purple)
         }
     }
 

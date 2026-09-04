@@ -119,7 +119,8 @@ struct FamilyActivityCoordinatorApp: App {
                     )
                     .tabItem { Label("Settings", systemImage: "gearshape") }
                 }
-                .tint(AppTheme.coral)
+            // No global .tint: destructive buttons stay native-red, each
+            // NavigationStack applies its own screen-specific accent colour.
                 .task { await monitorFamilyChanges() }
                 .task { await synchronizeCalendars(for: session.role) }
                 .task { await requestPushNotifications() }
