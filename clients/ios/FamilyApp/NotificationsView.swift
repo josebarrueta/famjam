@@ -37,6 +37,7 @@ struct NotificationsView: View {
                     notifications = Array((try? await notificationStore.notifications())?.reversed() ?? [])
                 }
             }
+                  .tint(AppTheme.purple)
         }
     }
 }
