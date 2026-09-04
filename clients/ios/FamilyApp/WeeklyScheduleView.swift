@@ -20,180 +20,173 @@ struct WeeklyScheduleView: View {
         notificationStore: any ConflictNotificationStore,
         allowsEditing: Bool = true,
         locationSearch: any LocationSearch = EmptyLocationSearch()
-    ) {
+     ) {
         self.allowsEditing = allowsEditing
         self.locationSearch = locationSearch
         _viewModel = StateObject(
             wrappedValue: WeeklyScheduleViewModel(eventStore: eventStore, memberStore: memberStore, notificationStore: notificationStore)
          )
-    }
+     }
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                List {
-                    RallyrooHeader(
-                        title: "Let's jam!",
-                        subtitle: "One colorful week for the whole crew."
-                     )
-                     .listRowBackground(Color.clear)
-                    if let errorMessage = viewModel.errorMessage {
-                        Label(errorMessage, systemImage: "exclamationmark.triangle")
-                             .foregroundStyle(.secondary)
-                     } else {
-                        ForEach(daysInWeek, id: \.self) { day in
-                            Section(day.formatted(.dateTime.weekday(.wide).month().day())) {
-                                let dayEvents = events(on: day)
-                                if dayEvents.isEmpty {
-                                    Text("No activities")
-                                         .foregroundStyle(.secondary)
-                                 } else {
-                                    ForEach(dayEvents) { occurrence in
-                                        EventRow(
-                                            display: ScheduleEventDisplay(
-                                                event: occurrence.event,
-                                                members: viewModel.members
-                                            )
-                                         )
-                                         .contentShape(Rectangle())
-                                         .onTapGesture {
-                                            if allowsEditing && !occurrence.sourceEvent.isReadOnly {
-                                                editingEvent = occurrence.sourceEvent
-                                            }
-                                         }
-                                     }
-                                 }
-                             }
-                             .id(day)
+            VStack(spacing: 0) {
+                RallyrooHeader(
+                    title: "Let's jam!",
+                    subtitle: "One colorful week for the whole crew."
+                )
+                .padding(.bottom, 4)
+
+                ScrollViewReader { proxy in
+                    daySections(proxy: proxy)
+                         .scrollContentBackground(.hidden)
+                         .background(AppTheme.background)
+                         .onAppear {
+                            Task { await viewModel.loadEvents() }
                          }
-                     }
-                 }
-                 .scrollContentBackground(.hidden)
-                 .background(AppTheme.background)
-                 .navigationTitle("Rallyroo")
-                 .toolbar {
-                    ToolbarItemGroup(placement: .topBarLeading) {
-                        Button("Today") {
-                            weekStart = startOfCurrentWeek
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                proxy.scrollTo(startOfCurrentWeek, anchor: .top)
+                         .onChange(of: viewModel.events) { _ in
+                            if !hasScrolledToToday { scrollToToday(proxy: proxy) }
+                         }
+                         .onReceive(NotificationCenter.default.publisher(for: .familyDataDidChange)) { _ in
+                            Task { await viewModel.loadEvents() }
+                         }
+                }
+            }
+            .navigationTitle("Rallyroo")
+            .toolbar { toolbarContent }
+            .sheet(isPresented: $isAddingEvent) {
+                AddEventSheet(members: viewModel.members, locationSearch: locationSearch) {
+                    try await viewModel.addEvent($0)
+                }
+            }
+            .sheet(item: $editingEvent) { event in
+                AddEventSheet(
+                    event: event, members: viewModel.members, locationSearch: locationSearch,
+                    onSave: { try await viewModel.addEvent($0) },
+                    onDelete: { try await viewModel.deleteEvent($0) }
+                )
+            }
+        }
+    }
+
+    // MARK: - Day sections
+
+    @ViewBuilder
+    private func daySections(proxy: ScrollViewProxy) -> some View {
+        if let errorMessage = viewModel.errorMessage {
+            List {
+                Label(errorMessage, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            List {
+                ForEach(daysInWeek, id: \.self) { day in
+                    Section(day.formatted(.dateTime.weekday(.wide).month().day())) {
+                        let dayEvents = events(on: day)
+                        if dayEvents.isEmpty {
+                            Text("No activities").foregroundStyle(.secondary)
+                        } else {
+                            ForEach(dayEvents) { occurrence in
+                                EventRow(
+                                    display: ScheduleEventDisplay(
+                                        event: occurrence.event,
+                                        members: viewModel.members
+                                    )
+                                )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if allowsEditing && !occurrence.sourceEvent.isReadOnly {
+                                        editingEvent = occurrence.sourceEvent
+                                    }
+                                }
                             }
                         }
                     }
-                    ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button {
-                            moveWeek(by: -1)
-                         } label: {
-                            Image(systemName: "chevron.left")
-                         }
-                        Button {
-                            moveWeek(by: 1)
-                         } label: {
-                            Image(systemName: "chevron.right")
-                         }
-                        Menu {
-                            Button("All family members") { selectedParticipantID = nil }
-                            ForEach(viewModel.members) { member in
-                                Button(member.name) { selectedParticipantID = member.id }
-                             }
-                         } label: {
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                         }
-                        if allowsEditing {
-                            Button {
-                                isAddingEvent = true
-                             } label: {
-                                Image(systemName: "plus")
-                             }
-                         }
-                     }
-                 }
-                 .onAppear {
-                    Task { await viewModel.loadEvents() }
-                 }
-                 .onChange(of: viewModel.events) { _ in
-                    if !hasScrolledToToday {
-                        scrollToToday(proxy: proxy)
-                    }
-                 }
-                 .onReceive(NotificationCenter.default.publisher(for: .familyDataDidChange)) { _ in
-                    Task { await viewModel.loadEvents() }
-                 }
-                 .sheet(isPresented: $isAddingEvent) {
-                    AddEventSheet(
-                        members: viewModel.members,
-                        locationSearch: locationSearch
-                     ) { event in
-                        try await viewModel.addEvent(event)
-                     }
-                 }
-                 .sheet(item: $editingEvent) { event in
-                    AddEventSheet(
-                        event: event,
-                        members: viewModel.members,
-                        locationSearch: locationSearch,
-                        onSave: { event in
-                            try await viewModel.addEvent(event)
-                         },
-                        onDelete: { event in
-                            try await viewModel.deleteEvent(event)
-                         }
-                     )
-                 }
-             }
-         }
-     }
+                    .id(day)
+                }
+            }
+        }
+    }
 
-     // MARK: - Scroll to today on first appearance
+    // MARK: - Toolbar
 
-     private func scrollToToday(proxy: ScrollViewProxy) {
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarLeading) {
+            Button("Today") {
+                weekStart = startOfCurrentWeek
+                hasScrolledToToday = false
+            }
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button { moveWeek(by: -1) } label: { Image(systemName: "chevron.left") }
+            Button { moveWeek(by: 1) } label: { Image(systemName: "chevron.right") }
+            Menu {
+                Button("All family members") { selectedParticipantID = nil }
+                ForEach(viewModel.members) { member in
+                    Button(member.name) { selectedParticipantID = member.id }
+                }
+            } label: {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+            }
+            if allowsEditing {
+                Button { isAddingEvent = true } label: { Image(systemName: "plus") }
+            }
+        }
+    }
+
+    // MARK: - Scroll to today on first appearance
+
+    private func scrollToToday(proxy: ScrollViewProxy) {
         let today = Calendar.autoupdatingCurrent.startOfDay(for: .now)
         let target = daysInWeek.contains(today) ? today : weekStart
         withAnimation(.easeInOut(duration: 0.3)) {
             proxy.scrollTo(target, anchor: .top)
-         }
+        }
         hasScrolledToToday = true
-     }
+    }
 
-     // MARK: - Computed helpers
+    // MARK: - Computed helpers
 
-     private var startOfCurrentWeek: Date {
+    private var startOfCurrentWeek: Date {
         Calendar.autoupdatingCurrent.dateInterval(of: .weekOfYear, for: .now)!.start
-     }
+    }
 
-     private var daysInWeek: [Date] {
+    private var daysInWeek: [Date] {
         let calendar = Calendar.autoupdatingCurrent
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) }
-     }
+    }
 
-     private var weekOccurrences: [EventOccurrence] {
+    private var weekOccurrences: [EventOccurrence] {
         EventOccurrenceExpander.occurrences(
             of: viewModel.events,
             in: DateInterval(
                 start: weekStart,
                 end: Calendar.autoupdatingCurrent.date(byAdding: .day, value: 7, to: weekStart)!
-             )
-         )
-     }
+            )
+        )
+    }
 
-     private func events(on day: Date) -> [EventOccurrence] {
+    private func events(on day: Date) -> [EventOccurrence] {
         let calendar = Calendar.autoupdatingCurrent
         return weekOccurrences.filter {
             calendar.isDate($0.event.startTime, inSameDayAs: day)
-                 && (selectedParticipantID == nil || $0.event.participantIDs.contains(selectedParticipantID!))
-         }
-     }
+                && (selectedParticipantID == nil || $0.event.participantIDs.contains(selectedParticipantID!))
+        }
+    }
 
-     private func moveWeek(by offset: Int) {
+    private func moveWeek(by offset: Int) {
         weekStart = Calendar.autoupdatingCurrent.date(byAdding: .weekOfYear, value: offset, to: weekStart)!
-     }
+    }
 }
+
+// MARK: - Row & helpers
 
 private extension Sequence where Element: Hashable {
     func uniqued() -> [Element] {
         var seen = Set<Element>()
         return filter { seen.insert($0).inserted }
-     }
+    }
 }
 
 private struct EventRow: View {
@@ -202,34 +195,33 @@ private struct EventRow: View {
     var body: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 2)
-                 .fill(Color(familyColorTag: display.primaryColorTag))
-                 .frame(width: 5)
+                .fill(Color(familyColorTag: display.primaryColorTag))
+                .frame(width: 5)
             VStack(alignment: .leading, spacing: 4) {
-                Text(display.event.title)
-                     .font(.headline)
+                Text(display.event.title).font(.headline)
                 if !display.participantNames.isEmpty {
                     Text(display.participantNames.joined(separator: " • "))
-                         .font(.subheadline)
-                         .foregroundStyle(Color(familyColorTag: display.primaryColorTag))
-                 }
+                        .font(.subheadline)
+                        .foregroundStyle(Color(familyColorTag: display.primaryColorTag))
+                }
                 Text(display.event.startTime.formatted(date: .omitted, time: .shortened))
-                     .font(.subheadline)
-                     .foregroundStyle(.secondary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 if display.event.isReadOnly {
                     Label(
                         display.event.provenance.map(\.sourceName).uniqued().joined(separator: " • "),
                         systemImage: "calendar.badge.clock"
-                     )
-                     .font(.caption)
-                     .foregroundStyle(.secondary)
-                 }
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
                 if let location = display.event.location, !location.isEmpty {
                     Label(location, systemImage: "mappin.and.ellipse")
-                         .font(.subheadline)
-                         .foregroundStyle(.secondary)
-                 }
-             }
-         }
-         .accessibilityElement(children: .combine)
-     }
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
 }
