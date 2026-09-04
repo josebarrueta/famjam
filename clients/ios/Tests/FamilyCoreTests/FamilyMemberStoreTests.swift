@@ -49,6 +49,30 @@ final class FamilyMemberStoreTests: XCTestCase {
         }
     }
 
+    func testBlocksDeletionOfAMemberWithAnOpenReminder() async throws {
+        let memberStore: any FamilyMemberStore = LocalFamilyMemberStore(storageURL: temporaryStorageURL())
+        let eventStore: any EventStore = LocalEventStore(storageURL: temporaryStorageURL())
+        let reminderStore: any ReminderStore = LocalReminderStore(storageURL: temporaryStorageURL())
+        let parent = FamilyMember(id: KidID(rawValue: "parent-1"), name: "Alex", role: .parent, colorTag: "blue")
+        try await memberStore.save(parent)
+        try await reminderStore.save(FamilyReminder(
+            title: "Bring forms",
+            assigneeIDs: [parent.id],
+            dueAt: Date(timeIntervalSince1970: 1_735_841_600)
+        ))
+        let deletionService = FamilyMemberDeletionService(
+            memberStore: memberStore,
+            eventStore: eventStore,
+            reminderStore: reminderStore
+        )
+
+        do {
+            try await deletionService.delete(parent)
+            XCTFail("Expected deletion to be blocked")
+        } catch FamilyMemberDeletionError.hasOpenReminders {
+        }
+    }
+
     private func temporaryStorageURL() -> URL {
         FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).appendingPathExtension("json")
     }

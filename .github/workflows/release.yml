@@ -91,14 +91,23 @@ jobs:
       - name: Verify API
         working-directory: server/api
         run: |
-          npm ci
-          npm run test:unit
-          npm run test:migrations
-          npm run typecheck
-          npm run build
+          run_timed() {
+            label="$1"
+            shift
+            started=$SECONDS
+            "$@"
+            echo "::notice title=Release timing::$label completed in $((SECONDS - started))s"
+          }
+          run_timed "npm ci" npm ci --no-audit --no-fund
+          run_timed "unit tests" npm run test:unit
+          run_timed "migration tests" npm run test:migrations
+          run_timed "typecheck" npm run typecheck
+          run_timed "TypeScript build" npm run build
 
+  # Native image builds may run alongside verification. Only immutable
+  # build-candidate tags are pushed here; publish remains verification-gated.
   build-image:
-    needs: [prepare, verify]
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
@@ -112,6 +121,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
+      - name: Start image build timer
+        run: date +%s > /tmp/rallyroo-image-build-started
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -132,9 +143,14 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=release-${{ matrix.suffix }}
           cache-to: type=gha,mode=max,scope=release-${{ matrix.suffix }}
+      - name: Report image build timing
+        if: always()
+        run: |
+          started=$(cat /tmp/rallyroo-image-build-started)
+          echo "::notice title=Release timing::${{ matrix.platform }} image job completed in $(($(date +%s) - started))s"
 
   publish:
-    needs: [prepare, build-image]
+    needs: [prepare, verify, build-image]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -150,6 +166,7 @@ jobs:
           SHA_VERSION: ${{ needs.prepare.outputs.sha }}
           STABLE: ${{ needs.prepare.outputs.stable }}
         run: |
+          started=$SECONDS
           image="$REGISTRY/$IMAGE_NAME"
           tags=(--tag "$image:$VERSION" --tag "$image:sha-$SHA_VERSION")
           if [[ "$STABLE" == "true" ]]; then
@@ -159,18 +176,21 @@ jobs:
             "$image:build-$SHA_VERSION-amd64" \
             "$image:build-$SHA_VERSION-arm64"
           docker buildx imagetools inspect "$image:$VERSION"
+          echo "::notice title=Release timing::Image manifest published in $((SECONDS - started))s"
 
       - uses: azure/setup-helm@v5
       - name: Package Helm chart
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
+          started=$SECONDS
           mkdir -p dist
           helm package deploy/helm/rallyroo \
             --destination dist \
             --version "$VERSION" \
             --app-version "$VERSION"
           helm show chart "dist/rallyroo-$VERSION.tgz"
+          echo "::notice title=Release timing::Helm chart packaged in $((SECONDS - started))s"
 
       # The chart is the deployment promotion signal and is deliberately
       # published only after every image architecture is available.
@@ -179,8 +199,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
+          started=$SECONDS
           echo "$GH_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           helm push "dist/rallyroo-$VERSION.tgz" "$CHART_REGISTRY"
+          echo "::notice title=Release timing::Helm chart published last in $((SECONDS - started))s"
 
       - uses: actions/upload-artifact@v6
         with:

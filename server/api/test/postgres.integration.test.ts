@@ -146,6 +146,81 @@ describe.skipIf(!adminURL)("PostgreSQL HTTP integration", () => {
     await reader.close();
   });
 
+  it("persists reminder completion across PostgreSQL repository instances", async () => {
+    const writerRepository = repositoryForTest();
+    const writer = buildApp({ identityProvider, repository: writerRepository });
+    const session = await writer.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      payload: { oauthToken: "oauth-token", codeVerifier: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq" },
+    });
+    const reminderID = "abcdefab-cdef-4abc-8def-abcdefabc301";
+    expect((await writer.inject({
+      method: "PUT",
+      url: `/v1/reminders/${reminderID}`,
+      headers: { authorization: "Bearer integration-token" },
+      payload: {
+        id: reminderID,
+        title: "Persistent reminder",
+        assigneeIDs: [session.json().accountID],
+        dueAt: "2026-09-10T15:00:00Z",
+        alertLeadTimeMinutes: 15,
+      },
+    })).statusCode).toBe(200);
+    expect((await writer.inject({
+      method: "POST",
+      url: `/v1/reminders/${reminderID}/complete`,
+      headers: { authorization: "Bearer integration-token" },
+    })).statusCode).toBe(200);
+    await writer.close();
+
+    const readerRepository = repositoryForTest();
+    const reader = buildApp({ identityProvider, repository: readerRepository });
+    const reminders = await reader.inject({
+      method: "GET",
+      url: "/v1/reminders",
+      headers: { authorization: "Bearer integration-token" },
+    });
+    expect(reminders.json()).toEqual([
+      expect.objectContaining({
+        id: reminderID,
+        title: "Persistent reminder",
+        status: "completed",
+        completedByMemberID: session.json().accountID,
+      }),
+    ]);
+    await reader.close();
+  });
+
+  it("claims a due reminder once across concurrent notification workers", async () => {
+    const data = repositoryForTest();
+    const account = await data.provisionParentAccount("notification-worker-parent", "Notifier");
+    const reminderID = "abcdefab-cdef-4abc-8def-abcdefabc302";
+    await data.saveReminder({
+      id: reminderID,
+      familyID: account.familyID,
+      title: "Due reminder",
+      assigneeIDs: [account.memberID],
+      dueAt: "2026-09-10T15:00:00Z",
+      status: "open",
+      completedAt: null,
+      completedByMemberID: null,
+      alertLeadTimeMinutes: 60,
+      createdByMemberID: account.memberID,
+    });
+    const now = new Date("2026-09-10T14:00:00Z");
+
+    const claims = await Promise.all([
+      data.claimDueReminderNotifications(now, 100),
+      data.claimDueReminderNotifications(now, 100),
+    ]);
+
+    expect(claims.flat().map((reminder) => reminder.id)).toEqual([reminderID]);
+    await data.releaseReminderNotificationClaim(account.familyID, reminderID, now);
+    expect((await data.claimDueReminderNotifications(now, 100)).map((reminder) => reminder.id))
+      .toEqual([reminderID]);
+  });
+
   it("persists synchronized calendar sources and imported events across API instances", async () => {
     const writerRepository = repositoryForTest();
     const feedBody = [

@@ -60,6 +60,19 @@ export interface FamilyEvent {
   }>;
 }
 
+export interface FamilyReminder {
+  id: string;
+  familyID: string;
+  title: string;
+  assigneeIDs: string[];
+  dueAt: string;
+  status: "open" | "completed";
+  completedAt: string | null;
+  completedByMemberID: string | null;
+  alertLeadTimeMinutes: 0 | 5 | 15 | 60 | 1440 | null;
+  createdByMemberID: string;
+}
+
 export interface EventConflict {
   kind: "overlapping_participant" | "double_booked_driver";
   memberID: string | null;

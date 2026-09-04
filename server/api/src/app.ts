@@ -6,7 +6,7 @@ import Fastify, {
   type FastifyServerOptions,
 } from "fastify";
 import { z } from "zod";
-import type { Account, EventConflict, FamilyEvent, FamilyMember } from "./domain.js";
+import type { Account, EventConflict, FamilyEvent, FamilyMember, FamilyReminder } from "./domain.js";
 import type { CalendarSourceModule } from "./calendar-source-module.js";
 import type { IdentityProvider } from "./identity-provider.js";
 import {
@@ -48,6 +48,16 @@ const eventSchema = z.object({
   }).nullable().optional(),
 }).refine((event) => new Date(event.endTime) > new Date(event.startTime), {
   message: "endTime must follow startTime",
+});
+
+const reminderSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().trim().min(1).max(200),
+  assigneeIDs: z.array(z.string().min(1)).min(1).transform((ids) => [...new Set(ids)]),
+  dueAt: z.string().datetime(),
+  alertLeadTimeMinutes: z.union([
+    z.literal(0), z.literal(5), z.literal(15), z.literal(60), z.literal(1440), z.null(),
+  ]).default(null),
 });
 
 const locationSearchSchema = z.object({ q: z.string().trim().min(2).max(200) });
@@ -478,6 +488,91 @@ export function buildApp({
     }
   });
 
+  app.get("/v1/reminders", async (request) => {
+    const account = requiredAccount(request);
+    const reminders = await repository.remindersForFamily(account.familyID);
+    return reminders
+      .filter((reminder) => account.role === "parent" || reminder.assigneeIDs.includes(account.memberID))
+      .map(clientReminder);
+  });
+
+  app.put("/v1/reminders/:id", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    const parsed = reminderSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_reminder", details: parsed.error.issues });
+    const routeID = (request.params as { id: string }).id.toLowerCase();
+    const reminderID = parsed.data.id.toLowerCase();
+    if (routeID !== reminderID) return reply.code(400).send({ error: "reminder_id_mismatch" });
+    const members = await repository.membersForFamily(account.familyID);
+    const memberIDs = new Set(members.map((member) => member.id));
+    if (parsed.data.assigneeIDs.some((memberID) => !memberIDs.has(memberID))) {
+      return reply.code(400).send({ error: "unknown_assignee" });
+    }
+    const existing = (await repository.remindersForFamily(account.familyID))
+      .find((reminder) => reminder.id.toLowerCase() === reminderID);
+    const reminder: FamilyReminder = {
+      ...parsed.data,
+      id: reminderID,
+      familyID: account.familyID,
+      status: existing?.status ?? "open",
+      completedAt: existing?.completedAt ?? null,
+      completedByMemberID: existing?.completedByMemberID ?? null,
+      createdByMemberID: existing?.createdByMemberID ?? account.memberID,
+    };
+    await repository.saveReminder(reminder);
+    await repository.markFamilyChanged(account.familyID);
+    return clientReminder(reminder);
+  });
+
+  app.post("/v1/reminders/:id/complete", async (request, reply) => {
+    const account = requiredAccount(request);
+    const reminderID = (request.params as { id: string }).id.toLowerCase();
+    const reminder = (await repository.remindersForFamily(account.familyID))
+      .find((candidate) => candidate.id.toLowerCase() === reminderID);
+    if (!reminder) return reply.code(404).send({ error: "reminder_not_found" });
+    if (account.role !== "parent" && !reminder.assigneeIDs.includes(account.memberID)) {
+      return reply.code(403).send({ error: "reminder_assignee_required" });
+    }
+    if (reminder.status === "open") {
+      reminder.status = "completed";
+      reminder.completedAt = new Date().toISOString();
+      reminder.completedByMemberID = account.memberID;
+      await repository.saveReminder(reminder);
+      await repository.markFamilyChanged(account.familyID);
+    }
+    return clientReminder(reminder);
+  });
+
+  app.post("/v1/reminders/:id/reopen", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    const reminderID = (request.params as { id: string }).id.toLowerCase();
+    const reminder = (await repository.remindersForFamily(account.familyID))
+      .find((candidate) => candidate.id.toLowerCase() === reminderID);
+    if (!reminder) return reply.code(404).send({ error: "reminder_not_found" });
+    if (reminder.status === "completed") {
+      reminder.status = "open";
+      reminder.completedAt = null;
+      reminder.completedByMemberID = null;
+      await repository.saveReminder(reminder);
+      await repository.markFamilyChanged(account.familyID);
+    }
+    return clientReminder(reminder);
+  });
+
+  app.delete("/v1/reminders/:id", async (request, reply) => {
+    const account = await requireParent(request, reply);
+    if (!account) return;
+    const reminderID = (request.params as { id: string }).id.toLowerCase();
+    const exists = (await repository.remindersForFamily(account.familyID))
+      .some((candidate) => candidate.id.toLowerCase() === reminderID);
+    if (!exists) return reply.code(404).send({ error: "reminder_not_found" });
+    await repository.deleteReminder(account.familyID, reminderID);
+    await repository.markFamilyChanged(account.familyID);
+    return reply.code(204).send();
+  });
+
   app.get("/v1/locations/search", {
     config: { rateLimit: limits.locations },
   }, async (request, reply) => {
@@ -628,6 +723,12 @@ export function buildApp({
     if (events.some((event) => event.participantIDs.includes(memberID))) {
       return reply.code(409).send({ error: "member_has_scheduled_events" });
     }
+    const reminders = await repository.remindersForFamily(account.familyID);
+    if (reminders.some((reminder) =>
+      reminder.status === "open" && reminder.assigneeIDs.includes(memberID)
+    )) {
+      return reply.code(409).send({ error: "member_has_open_reminders" });
+    }
     await repository.deleteMember(account.familyID, memberID);
     await repository.markFamilyChanged(account.familyID);
     return reply.code(204).send();
@@ -717,6 +818,10 @@ function occurrenceRanges(event: FamilyEvent, rangeEnd: Date): Array<{ start: Da
 
 function clientEvent({ familyID: _familyID, ...event }: FamilyEvent) {
   return event;
+}
+
+function clientReminder({ familyID: _familyID, createdByMemberID: _createdByMemberID, ...reminder }: FamilyReminder) {
+  return reminder;
 }
 
 function clientMember({ familyID: _familyID, ...member }: FamilyMember) {

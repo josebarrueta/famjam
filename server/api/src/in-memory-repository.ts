@@ -1,24 +1,29 @@
 import { randomUUID } from "node:crypto";
-import type { Account, FamilyEvent, FamilyInvitation, FamilyMember } from "./domain.js";
+import type { Account, FamilyEvent, FamilyInvitation, FamilyMember, FamilyReminder } from "./domain.js";
 import type { RallyrooRepository } from "./repository.js";
 
 interface SeedData {
   accounts?: Account[];
   events?: FamilyEvent[];
+  reminders?: FamilyReminder[];
   members?: FamilyMember[];
 }
 
 export class InMemoryRallyrooRepository implements RallyrooRepository {
   private readonly accounts: Account[];
   private readonly events: FamilyEvent[];
+  private readonly reminders: FamilyReminder[];
   private readonly members: FamilyMember[];
   private readonly invitations: FamilyInvitation[] = [];
   private readonly changeVersions = new Map<string, number>();
   private readonly devices = new Map<string, { familyID: string; memberID: string }>();
+  private readonly claimedReminderNotifications = new Set<string>();
+  private readonly sentReminderNotifications = new Set<string>();
 
   constructor(seed: SeedData = {}) {
     this.accounts = [...(seed.accounts ?? [])];
     this.events = [...(seed.events ?? [])];
+    this.reminders = [...(seed.reminders ?? [])];
     this.members = [...(seed.members ?? [])];
   }
 
@@ -60,6 +65,7 @@ export class InMemoryRallyrooRepository implements RallyrooRepository {
       removeWhere(this.accounts, (candidate) => candidate.familyID === account.familyID);
       removeWhere(this.members, (member) => member.familyID === account.familyID);
       removeWhere(this.events, (event) => event.familyID === account.familyID);
+      removeWhere(this.reminders, (reminder) => reminder.familyID === account.familyID);
       removeWhere(this.invitations, (invitation) => invitation.familyID === account.familyID);
       this.changeVersions.delete(account.familyID);
       for (const [token, device] of this.devices) {
@@ -76,6 +82,14 @@ export class InMemoryRallyrooRepository implements RallyrooRepository {
     for (const event of this.events.filter((candidate) => candidate.familyID === account.familyID)) {
       event.participantIDs = event.participantIDs.filter((id) => id !== account.memberID);
       if (event.kidID === account.memberID) event.kidID = null;
+    }
+    removeWhere(this.reminders, (reminder) =>
+      reminder.familyID === account.familyID
+      && reminder.assigneeIDs.length === 1
+      && reminder.assigneeIDs[0] === account.memberID
+    );
+    for (const reminder of this.reminders.filter((candidate) => candidate.familyID === account.familyID)) {
+      reminder.assigneeIDs = reminder.assigneeIDs.filter((id) => id !== account.memberID);
     }
     for (const [token, device] of this.devices) {
       if (device.memberID === account.memberID) this.devices.delete(token);
@@ -174,6 +188,13 @@ export class InMemoryRallyrooRepository implements RallyrooRepository {
       .map(([token]) => token);
   }
 
+  async deviceTokensForMembers(familyID: string, memberIDs: string[]): Promise<string[]> {
+    const requested = new Set(memberIDs);
+    return [...this.devices.entries()]
+      .filter(([, device]) => device.familyID === familyID && requested.has(device.memberID))
+      .map(([token]) => token);
+  }
+
   async eventsForFamily(familyID: string): Promise<FamilyEvent[]> {
     return this.events.filter((event) => event.familyID === familyID);
   }
@@ -187,6 +208,55 @@ export class InMemoryRallyrooRepository implements RallyrooRepository {
   async deleteEvent(familyID: string, eventID: string): Promise<void> {
     const index = this.events.findIndex((event) => event.familyID === familyID && event.id === eventID);
     if (index >= 0) this.events.splice(index, 1);
+  }
+
+  async remindersForFamily(familyID: string): Promise<FamilyReminder[]> {
+    return this.reminders
+      .filter((reminder) => reminder.familyID === familyID)
+      .sort((left, right) => left.dueAt.localeCompare(right.dueAt));
+  }
+
+  async saveReminder(reminder: FamilyReminder): Promise<void> {
+    const index = this.reminders.findIndex((candidate) =>
+      candidate.familyID === reminder.familyID && candidate.id.toLowerCase() === reminder.id.toLowerCase()
+    );
+    if (index >= 0) this.reminders[index] = reminder;
+    else this.reminders.push(reminder);
+    this.claimedReminderNotifications.delete(`${reminder.familyID}:${reminder.id.toLowerCase()}`);
+    this.sentReminderNotifications.delete(`${reminder.familyID}:${reminder.id.toLowerCase()}`);
+  }
+
+  async deleteReminder(familyID: string, reminderID: string): Promise<void> {
+    const index = this.reminders.findIndex((reminder) =>
+      reminder.familyID === familyID && reminder.id.toLowerCase() === reminderID.toLowerCase()
+    );
+    if (index >= 0) this.reminders.splice(index, 1);
+  }
+
+  async claimDueReminderNotifications(now: Date, limit: number): Promise<FamilyReminder[]> {
+    const oldestDueAt = now.getTime() - 24 * 60 * 60 * 1_000;
+    const due = this.reminders.filter((reminder) => {
+      if (reminder.status !== "open" || reminder.alertLeadTimeMinutes === null) return false;
+      const key = `${reminder.familyID}:${reminder.id.toLowerCase()}`;
+      if (this.claimedReminderNotifications.has(key) || this.sentReminderNotifications.has(key)) return false;
+      const dueAt = new Date(reminder.dueAt).getTime();
+      const notifyAt = dueAt - reminder.alertLeadTimeMinutes * 60 * 1_000;
+      return notifyAt <= now.getTime() && dueAt >= oldestDueAt;
+    }).slice(0, limit);
+    for (const reminder of due) {
+      this.claimedReminderNotifications.add(`${reminder.familyID}:${reminder.id.toLowerCase()}`);
+    }
+    return due;
+  }
+
+  async markReminderNotificationSent(familyID: string, reminderID: string): Promise<void> {
+    const key = `${familyID}:${reminderID.toLowerCase()}`;
+    this.claimedReminderNotifications.delete(key);
+    this.sentReminderNotifications.add(key);
+  }
+
+  async releaseReminderNotificationClaim(familyID: string, reminderID: string, _claimedAt: Date): Promise<void> {
+    this.claimedReminderNotifications.delete(`${familyID}:${reminderID.toLowerCase()}`);
   }
 
   async membersForFamily(familyID: string): Promise<FamilyMember[]> {

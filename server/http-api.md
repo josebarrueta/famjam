@@ -10,14 +10,15 @@ JSON requests use `Content-Type: application/json`. Dates are ISO 8601 strings.
 - `DELETE /v1/devices/{apnsToken}` removes that member's device.
 
 Event creates and updates send family-scoped APNs alerts. Conflict writes use a
-conflict-specific message. Device registration is optional, and APNs failures never
-roll back the source-of-truth event.
+conflict-specific message. Due reminder alerts are sent only to devices registered
+by the reminder's assignees. Device registration is optional, and APNs failures never
+roll back PostgreSQL source-of-truth data.
 
 ## Synchronization
 
 - `GET /v1/changes` → `{ "version": 42 }` for the authenticated family.
 
-Every event or family-member mutation advances this cursor. Remote iOS sessions
+Every event, reminder, or family-member mutation advances this cursor. Remote iOS sessions
 poll the small cursor every five seconds and reload visible family data only when
 it changes. The app also refreshes whenever it becomes active.
 
@@ -56,6 +57,22 @@ and a `provenance` array containing `sourceID`, `sourceName`, and `externalUID`.
 They participate in conflict detection but cannot be edited as native Rallyroo events.
 Exact duplicates are consolidated by external identity or normalized title, time,
 and location; participant IDs and provenance are combined.
+
+## Reminders
+
+- `GET /v1/reminders` lists reminders visible to the authenticated member. Parents
+  see the family's reminders; kids see only reminders assigned to them.
+- `PUT /v1/reminders/{id}` creates or updates a reminder. Parents only.
+- `POST /v1/reminders/{id}/complete` completes a reminder. Parents and assigned
+  kids may complete it; completion is shared and records the authenticated member.
+- `POST /v1/reminders/{id}/reopen` reopens a reminder. Parents only.
+- `DELETE /v1/reminders/{id}` deletes a reminder. Parents only.
+
+A reminder has a title, one `dueAt` instant, one or more `assigneeIDs`, shared
+`status`, and optional `alertLeadTimeMinutes` (`0`, `5`, `15`, `60`, or `1440`).
+It has no duration and never participates in event overlap conflict detection.
+Members with open assigned reminders cannot be deleted until those reminders are
+completed or reassigned.
 
 ## Calendar subscriptions
 
@@ -176,7 +193,7 @@ the hosted session.
 Rallyroo account. When another authenticated account remains in the family, shared
 family records remain and references to the deleted member are removed. When the
 deleted account is the family's last authenticated account, the backend deletes the
-entire family dataset, including members, events, invitations, device tokens, and
+entire family dataset, including members, events, reminders, invitations, device tokens, and
 connected calendar sources.
 
 No Stytch secret, SDK, configuration, or provider-specific type exists in the iOS

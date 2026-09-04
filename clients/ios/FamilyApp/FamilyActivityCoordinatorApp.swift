@@ -10,6 +10,8 @@ struct FamilyActivityCoordinatorApp: App {
     private let eventStore: any EventStore
     private let memberStore: any FamilyMemberStore
     private let notificationStore: any ConflictNotificationStore
+    private let reminderStore: any ReminderStore
+    private let reminderAlertScheduler: (any ReminderAlertScheduler)?
     private let authentication: any Authentication
     private let locationSearch: any LocationSearch
     private let invitationStore: (any FamilyInvitationStore)?
@@ -32,6 +34,8 @@ struct FamilyActivityCoordinatorApp: App {
             AppStorage.resetForUnifiedFamilyMembersIfNeeded()
             authentication = LocalAuthentication()
             eventStore = LocalEventStore(storageURL: AppStorage.eventsURL)
+            reminderStore = LocalReminderStore(storageURL: AppStorage.remindersURL)
+            reminderAlertScheduler = LocalReminderAlertScheduler()
             memberStore = LocalFamilyMemberStore(storageURL: AppStorage.membersURL)
             locationSearch = EmptyLocationSearch()
             invitationStore = nil
@@ -50,6 +54,8 @@ struct FamilyActivityCoordinatorApp: App {
             )
             authentication = remoteAuthentication
             eventStore = RemoteEventStore(baseURL: baseURL, transport: authenticatedTransport)
+            reminderStore = RemoteReminderStore(baseURL: baseURL, transport: authenticatedTransport)
+            reminderAlertScheduler = nil
             memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: authenticatedTransport)
             locationSearch = RemoteLocationSearch(baseURL: baseURL, transport: authenticatedTransport)
             invitationStore = RemoteFamilyInvitationStore(
@@ -84,10 +90,18 @@ struct FamilyActivityCoordinatorApp: App {
                         locationSearch: locationSearch
                     )
                     .tabItem { Label("Schedule", systemImage: "calendar") }
+                    RemindersView(
+                        store: reminderStore,
+                        memberStore: memberStore,
+                        alertScheduler: reminderAlertScheduler,
+                        session: session
+                    )
+                    .tabItem { Label("Reminders", systemImage: "checklist") }
                     if session.role == .parent {
                         FamilyMembersView(
                             memberStore: memberStore,
                             eventStore: eventStore,
+                            reminderStore: reminderStore,
                             locationSearch: locationSearch,
                             invitationStore: invitationStore
                         )
@@ -185,6 +199,10 @@ enum AppStorage {
 
     static var notificationsURL: URL {
         storageDirectory.appendingPathComponent("conflicts").appendingPathExtension("json")
+    }
+
+    static var remindersURL: URL {
+        storageDirectory.appendingPathComponent("reminders").appendingPathExtension("json")
     }
 
     static var membersURL: URL {

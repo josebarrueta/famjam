@@ -263,6 +263,165 @@ describe("Rallyroo API", () => {
     await app.close();
   });
 
+  it("creates a due-time reminder separately from scheduled events", async () => {
+    const data = repository();
+    const app = buildApp({ identityProvider, repository: data });
+    const reminderID = "abcdefab-cdef-4abc-8def-abcdefabc101";
+
+    const saved = await app.inject({
+      method: "PUT",
+      url: `/v1/reminders/${reminderID}`,
+      headers: { authorization: "Bearer parent-token" },
+      payload: {
+        id: reminderID,
+        title: "Bring the permission slip",
+        assigneeIDs: ["kid-1"],
+        dueAt: "2026-09-10T15:00:00Z",
+        alertLeadTimeMinutes: 60,
+      },
+    });
+    const listed = await app.inject({
+      method: "GET",
+      url: "/v1/reminders",
+      headers: { authorization: "Bearer kid-token" },
+    });
+
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({
+      id: reminderID,
+      status: "open",
+      completedAt: null,
+      completedByMemberID: null,
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toEqual([saved.json()]);
+    expect((await data.eventsForFamily("family-1"))).toHaveLength(1);
+    await app.close();
+  });
+
+  it("lets an assigned kid complete a reminder and a parent reopen it", async () => {
+    const data = repository();
+    const reminderID = "abcdefab-cdef-4abc-8def-abcdefabc102";
+    await data.saveReminder({
+      id: reminderID,
+      familyID: "family-1",
+      title: "Pack lunch",
+      assigneeIDs: ["kid-1"],
+      dueAt: "2026-09-10T15:00:00Z",
+      status: "open",
+      completedAt: null,
+      completedByMemberID: null,
+      alertLeadTimeMinutes: 15,
+      createdByMemberID: "parent-1",
+    });
+    const app = buildApp({ identityProvider, repository: data });
+
+    const completed = await app.inject({
+      method: "POST",
+      url: `/v1/reminders/${reminderID}/complete`,
+      headers: { authorization: "Bearer kid-token" },
+    });
+    const reopened = await app.inject({
+      method: "POST",
+      url: `/v1/reminders/${reminderID}/reopen`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(completed.statusCode).toBe(200);
+    expect(completed.json()).toMatchObject({
+      status: "completed",
+      completedByMemberID: "kid-1",
+    });
+    expect(completed.json().completedAt).toBeTruthy();
+    expect(reopened.statusCode).toBe(200);
+    expect(reopened.json()).toMatchObject({
+      status: "open",
+      completedAt: null,
+      completedByMemberID: null,
+    });
+    await app.close();
+  });
+
+  it("keeps reminder management parent-only and hides unassigned reminders from kids", async () => {
+    const data = repository();
+    const reminderID = "abcdefab-cdef-4abc-8def-abcdefabc103";
+    await data.saveReminder({
+      id: reminderID,
+      familyID: "family-1",
+      title: "Parent responsibility",
+      assigneeIDs: ["parent-3"],
+      dueAt: "2026-09-10T15:00:00Z",
+      status: "open",
+      completedAt: null,
+      completedByMemberID: null,
+      alertLeadTimeMinutes: null,
+      createdByMemberID: "parent-1",
+    });
+    const app = buildApp({ identityProvider, repository: data });
+
+    const kidList = await app.inject({
+      method: "GET",
+      url: "/v1/reminders",
+      headers: { authorization: "Bearer kid-token" },
+    });
+    const kidEdit = await app.inject({
+      method: "PUT",
+      url: `/v1/reminders/${reminderID}`,
+      headers: { authorization: "Bearer kid-token" },
+      payload: {
+        id: reminderID,
+        title: "Changed",
+        assigneeIDs: ["kid-1"],
+        dueAt: "2026-09-10T15:00:00Z",
+        alertLeadTimeMinutes: null,
+      },
+    });
+    const kidComplete = await app.inject({
+      method: "POST",
+      url: `/v1/reminders/${reminderID}/complete`,
+      headers: { authorization: "Bearer kid-token" },
+    });
+    const removed = await app.inject({
+      method: "DELETE",
+      url: `/v1/reminders/${reminderID}`,
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(kidList.json()).toEqual([]);
+    expect(kidEdit.statusCode).toBe(403);
+    expect(kidComplete.statusCode).toBe(403);
+    expect(removed.statusCode).toBe(204);
+    expect(await data.remindersForFamily("family-1")).toEqual([]);
+    await app.close();
+  });
+
+  it("blocks deleting a member who has an open reminder", async () => {
+    const data = repository();
+    await data.saveReminder({
+      id: "abcdefab-cdef-4abc-8def-abcdefabc104",
+      familyID: "family-1",
+      title: "Return library books",
+      assigneeIDs: ["kid-2"],
+      dueAt: "2026-09-10T15:00:00Z",
+      status: "open",
+      completedAt: null,
+      completedByMemberID: null,
+      alertLeadTimeMinutes: null,
+      createdByMemberID: "parent-1",
+    });
+    const app = buildApp({ identityProvider, repository: data });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/family-members/kid-2",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: "member_has_open_reminders" });
+    await app.close();
+  });
+
   it("searches US addresses through the backend location provider", async () => {
     const app = buildApp({
       identityProvider,

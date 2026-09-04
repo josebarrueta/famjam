@@ -7,6 +7,7 @@ import type {
   FamilyEvent,
   FamilyInvitation,
   FamilyMember,
+  FamilyReminder,
 } from "./domain.js";
 import type { RallyrooRepository } from "./repository.js";
 import type {
@@ -106,6 +107,7 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
         await client.query("DELETE FROM device_tokens WHERE family_id = $1", [row.family_id]);
         await client.query("DELETE FROM family_invitations WHERE family_id = $1", [row.family_id]);
         await client.query("DELETE FROM events WHERE family_id = $1", [row.family_id]);
+        await client.query("DELETE FROM family_reminders WHERE family_id = $1", [row.family_id]);
         await client.query("DELETE FROM family_change_versions WHERE family_id = $1", [row.family_id]);
         await client.query("DELETE FROM accounts WHERE family_id = $1", [row.family_id]);
         await client.query("DELETE FROM family_members WHERE family_id = $1", [row.family_id]);
@@ -153,6 +155,17 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
           `UPDATE events SET participant_ids = array_remove(participant_ids, $2),
                             kid_id = CASE WHEN kid_id = $2 THEN NULL ELSE kid_id END
            WHERE family_id = $1`,
+          [row.family_id, row.member_id],
+        );
+        await client.query(
+          `DELETE FROM family_reminders
+           WHERE family_id = $1 AND cardinality(array_remove(assignee_ids, $2)) = 0`,
+          [row.family_id, row.member_id],
+        );
+        await client.query(
+          `UPDATE family_reminders
+           SET assignee_ids = array_remove(assignee_ids, $2), updated_at = now()
+           WHERE family_id = $1 AND $2 = ANY(assignee_ids)`,
           [row.family_id, row.member_id],
         );
         await client.query(
@@ -351,6 +364,15 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
     return result.rows.map((row) => row.token);
   }
 
+  async deviceTokensForMembers(familyID: string, memberIDs: string[]): Promise<string[]> {
+    if (memberIDs.length === 0) return [];
+    const result = await this.pool.query<{ token: string }>(
+      "SELECT token FROM device_tokens WHERE family_id = $1 AND member_id = ANY($2::text[])",
+      [familyID, memberIDs],
+    );
+    return result.rows.map((row) => row.token);
+  }
+
   async eventsForFamily(familyID: string): Promise<FamilyEvent[]> {
     const result = await this.pool.query<EventRow>(
       `SELECT family_id, id::text, title, kid_id, participant_ids, start_time,
@@ -511,6 +533,92 @@ export class PostgresRallyrooRepository implements RallyrooRepository, CalendarS
     }));
   }
 
+  async remindersForFamily(familyID: string): Promise<FamilyReminder[]> {
+    const result = await this.pool.query<ReminderRow>(
+      `SELECT family_id, id::text, title, assignee_ids, due_at, status,
+              completed_at, completed_by_member_id, alert_lead_time_minutes,
+              created_by_member_id
+       FROM family_reminders WHERE family_id = $1 ORDER BY due_at`,
+      [familyID],
+    );
+    return result.rows.map(reminderFromRow);
+  }
+
+  async saveReminder(reminder: FamilyReminder): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO family_reminders (
+         family_id, id, title, assignee_ids, due_at, status, completed_at,
+         completed_by_member_id, alert_lead_time_minutes, created_by_member_id
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       ON CONFLICT (family_id, id) DO UPDATE SET
+         title=EXCLUDED.title, assignee_ids=EXCLUDED.assignee_ids,
+         due_at=EXCLUDED.due_at, status=EXCLUDED.status,
+         completed_at=EXCLUDED.completed_at,
+         completed_by_member_id=EXCLUDED.completed_by_member_id,
+         alert_lead_time_minutes=EXCLUDED.alert_lead_time_minutes,
+         notification_claimed_at=NULL, notification_sent_at=NULL, updated_at=now()`,
+      [
+        reminder.familyID, reminder.id, reminder.title, reminder.assigneeIDs,
+        reminder.dueAt, reminder.status, reminder.completedAt,
+        reminder.completedByMemberID, reminder.alertLeadTimeMinutes,
+        reminder.createdByMemberID,
+      ],
+    );
+  }
+
+  async deleteReminder(familyID: string, reminderID: string): Promise<void> {
+    await this.pool.query(
+      "DELETE FROM family_reminders WHERE family_id = $1 AND id = $2",
+      [familyID, reminderID],
+    );
+  }
+
+  async claimDueReminderNotifications(now: Date, limit: number): Promise<FamilyReminder[]> {
+    const result = await this.pool.query<ReminderRow>(
+      `WITH due AS (
+         SELECT family_id, id
+         FROM family_reminders
+         WHERE status = 'open'
+           AND notification_sent_at IS NULL
+           AND (notification_claimed_at IS NULL OR notification_claimed_at < $1::timestamptz - interval '5 minutes')
+           AND alert_lead_time_minutes IS NOT NULL
+           AND due_at - make_interval(mins => alert_lead_time_minutes) <= $1
+           AND due_at >= $1::timestamptz - interval '24 hours'
+         ORDER BY due_at
+         LIMIT $2
+         FOR UPDATE SKIP LOCKED
+       )
+       UPDATE family_reminders AS reminder
+       SET notification_claimed_at = $1, updated_at = now()
+       FROM due
+       WHERE reminder.family_id = due.family_id AND reminder.id = due.id
+       RETURNING reminder.family_id, reminder.id::text, reminder.title,
+                 reminder.assignee_ids, reminder.due_at, reminder.status,
+                 reminder.completed_at, reminder.completed_by_member_id,
+                 reminder.alert_lead_time_minutes, reminder.created_by_member_id`,
+      [now.toISOString(), limit],
+    );
+    return result.rows.map(reminderFromRow);
+  }
+
+  async markReminderNotificationSent(familyID: string, reminderID: string, sentAt: Date): Promise<void> {
+    await this.pool.query(
+      `UPDATE family_reminders
+       SET notification_claimed_at = NULL, notification_sent_at = $3, updated_at = now()
+       WHERE family_id = $1 AND id = $2 AND notification_claimed_at = $3`,
+      [familyID, reminderID, sentAt.toISOString()],
+    );
+  }
+
+  async releaseReminderNotificationClaim(familyID: string, reminderID: string, claimedAt: Date): Promise<void> {
+    await this.pool.query(
+      `UPDATE family_reminders SET notification_claimed_at = NULL, updated_at = now()
+       WHERE family_id = $1 AND id = $2 AND notification_sent_at IS NULL
+         AND notification_claimed_at = $3`,
+      [familyID, reminderID, claimedAt.toISOString()],
+    );
+  }
+
   async membersForFamily(familyID: string): Promise<FamilyMember[]> {
     const result = await this.pool.query<MemberRow>(
       `SELECT family_id, id, name, role, grade_or_birth_year, color_tag
@@ -582,6 +690,19 @@ interface EventRow {
   source: FamilyEvent["source"];
   status: FamilyEvent["status"];
   recurrence: EventRecurrence | null;
+}
+
+interface ReminderRow {
+  family_id: string;
+  id: string;
+  title: string;
+  assignee_ids: string[];
+  due_at: Date | string;
+  status: FamilyReminder["status"];
+  completed_at: Date | string | null;
+  completed_by_member_id: string | null;
+  alert_lead_time_minutes: FamilyReminder["alertLeadTimeMinutes"];
+  created_by_member_id: string;
 }
 
 interface CalendarSourceRow {
@@ -663,6 +784,21 @@ function eventFromRow(row: EventRow): FamilyEvent {
     source: row.source,
     status: row.status,
     recurrence: row.recurrence,
+  };
+}
+
+function reminderFromRow(row: ReminderRow): FamilyReminder {
+  return {
+    familyID: row.family_id,
+    id: row.id,
+    title: row.title,
+    assigneeIDs: row.assignee_ids,
+    dueAt: asISOString(row.due_at),
+    status: row.status,
+    completedAt: row.completed_at ? asISOString(row.completed_at) : null,
+    completedByMemberID: row.completed_by_member_id,
+    alertLeadTimeMinutes: row.alert_lead_time_minutes,
+    createdByMemberID: row.created_by_member_id,
   };
 }
 

@@ -59,12 +59,15 @@ See [`deploy/README.md`](deploy/README.md) for persistence, credentials, inspect
 and the later domain/TLS path.
 
 Remote mode configuration is validated by `AppConfiguration`. Authentication,
-events, family members, and calendar subscriptions use vendor-neutral interfaces;
+events, reminders, family members, and calendar subscriptions use vendor-neutral interfaces;
 a custom server or another provider can implement `server/http-api.md`. Parents can
 add HTTPS iCalendar feeds for TeamSnap, schools, and sports calendars from Settings.
 Imported events remain read-only, participate in conflict detection, and consolidate
 exact duplicates across family members' subscriptions while preserving combined
-participants and provenance. Conflict alerts remain local to each device for now.
+participants and provenance. Family reminders have one due instant, shared completion,
+multiple assignees, and optional alerts without blocking schedule time or creating
+conflicts. Local mode schedules on-device alerts; remote mode delivers assignee-only
+APNs notifications from the API. Conflict alerts remain local to each device for now.
 
 ## Secret scanning
 

@@ -60,6 +60,31 @@ final class FamilyAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["123 Main Street"].exists)
     }
 
+    func testParentCanCreateAndCompleteAReminderWithoutAnEndTime() {
+        let app = XCUIApplication()
+        app.launchEnvironment["RALLYROO_DATA_MODE"] = "local"
+        app.launch()
+
+        XCTAssertTrue(app.tabBars.buttons["Reminders"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Reminders"].tap()
+        app.buttons["Add Reminder"].tap()
+        XCTAssertTrue(app.navigationBars["Add Reminder"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.datePickers["Ends"].exists)
+
+        app.textFields["Title"].tap()
+        app.textFields["Title"].typeText("Bring the permission slip")
+        let assignee = app.switches["Local Parent"]
+        if (assignee.value as? String) == "0" {
+            assignee.tap()
+        }
+        XCTAssertTrue(app.buttons["Save"].isEnabled)
+        app.buttons["Save"].tap()
+
+        XCTAssertTrue(app.staticTexts["Bring the permission slip"].waitForExistence(timeout: 5))
+        app.buttons["Complete reminder"].tap()
+        XCTAssertTrue(app.buttons["Reopen reminder"].waitForExistence(timeout: 5))
+    }
+
     func testParentCanOpenTheLocalScheduleAndFamilyTabs() {
         let app = XCUIApplication()
         app.launchEnvironment["RALLYROO_DATA_MODE"] = "local"

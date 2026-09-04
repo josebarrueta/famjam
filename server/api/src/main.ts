@@ -19,6 +19,7 @@ import {
 import { RallyrooMetrics } from "./metrics.js";
 import { PostgresRallyrooRepository } from "./postgres-repository.js";
 import { NoopPushNotificationProvider } from "./push-notification-provider.js";
+import { ReminderNotificationDispatcher } from "./reminder-notification-dispatcher.js";
 import { RedisCache } from "./redis-cache.js";
 import { ResendInvitationEmailSender } from "./resend-invitation-email-sender.js";
 import { configuredSecret } from "./runtime-configuration.js";
@@ -43,6 +44,12 @@ const locationProvider: LocationSearchProvider = googlePlacesAPIKey
   : new EmptyLocationSearchProvider();
 
 const repository = PostgresRallyrooRepository.fromConfiguration(databaseConfiguration);
+const pushNotificationProvider = APNSPushNotificationProvider.fromEnvironment()
+  ?? new NoopPushNotificationProvider();
+const reminderNotificationDispatcher = new ReminderNotificationDispatcher({
+  repository,
+  pushNotificationProvider,
+});
 const calendarEncryptionKey = configuredSecret("CALENDAR_SOURCE_ENCRYPTION_KEY");
 const calendarSources = calendarEncryptionKey
   ? new CalendarSourceModule({
@@ -69,8 +76,7 @@ const app = buildApp({
     30 * 60,
     metrics,
   ),
-  pushNotificationProvider: APNSPushNotificationProvider.fromEnvironment()
-    ?? new NoopPushNotificationProvider(),
+  pushNotificationProvider,
   readinessCheck: () => repository.checkReadiness(),
   metrics,
   ...(metricsBearerToken
@@ -89,9 +95,27 @@ const app = buildApp({
     },
   },
 });
+let reminderDispatchIsRunning = false;
+const reminderDispatchInterval = setInterval(async () => {
+  if (reminderDispatchIsRunning) return;
+  reminderDispatchIsRunning = true;
+  try {
+    await reminderNotificationDispatcher.dispatchDue();
+  } catch (error) {
+    app.log.error({ error }, "Reminder notification dispatch failed");
+  } finally {
+    reminderDispatchIsRunning = false;
+  }
+}, 30_000);
+reminderDispatchInterval.unref();
+
 app.addHook("onClose", async () => {
+  clearInterval(reminderDispatchInterval);
   await Promise.all([cache.close?.(), repository.close()]);
 });
 
 const port = Number(process.env.PORT ?? "3000");
 await app.listen({ port, host: process.env.HOST ?? "0.0.0.0" });
+void reminderNotificationDispatcher.dispatchDue().catch((error) => {
+  app.log.error({ error }, "Initial reminder notification dispatch failed");
+});

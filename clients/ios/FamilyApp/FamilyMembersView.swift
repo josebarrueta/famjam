@@ -12,6 +12,7 @@ struct FamilyMembersView: View {
     init(
         memberStore: any FamilyMemberStore,
         eventStore: any EventStore,
+        reminderStore: (any ReminderStore)? = nil,
         locationSearch: any LocationSearch = EmptyLocationSearch(),
         invitationStore: (any FamilyInvitationStore)? = nil
     ) {
@@ -20,7 +21,11 @@ struct FamilyMembersView: View {
             memberStore: memberStore,
             eventStore: eventStore,
             invitationStore: invitationStore,
-            deletionService: FamilyMemberDeletionService(memberStore: memberStore, eventStore: eventStore)
+            deletionService: FamilyMemberDeletionService(
+                memberStore: memberStore,
+                eventStore: eventStore,
+                reminderStore: reminderStore
+            )
         ))
     }
 
@@ -351,5 +356,5 @@ private struct FamilyMemberEditor: View {
     }
 
     private func save() { Task { do { try await onSave(FamilyMember(id: existingMember?.id ?? KidID(rawValue: UUID().uuidString), name: name, role: role, gradeOrBirthYear: role == .kid ? grade : nil, colorTag: color)); dismiss() } catch { errorMessage = "Could not save this family member." } } }
-    private func delete() { guard let existingMember, let onDelete else { return }; Task { do { try await onDelete(existingMember); dismiss() } catch FamilyMemberDeletionError.hasScheduledEvents { errorMessage = "Remove this member from scheduled events before deleting." } catch { errorMessage = "Could not delete this family member." } } }
+    private func delete() { guard let existingMember, let onDelete else { return }; Task { do { try await onDelete(existingMember); dismiss() } catch FamilyMemberDeletionError.hasScheduledEvents { errorMessage = "Remove this member from scheduled events before deleting." } catch FamilyMemberDeletionError.hasOpenReminders { errorMessage = "Complete or reassign this member's open reminders before deleting." } catch { errorMessage = "Could not delete this family member." } } }
 }

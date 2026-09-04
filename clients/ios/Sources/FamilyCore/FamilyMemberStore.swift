@@ -29,21 +29,36 @@ public protocol FamilyMemberStore: Sendable {
 
 public enum FamilyMemberDeletionError: Error, Sendable {
     case hasScheduledEvents
+    case hasOpenReminders
 }
 
 public actor FamilyMemberDeletionService {
     private let memberStore: any FamilyMemberStore
     private let eventStore: any EventStore
+    private let reminderStore: (any ReminderStore)?
 
-    public init(memberStore: any FamilyMemberStore, eventStore: any EventStore) {
+    public init(
+        memberStore: any FamilyMemberStore,
+        eventStore: any EventStore,
+        reminderStore: (any ReminderStore)? = nil
+    ) {
         self.memberStore = memberStore
         self.eventStore = eventStore
+        self.reminderStore = reminderStore
     }
 
     public func delete(_ member: FamilyMember) async throws {
         let events = try await eventStore.events()
         guard !events.contains(where: { $0.participantIDs.contains(member.id) }) else {
             throw FamilyMemberDeletionError.hasScheduledEvents
+        }
+        if let reminderStore {
+            let reminders = try await reminderStore.reminders()
+            guard !reminders.contains(where: {
+                $0.status == .open && $0.assigneeIDs.contains(member.id)
+            }) else {
+                throw FamilyMemberDeletionError.hasOpenReminders
+            }
         }
         try await memberStore.delete(member)
     }
