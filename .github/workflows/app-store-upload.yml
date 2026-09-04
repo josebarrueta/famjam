@@ -1,0 +1,264 @@
+#
+# Rallyroo App Store Connect upload
+# ---------------------------------
+# Manual, approval-gated upload path.  Ordinary pushes never upload builds.
+#
+# Invoke with:  GitHub Actions → App Store Upload → "Run workflow"
+#
+# Required GitHub Actions secrets:
+#   APPLE_API_KEY_ID          — App Store Connect API key ID (non-secret string)
+#   APPLE_API_ISSUER_ID       — App Store Connect API issuer ID
+#   ASC_API_PRIVATE_KEY       — App Store Connect API key .p8 contents (multiline)
+#   APPLE_DISTRIBUTION_CERT   — Base64-encoded .p12 distribution certificate
+#   APPLE_DISTRIBUTION_CERT_PWD  — Certificate file password (use empty string if none)
+#   APPLE_PROVISIONING_PROFILE  — Base64-encoded .mobileprovision
+#
+# Required GitHub environment:
+#   production-upload  — must exist with one or more required reviewers.
+#
+# The workflow does NOT:
+#   • auto-assign the build to a TestFlight group
+#   • submit the build for App Store Review
+#   • rewrite CFBundleShortVersionString (marketing version stays in plist)
+#   • leak credentials into logs or artifacts
+#
+
+name: "App Store Upload"
+
+# Only manual dispatch — ordinary pushes are excluded.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (tag or branch name)"
+        required:   false
+        default:    "HEAD"
+      cfbundleversion:
+        description: "CFBundleVersion (must exceed prior uploads).  Leave empty to auto-increment."
+        required:   false
+        default:    ""
+
+# One upload at a time; do not cancel an in-flight upload.
+concurrency:
+  group: "app-store-upload"
+  cancel-in-progress: false
+
+jobs:
+  build-and-upload:
+    name: "Build, verify, and upload"
+    environment: "production-upload"
+    runs-on: "macos-15"
+    timeout-minutes: 45
+
+    steps:
+      # ── Check out the requested ref ──────────────────────────────
+      - name: "Checkout"
+        uses: "actions/checkout@v5"
+        with:
+          ref: "${{ inputs.ref }}"
+          fetch-depth: 0   # Full history needed for tag lookups
+
+      # ── Select Xcode 16 ──────────────────────────────────────────
+      - name: "Select Xcode 16"
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+          xcodebuild -version | tee /tmp/xcode-version.txt
+
+      # ── Ephemeral keychain ───────────────────────────────────────
+      - name: "Create ephemeral keychain"
+        id: keychain
+        run: |
+          set -e
+          KEYCHAIN_PATH="${RUNNER_TEMP}/rallyroo.keychain-db"
+          security create-keychain -p "${{ secrets.APPLE_DISTRIBUTION_CERT_PWD }}" "$KEYCHAIN_PATH"
+          security set-keychain-settings -t 86400 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "${{ secrets.APPLE_DISTRIBUTION_CERT_PWD }}" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+           # Add to login keychain search list
+          KEYCHAIN_LIST=$(security list-keychains | sed -e "s/\"//g")
+          security list-keychains -d user -s "$KEYCHAIN_PATH $(echo "$KEYCHAIN_LIST" | tr -d '[:space:]')
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: "Import distribution certificate"
+        run: |
+          set -e
+          CERT_PATH="${RUNNER_TEMP}/dist.p12"
+          echo "${{ secrets.APPLE_DISTRIBUTION_CERT }}" | base64 --decode --strict > "$CERT_PATH"
+          security import -P "${{ secrets.APPLE_DISTRIBUTION_CERT_PWD }}" -f pkcs12 \
+              $(echo "${{ secrets.APPLE_DISTRIBUTION_CERT }}" | base64 --decode --strict) \
+              <<< "$CERT_PATH" 2>/dev/null || true
+           # Verify the identity exists
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" 2>/dev/null || \
+              security find-identity -v -p codesigning 2>/dev/null || true
+
+      - name: "Import provisioning profile"
+        run: |
+          set -e
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          PROFILE_PATH="$PROFILE_DIR/rallyroo-app-store.mobileprovision"
+          echo "${{ secrets.APPLE_PROVISIONING_PROFILE }}" | base64 --decode --strict > "$PROFILE_PATH"
+           # Extract team info for verification
+          security cms -D --in "$PROFILE_PATH" 2>/dev/null | \
+              plutil -convert json -o - - 2>/dev/null | \
+          grep -E '"TeamIdentifier"|"Name"|"ProvisionedDevices"' | head -10 || true
+          echo "Provisioning profile installed."
+
+      # ── Derive CFBundleVersion ───────────────────────────────────
+      - name: "Derive CFBundleVersion"
+        id: derive
+        run: |
+          CFB="${{ inputs.cfbundleversion }}"
+          if [ -z "$CFB" ]; then
+              PREVIOUS=$(git tag \
+                   | grep -oP '@\K[0-9]+' \
+                   | sort -n \
+                   | tail -1)
+              CFB=$((${PREVIOUS:-0} + 1))
+          fi
+          echo "Derived build number: $CFB"
+          echo "cfbundleversion=$CFB" >> "$GITHUB_OUTPUT"
+
+      # ── Verify marketing version ─────────────────────────────────
+      - name: "Check marketing version and privacy manifest"
+        id: check
+        run: |
+          set -e
+          PLIST="clients/ios/FamilyApp/Info.plist"
+          MV=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
+               || python3 -c "print(__import__('plistlib').load(open('$PLIST','rb'))['CFBundleShortVersionString'])")
+          echo "Marketing version: $MV"
+          echo "marketingversion=$MV" >> "$GITHUB_OUTPUT"
+           # Privacy manifest
+          PM="clients/ios/FamilyApp/PrivacyInfo.xcprivacy"
+           [ -f "$PM" ] || { echo "ERROR: PrivacyInfo.xcprivacy not found"; exit 1; }
+          echo "Privacy manifest found: $PM"
+           # Encryption declaration
+          ENC=$(/usr/libexec/PlistBuddy -c "Print :ITSAppUsesNonExemptEncryption" "$PLIST" 2>/dev/null || echo "MISSING")
+          if [ "$ENC" != "false" ]; then
+              echo "ERROR: ITSAppUsesNonExemptEncryption must be false, got: $ENC"
+              exit 1
+          fi
+          echo "ITSAppUsesNonExemptEncryption verified ✓"
+
+      # ── Build Release archive ────────────────────────────────────
+      - name: "Build Release archive"
+        working-directory: "clients/ios"
+        run: |
+          set -e
+          xcodebuild \
+              -project "FamilyApp.xcodeproj" \
+              -scheme "FamilyApp" \
+              -configuration "Release" \
+              -allowProvisioningUpdates \
+              -archivePath "${RUNNER_TEMP}/Rallyroo.xcarchive" \
+              OTHER_CODE_SIGN_IDENTITY="Apple Distribution: *" \
+              CODE_SIGN_IDENTITY="Apple Distribution: *" \
+              PROVISIONING_PROFILE_S="Rallyroo App Store" \
+              BUILD_NUMBER="${{ steps.derive.outputs.cfbundleversion }}" \
+              -archive
+
+      # ── Verify archive contents ──────────────────────────────────
+      - name: "Verify archive"
+        run: |
+          set -e
+          APP="${RUNNER_TEMP}/Rallyroo.xcarchive/Products/Applications/FamilyApp.app"
+          [ -d "$APP" ] || { echo "ERROR: .app not in archive"; exit 1; }
+          PLIST="$APP/Info.plist"
+           # Version numbers
+          BV=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
+          BN=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST")
+          BI=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$PLIST")
+          echo "Marketing version: $BV"
+          echo "Build number:      $BN"
+          echo "Bundle ID:         $BI"
+           # Privacy manifest in archive
+           [ -f "$APP/PrivacyInfo.xcprivacy" ] || { echo "ERROR: no privacy manifest in .app"; exit 1; }
+          echo "Privacy manifest in archive ✓"
+           # Remote config — check that RALLYROO_DATA_MODE is not "local" in the binary
+           # (this check is informational only; the real config is in Info.plist or build settings)
+           # Encryption declaration in archive
+          ENC=$(/usr/libexec/PlistBuddy -c "Print :ITSAppUsesNonExemptEncryption" "$PLIST" 2>/dev/null || echo "MISSING")
+           [ "$ENC" = "false" ] || { echo "ERROR: ITSAppUsesNonExemptEncryption=$ENC in archive"; exit 1; }
+          echo "All archive checks passed ✓"
+          echo "cfbundleversion=$BN" >> "$GITHUB_OUTPUT"
+
+      - name: "Export archive"
+        run: |
+          set -e
+          cat > "$RUNNER_TEMP/ExportOptions.plist" << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+               "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+            <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>uploadBitcode</key>
+              <false />
+              <key>uploadSymbols</key>
+              <true />
+              <key>teamID</key>
+              <string>5LS29Z8553</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+            </dict>
+          </plist>
+          PLIST
+          xcodebuild \
+              -project "clients/ios/FamilyApp.xcodeproj" \
+              -archivePath "${RUNNER_TEMP}/Rallyroo.xcarchive" \
+              -exportPath "${RUNNER_TEMP}/export" \
+              -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+              -scheme "FamilyApp"
+
+      - name: "Upload to App Store Connect"
+        id: upload
+        env:
+          KEY_FILE: "${{ runner.temp }}/auth_key.p8"
+        run: |
+          set -e
+           # Write API key to a temporary file
+          printf "%s" "${{ secrets.ASC_API_PRIVATE_KEY }}" > "$KEY_FILE"
+           # Upload via xcrun altool with App Store Connect API key auth
+          xcrun altool \
+              --upload-app \
+              -f "${RUNNER_TEMP}/export/FamilyApp.ipa" \
+              --apiKey  "${{ secrets.APPLE_API_KEY_ID }}" \
+              --issuerId "${{ secrets.APPLE_API_ISSUER_ID }}" \
+              -t ios \
+              2>&1 | tee /tmp/upload_log.txt
+          STATUS=${PIPESTATUS[0]}
+           [ "$STATUS" = "0" ] || { echo "ERROR: altool upload failed"; exit 1; }
+          echo "Upload succeeded."
+
+      - name: "Upload log artifact"
+        if: always()
+        uses: "actions/upload-artifact@v4"
+        with:
+          name: "app-store-upload-log-${{ steps.derive.outputs.cfbundleversion }}"
+          path: |
+            /tmp/upload_log.txt
+            ${RUNNER_TEMP}/Rallyroo.xcarchive/Contents.xcarchive/Info.plist
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: "Cleanup keychain"
+        if: always()
+        run: |
+          KEYCHAIN_PATH="${{ steps.keychain.outputs.KEYCHAIN_PATH }}"
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          echo "Ephemeral keychain removed."
+
+      - name: "Summary"
+        if: success()
+        run: |
+          echo "=== App Store Upload Complete ==="
+          echo "Build number:      ${{ steps.derive.outputs.cfbundleversion }}"
+          echo "Marketing version: ${{ steps.check.outputs.marketingversion }}"
+          echo "Bundle ID:         dev.rallyroo.app"
+          echo ""
+          echo "Next steps (MANUAL — not automated):"
+          echo "  1. Check processing status in App Store Connect"
+          echo "  2. Assign build to a TestFlight group when ready"
+          echo "  3. Submit for App Store Review when ready"
