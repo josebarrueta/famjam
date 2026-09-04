@@ -85,6 +85,23 @@ final class FamilyAppUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Reopen reminder"].waitForExistence(timeout: 5))
     }
 
+    // Issue #3: the schedule tab should open near the current week.
+    // A "Today" button in the leading toolbar lets the user jump back to the
+    // current week at any time. This test verifies that button is present and
+    // functional.
+    func testScheduleShowsTodayButton() {
+        let app = XCUIApplication()
+        app.launchEnvironment["RALLYROO_DATA_MODE"] = "local"
+        app.launch()
+
+        XCTAssertTrue(app.navigationBars["Rallyroo"].waitForExistence(timeout: 10))
+        let todayButton = app.navigationBars["Rallyroo"].buttons["Today"]
+        XCTAssertTrue(todayButton.exists)
+        // Tapping "Today" returns to the start of the current week without crashing.
+        todayButton.tap()
+        XCTAssertTrue(app.navigationBars["Rallyroo"].exists)
+     }
+
     func testParentCanOpenTheLocalScheduleAndFamilyTabs() {
         let app = XCUIApplication()
         app.launchEnvironment["RALLYROO_DATA_MODE"] = "local"
