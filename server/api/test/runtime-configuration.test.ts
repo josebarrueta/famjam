@@ -14,6 +14,14 @@ describe("configuredSecret", () => {
     expect(value).toBe("mounted-value");
   });
 
+  it("trims line endings from mounted secret files", () => {
+    const value = configuredSecret("PROVIDER_TOKEN", {
+      PROVIDER_TOKEN_FILE: "/run/secrets/provider/token",
+    }, () => "mounted-value\n");
+
+    expect(value).toBe("mounted-value");
+  });
+
   it("retains environment compatibility for local development", () => {
     expect(configuredSecret("PROVIDER_TOKEN", {
       PROVIDER_TOKEN: "local-value",

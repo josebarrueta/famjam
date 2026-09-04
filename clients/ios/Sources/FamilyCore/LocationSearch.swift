@@ -14,9 +14,15 @@ public protocol LocationSearch: Sendable {
     func suggestions(for query: String) async throws -> [LocationSuggestion]
 }
 
+public enum LocationSearchError: Error, Equatable, Sendable {
+    case unavailable
+}
+
 public struct EmptyLocationSearch: LocationSearch {
     public init() {}
-    public func suggestions(for query: String) async throws -> [LocationSuggestion] { [] }
+    public func suggestions(for query: String) async throws -> [LocationSuggestion] {
+        throw LocationSearchError.unavailable
+    }
 }
 
 public actor RemoteLocationSearch: LocationSearch {

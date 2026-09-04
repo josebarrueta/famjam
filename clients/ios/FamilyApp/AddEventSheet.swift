@@ -23,6 +23,7 @@ struct AddEventSheet: View {
     @State private var isShowingAlert = false
     @State private var isShowingDeleteConfirmation = false
     @State private var locationSuggestions: [LocationSuggestion] = []
+    @State private var locationSearchMessage: String?
 
     init(
         event: FamilyEvent? = nil,
@@ -87,10 +88,16 @@ struct AddEventSheet: View {
                         Button {
                             location = suggestion.address
                             locationSuggestions = []
+                            locationSearchMessage = nil
                         } label: {
                             Label(suggestion.address, systemImage: "mappin.and.ellipse")
                                 .foregroundStyle(.primary)
                         }
+                    }
+                    if let locationSearchMessage {
+                        Label(locationSearchMessage, systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     TextField("Driver", text: $driver)
                 }
@@ -100,11 +107,20 @@ struct AddEventSheet: View {
                 let query = location.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard query.count >= 2 else {
                     locationSuggestions = []
+                    locationSearchMessage = nil
                     return
                 }
-                try? await Task.sleep(for: .milliseconds(250))
-                guard !Task.isCancelled else { return }
-                locationSuggestions = (try? await locationSearch.suggestions(for: query)) ?? []
+                do {
+                    try await Task.sleep(for: .milliseconds(250))
+                    guard !Task.isCancelled else { return }
+                    locationSuggestions = try await locationSearch.suggestions(for: query)
+                    locationSearchMessage = nil
+                } catch is CancellationError {
+                    return
+                } catch {
+                    locationSuggestions = []
+                    locationSearchMessage = "Location suggestions are unavailable. You can still enter a location manually."
+                }
             }
             .toolbar {
                 if existingEvent != nil, onDelete != nil {

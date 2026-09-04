@@ -36,6 +36,30 @@ final class FamilyAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Welcome to Rallyroo"].waitForExistence(timeout: 5))
     }
 
+    func testManualLocationRemainsSavableWhenSuggestionsAreUnavailable() {
+        let app = XCUIApplication()
+        app.launchEnvironment["RALLYROO_DATA_MODE"] = "local"
+        app.launch()
+
+        XCTAssertTrue(app.navigationBars["Rallyroo"].waitForExistence(timeout: 10))
+        app.buttons["Add"].tap()
+        XCTAssertTrue(app.navigationBars["Add Event"].waitForExistence(timeout: 5))
+
+        app.textFields["Title"].tap()
+        app.textFields["Title"].typeText("Location fallback test")
+        app.textFields["Location"].tap()
+        app.textFields["Location"].typeText("123 Main Street")
+
+        let fallbackMessage = app.staticTexts[
+            "Location suggestions are unavailable. You can still enter a location manually."
+        ]
+        XCTAssertTrue(fallbackMessage.waitForExistence(timeout: 5))
+        app.buttons["Save"].tap()
+
+        XCTAssertTrue(app.staticTexts["Location fallback test"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["123 Main Street"].exists)
+    }
+
     func testParentCanOpenTheLocalScheduleAndFamilyTabs() {
         let app = XCUIApplication()
         app.launchEnvironment["RALLYROO_DATA_MODE"] = "local"

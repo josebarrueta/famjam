@@ -9,7 +9,7 @@ export function configuredSecret(
 ): string | undefined {
   const file = environment[`${name}_FILE`];
   if (file) {
-    const value = readSecretFile(file);
+    const value = readSecretFile(file).trim();
     if (!value) throw new Error(`${name}_FILE is empty`);
     return value;
   }

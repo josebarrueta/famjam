@@ -483,7 +483,11 @@ export function buildApp({
   }, async (request, reply) => {
     const parsed = locationSearchSchema.safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_location_query" });
-    return locationSearchProvider.search(parsed.data.q);
+    try {
+      return await locationSearchProvider.search(parsed.data.q);
+    } catch {
+      return reply.code(502).send({ error: "location_search_unavailable" });
+    }
   });
 
   app.put("/v1/devices/:token", async (request, reply) => {

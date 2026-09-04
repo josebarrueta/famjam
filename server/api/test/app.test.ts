@@ -282,6 +282,26 @@ describe("Rallyroo API", () => {
     await app.close();
   });
 
+  it("returns a non-sensitive unavailable response when location search fails", async () => {
+    const app = buildApp({
+      identityProvider,
+      repository: repository(),
+      locationSearchProvider: {
+        async search() { throw new Error("provider response containing sensitive details"); },
+      },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/locations/search?q=123%20Main",
+      headers: { authorization: "Bearer parent-token" },
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toEqual({ error: "location_search_unavailable" });
+    expect(response.body).not.toContain("sensitive details");
+    await app.close();
+  });
+
   it("requires guardian authorization before inviting a kid", async () => {
     const app = buildApp({ identityProvider, repository: repository() });
 
