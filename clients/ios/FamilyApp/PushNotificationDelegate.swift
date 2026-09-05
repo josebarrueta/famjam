@@ -1,5 +1,5 @@
 import UIKit
-import UserNotifications
+@preconcurrency import UserNotifications
 
 final class PushNotificationDelegate: NSObject, UIApplicationDelegate {
     func application(

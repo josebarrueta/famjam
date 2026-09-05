@@ -1,6 +1,6 @@
 import FamilyCore
 import Foundation
-import UserNotifications
+@preconcurrency import UserNotifications
 
 actor LocalReminderAlertScheduler: ReminderAlertScheduler {
      // UNUserNotificationCenter is a thread-safe singleton; nonisolated(unsafe) lets Swift 6
