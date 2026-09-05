@@ -1,17 +1,11 @@
 name: iOS
 
 on:
+  # These checks are required by main branch protection, so they must report for
+  # every PR/push. The TestFlight queue separately filters commits by clients/ios/.
   pull_request:
-    paths:
-      - "clients/ios/**"
-      - "server/api/**"
-      - ".github/workflows/ios.yml"
   push:
     branches: [main]
-    paths:
-      - "clients/ios/**"
-      - "server/api/**"
-      - ".github/workflows/ios.yml"
 
 jobs:
   core-contract:

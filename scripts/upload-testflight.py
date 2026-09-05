@@ -26,6 +26,13 @@ def security(args):
     return result
 
 
+def activate_keychain(keychain, original_keychains):
+    # Xcode discovers signing identities through the user search list. Passing
+    # --keychain to codesign alone happens after Xcode's identity selection.
+    run(["security", "list-keychains", "-d", "user", "-s",
+         str(keychain), *original_keychains])
+
+
 def verify(app, build):
     with (app / "Info.plist").open("rb") as f:
         info = plistlib.load(f)
@@ -93,6 +100,7 @@ def main():
                       "-T", "/usr/bin/codesign", "-T", "/usr/bin/security"])
             security(["set-key-partition-list", "-S", "apple-tool:,apple:,codesign:",
                       "-s", "-k", password, str(keychain)])
+            activate_keychain(keychain, original_keychains)
             identities = run(["security", "find-identity", "-v", "-p", "codesigning", str(keychain)])
             if b'"Apple Distribution:' not in identities:
                 raise RuntimeError("Distribution signing identity not available")
@@ -112,7 +120,6 @@ def main():
                 "signingStyle": "manual", "signingCertificate": "Apple Distribution",
                 "provisioningProfiles": {"dev.rallyroo.app": decoded["UUID"]},
                 "manageAppVersionAndBuildNumber": False, "uploadSymbols": True}))
-            run(["security", "list-keychains", "-d", "user", "-s", str(keychain)])
             run(["xcodebuild", "-exportArchive", "-archivePath", str(archive),
                  "-exportPath", str(root / "export"), "-exportOptionsPlist", str(options)])
             ipa, = (root / "export").glob("*.ipa")
