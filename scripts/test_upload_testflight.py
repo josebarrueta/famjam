@@ -45,7 +45,8 @@ Actionable: Unauthorized (401)
         good = {"CFBundleIdentifier": "dev.rallyroo.app", "CFBundleVersion": "101.1.0",
                 "CFBundleShortVersionString": "1.0", "RALLYROO_DATA_MODE": "remote",
                 "RALLYROO_REMOTE_BASE_URL": "https://api.rallyroo.dev",
-                "ITSAppUsesNonExemptEncryption": False, "UIDeviceFamily": [1]}
+                "ITSAppUsesNonExemptEncryption": False, "UIDeviceFamily": [1],
+                "DTSDKName": "iphoneos26.3"}
         entitlements = {"application-identifier": "5LS29Z8553.dev.rallyroo.app",
                         "com.apple.developer.team-identifier": "5LS29Z8553",
                         "aps-environment": "production", "com.apple.developer.applesignin": ["Default"]}
