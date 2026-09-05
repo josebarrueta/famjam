@@ -3,16 +3,24 @@ import Foundation
 import UserNotifications
 
 actor LocalReminderAlertScheduler: ReminderAlertScheduler {
-    // UNUserNotificationCenter is a thread-safe singleton; nonisolated(unsafe) lets Swift 6
-    // know it is safe to reference across the actor boundary without copying.
+     // UNUserNotificationCenter is a thread-safe singleton; nonisolated(unsafe) lets Swift 6
+     // know it is safe to reference across the actor boundary without copying.
     nonisolated(unsafe) private let notificationCenter = UNUserNotificationCenter.current()
 
     func schedule(_ reminder: FamilyReminder) async throws {
         await cancel(reminder)
         guard reminder.status == .open, let leadTime = reminder.alertLeadTime else { return }
+
+        // Check authorization status without prompting — the prompt is requested
+        // at app startup via requestPushNotifications(). If the user has not
+        // granted permission we do not schedule a local notification.
+        let settings = await notificationCenter.notificationSettings()
+        guard settings.authorizationStatus == .authorized ||
+              settings.authorizationStatus == .provisional ||
+              settings.authorizationStatus == .ephemeral else { return }
+
         let fireAt = reminder.dueAt.addingTimeInterval(-Double(leadTime.rawValue * 60))
         guard fireAt > .now else { return }
-        guard try await notificationCenter.requestAuthorization(options: [.alert, .badge, .sound]) else { return }
 
         let content = UNMutableNotificationContent()
         content.title = reminder.title
@@ -24,14 +32,14 @@ actor LocalReminderAlertScheduler: ReminderAlertScheduler {
             identifier: identifier(for: reminder),
             content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
-        ))
-    }
+         ))
+     }
 
     func cancel(_ reminder: FamilyReminder) async {
         notificationCenter.removePendingNotificationRequests(withIdentifiers: [identifier(for: reminder)])
-    }
+     }
 
     private func identifier(for reminder: FamilyReminder) -> String {
-        "rallyroo.reminder.\(reminder.id.uuidString.lowercased())"
-    }
+         "rallyroo.reminder.\(reminder.id.uuidString.lowercased())"
+     }
 }

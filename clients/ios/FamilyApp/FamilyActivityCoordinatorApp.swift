@@ -55,7 +55,9 @@ struct FamilyActivityCoordinatorApp: App {
             authentication = remoteAuthentication
             eventStore = RemoteEventStore(baseURL: baseURL, transport: authenticatedTransport)
             reminderStore = RemoteReminderStore(baseURL: baseURL, transport: authenticatedTransport)
-            reminderAlertScheduler = nil
+            // Local scheduler runs in both modes so a reminder always fires a local
+            // notification even if the APNs path fails or the server is unreachable.
+            reminderAlertScheduler = LocalReminderAlertScheduler()
             memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: authenticatedTransport)
             locationSearch = RemoteLocationSearch(baseURL: baseURL, transport: authenticatedTransport)
             invitationStore = RemoteFamilyInvitationStore(
@@ -139,15 +141,17 @@ struct FamilyActivityCoordinatorApp: App {
 
     @MainActor
     private func requestPushNotifications() async {
-        guard deviceRegistrationStore != nil else { return }
+        // Always request local notification permission—reminders need it in both modes.
         let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .badge, .sound]
-        )) == true
+          )) == true
         if granted {
-            UIApplication.shared.registerForRemoteNotifications()
+            if deviceRegistrationStore != nil {
+                // Remote mode: also register for APNs
+                UIApplication.shared.registerForRemoteNotifications()
+                }
+             }
         }
-    }
-
     private func synchronizeCalendars(for role: AccountRole) async {
         guard role == .parent, let calendarSourceStore else { return }
         while !Task.isCancelled {
