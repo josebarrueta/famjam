@@ -55,8 +55,8 @@ internal TestFlight distribution (App Manager); do not use an Admin key.
 Create/verify the internal group named exactly `Rallyroo Internal` before enabling.
 No beta-group ID or hardcoded numeric app ID is needed.
 
-Both UI CI and signed archives pin Xcode 16.4 on macOS 15; upload tooling pins
-Fastlane 2.232.2. Missing tooling fails the job—there is no silent fallback.
+Both UI CI and signed archives pin Xcode 26.3 on macOS 15, satisfying App Store
+Connect's iOS 26 SDK minimum; upload tooling pins Fastlane 2.232.2. Missing tooling fails the job—there is no silent fallback.
 Confirm availability on the selected hosted runner during the first acceptance run.
 
 ## Build numbers and recovery
@@ -76,8 +76,8 @@ numbering migration, not a silent fallback.
 
 ## Verification and credential lifecycle
 
-The script validates bundle ID, build number, remote production configuration,
-iPhone-only device family, privacy manifest presence/parseability, encryption
+The script validates bundle ID, build number, iOS 26-or-later SDK, remote production
+configuration, iPhone-only device family, privacy manifest presence/parseability, encryption
 flag, code signature, Apple sign-in, production APNs, team/application identifiers,
 and absence of a debug entitlement before export/upload.
 

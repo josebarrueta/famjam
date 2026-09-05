@@ -71,6 +71,10 @@ def verify(app, build):
     for key, value in expected.items():
         if info.get(key) != value:
             raise RuntimeError(f"Archive validation failed: {key}")
+    sdk_name = info.get('DTSDKName', '')
+    sdk_match = re.fullmatch(r'iphoneos(\d+)(?:\.\d+)*', sdk_name) if isinstance(sdk_name, str) else None
+    if not sdk_match or int(sdk_match.group(1)) < 26:
+        raise RuntimeError('Archive validation failed: iOS 26 SDK or later required')
     with (app / "PrivacyInfo.xcprivacy").open("rb") as f:
         plistlib.load(f)
     run(["codesign", "--verify", "--deep", "--strict", str(app)])

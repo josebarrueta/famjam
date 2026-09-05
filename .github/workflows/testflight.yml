@@ -50,13 +50,13 @@ jobs:
           ref: main
           fetch-depth: 0
           persist-credentials: false
-      - name: Select pinned Xcode 16.4
+      - name: Select pinned Xcode 26.3
         run: |
-          test -d /Applications/Xcode_16.4.app || {
-            echo "Pinned Xcode 16.4 is unavailable" >&2
+          test -d /Applications/Xcode_26.3.app || {
+            echo "Pinned Xcode 26.3 is unavailable" >&2
             exit 1
           }
-          sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
           xcodebuild -version
       - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b
         with:
