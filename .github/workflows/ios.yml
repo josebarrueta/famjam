@@ -56,22 +56,21 @@ jobs:
           fi
 
   ui:
-    # Xcode 26's hosted simulator has shown multi-minute cold-start regressions.
-    runs-on: macos-14
+    # Keep CI and signed TestFlight archives on the same pinned toolchain.
+    runs-on: macos-15
     timeout-minutes: 15
     defaults:
       run:
         working-directory: clients/ios
     steps:
-      - uses: actions/checkout@v5
-      - name: Select newest installed Xcode 16
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Select pinned Xcode 16.4
         run: |
-          XCODE_PATH=$(find /Applications -maxdepth 1 -type d -name 'Xcode_16*.app' | sort -V | tail -1)
-          if [[ -z "$XCODE_PATH" ]]; then
-            echo "No Xcode 16 installation found" >&2
+          test -d /Applications/Xcode_16.4.app || {
+            echo "Pinned Xcode 16.4 is unavailable" >&2
             exit 1
-          fi
-          sudo xcode-select --switch "$XCODE_PATH"
+          }
+          sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
           xcodebuild -version
       - name: Start simulator boot early
         run: |

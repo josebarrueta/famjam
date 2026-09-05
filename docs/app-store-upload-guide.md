@@ -1,140 +1,103 @@
-# App Store Connect Upload — Operational Guide
+# Automatic internal TestFlight uploads
 
-## Overview
+## Current status
 
-The `App Store Upload` GitHub Actions workflow (`.github/workflows/app-store-upload.yml`)
-provides a controlled, gated path for building and uploading signed Rallyroo
-archives to App Store Connect.  It is **manual only** — no routine push,
-pull-request, or tag event triggers an upload.
+The previous manual upload workflow was defective and has been replaced by
+`.github/workflows/testflight.yml`. Static checks and archive-validation unit tests
+are available; a real signed upload is still required before this is operational.
+Issue #8 must remain open until that acceptance run succeeds.
 
----
+## Trigger and destination
 
-## Prerequisites (one-time setup)
+A successful **iOS** main-push workflow wakes a durable FIFO queue. Main's
+first-parent history after repository variable `TESTFLIGHT_START_SHA` is the
+queue; GitHub deployments in `rallyroo-testflight` are its completion ledger.
+Set that immutable variable to the last main commit that must **not** be published
+(full SHA), before merging the uploader. Every subsequent main commit changing
+`clients/ios/` is queued. PR validation runs cannot upload.
 
-### 1. GitHub Environment: `production-upload`
+Each wake publishes the oldest unpublished commit after its main-push iOS CI
+succeeds. A failing or unfinished CI run blocks the queue, rather than publishing
+out of order. Re-run that commit's CI to recover. The exact queued SHA is built
+in a detached worktree using the current trusted main delivery scripts.
 
-1. Go to **GitHub → rallyroo → Settings → Environments**.
-2. Click **Add environment** → name it `production-upload`.
-3. Add one or more **required reviewers** (accounts that must approve each run).
-4. *(Optional)* add a **production secret** named `ASC_API_KEY_ID` as a
-   non-secret environment variable — leave blank initially.
+Manual dispatch and a 15-minute scheduled wake recover coalesced/missed events.
+The workflow concurrency group is only a mutex, not the queue: replacing a pending
+wake does not discard commits. Idle polls run on Ubuntu, not a signing macOS runner.
+One commit is processed per wake; a backlog drains over subsequent scheduled runs.
+GitHub schedule delays may increase latency. Do not force-push main or delete the
+bootstrap commit/deployment ledger.
 
-### 2. App Store Connect API Key
+There is no approval gate for this internal-testing path, as requested. Protect
+main with required PR reviews and required iOS CI checks: merged code can execute
+with signing secrets. This workflow does not itself enforce branch protection.
 
-1. Go to **App Store Connect → Users and Access → Integrations → App Store Connect API**.
-2. Click **Generate API Key** (or **Generate New Key**).
-3. Choose:
-   - **Name**: `rallyroo-ci`
-   - **Role**: `App Manager` (minimum scope: read + manage TestFlight)
-4. Download the `.p8` key file **immediately** — Apple will not show it again.
+Fastlane uploads and waits for processing, then assigns the build to **Rallyroo
+Internal**. It never requests external beta review or App Store Review. Internal
+testers may receive the build automatically; this supersedes the earlier manual
+internal-distribution policy.
 
-### 3. Distribution Certificate & Provisioning Profile
+## Required one-time setup
 
-Already in place from existing TestFlight work:
+Store these repository Actions secrets using GitHub's secret UI or a secure
+file/stdin upload, never by pasting values into command arguments or chat:
 
-- **Certificate**: `Apple Distribution: <Your Name>` (from Keychain Access,
-  export as `.p12` with a password).
-- **Provisioning Profile**: `Rallyroo App Store` (from App Store Connect →
-  Devices, Profiles & Certificates → Profiles).
+- `APPLE_API_KEY_ID`: App Store Connect team API key ID.
+- `APPLE_API_ISSUER_ID`: issuer ID.
+- `ASC_API_PRIVATE_KEY`: complete PEM .p8 contents, not base64.
+- `APPLE_DISTRIBUTION_CERT`: base64 .p12 including its private key.
+- `APPLE_DISTRIBUTION_CERT_PWD`: .p12 password (may be empty).
+- `APPLE_PROVISIONING_PROFILE`: base64 App Store distribution profile for
+  `dev.rallyroo.app`, team `5LS29Z8553`, including Apple sign-in and production APNs.
 
-### 4. GitHub Secrets
+Use a narrowly scoped key with the permissions necessary to upload and manage
+internal TestFlight distribution (App Manager); do not use an Admin key.
+Create/verify the internal group named exactly `Rallyroo Internal` before enabling.
+No beta-group ID or hardcoded numeric app ID is needed.
 
-Set the following in **GitHub → rallyroo → Settings → Actions → Secrets and
-variables → Repository** (or Organization):
+Both UI CI and signed archives pin Xcode 16.4 on macOS 15; upload tooling pins
+Fastlane 2.232.2. Missing tooling fails the job—there is no silent fallback.
+Confirm availability on the selected hosted runner during the first acceptance run.
 
-| Secret                         | Description                                      | Source                                        |
-| ------------------------------ | ------------------------------------------------ | -------------------------------------------- |
-| `APPLE_API_KEY_ID`             | App Store Connect API Key ID (non-secret)        | App Store Connect UI                          |
-| `APPLE_API_ISSUER_ID`          | App Store Connect Issuer ID                      | App Store Connect UI                          |
-| `ASC_API_PRIVATE_KEY`          | Full contents of the `.p8` key (multiline block) | Downloaded `.p8` file from Apple              |
-| `APPLE_DISTRIBUTION_CERT`      | Base64 of the `.p12` certificate                 | `base64 -i cert.p12`                          |
-| `APPLE_DISTRIBUTION_CERT_PWD`  | Password for the `.p12` file (use `""` if none)  | Same password set during Keychain export      |
-| `APPLE_PROVISIONING_PROFILE`   | Base64 of the `.mobileprovision` file            | `base64 -i Rallyroo\ App\ Store.mobileprovision` |
+## Build numbers and recovery
 
----
+Build integers start at 101. Before signing, the serialized worker reserves the
+next number in a deployment payload. Failed/interrupted attempts consume their
+numbers; retries allocate a fresh number, never reuse one. The bound is 9999;
+migrate deliberately before exhaustion. The marketing version is unchanged.
 
-## Running the Workflow
+Only successful processing/distribution marks a commit complete. If an upload
+succeeded but its completion record was lost, a retry can produce a second build
+for that SHA with a new number (at-least-once delivery). Completed commits are
+skipped. Do not use another uploader or delete deployment records: the ledger
+and workflow mutex jointly own numbering and ordering. App Store Connect remains
+authoritative; pre-existing builds above the reserved range require a planned
+numbering migration, not a silent fallback.
 
-1. Go to **GitHub → rallyroo → Actions → App Store Upload**.
-2. Click **Run workflow** on the right.
-3. (Optional) provide:
-   - `ref`: git tag or branch name (defaults to `HEAD`)
-   - `cfbundleversion`: a unique build number > any previously uploaded (leave blank to auto-increment)
-4. Click **Run workflow**.
-5. Navigate to **GitHub → rallyroo → Actions → Environments → production-upload**
-   and **Approve** the pending workflow run.
-6. Watch the run.  A green checkmark means the archive was uploaded to
-   App Store Connect.
+## Verification and credential lifecycle
 
----
+The script validates bundle ID, build number, remote production configuration,
+iPhone-only device family, privacy manifest presence/parseability, encryption
+flag, code signature, Apple sign-in, production APNs, team/application identifiers,
+and absence of a debug entitlement before export/upload.
 
-## Post-upload Steps (Manual — Not Automated)
+Credentials live in a private temporary directory and ephemeral keychain. Keychain
+password commands are sent over stdin to `security -i`, not process arguments.
+Cleanup restores the runner keychain search list and removes installed signing
+material on normal failure/success. Hosted-runner disposal is the final boundary
+for cancellation or machine failure. Raw build/provider logs are deliberately not
+printed or uploaded: errors identify only the failing stage/tool.
 
-The workflow does **not** automatically:
-- Assign the build to a TestFlight group
-- Submit the build for App Store Review
+Rotate certificates/profiles before expiry and API keys after exposure or personnel
+changes. App Store profiles contain no device UDIDs. Revoke compromised keys in
+App Store Connect and certificates in the Apple Developer portal, replace secrets,
+and validate a new upload. Never put credentials in screenshots or issues.
 
-After a successful upload:
+## Acceptance
 
-1. Go to **App Store Connect → TestFlight** and assign the new build to
-   `Rallyroo Internal` (or another group) when ready.
-2. Go to **App Store Connect → Your App → TestFlight** and submit the build
-   for **App Store Review** when the release is ready for public distribution.
-
----
-
-## Certificate & Key Rotation
-
-### When to rotate
-
-- Apple Distribution certificate expires every **1 year**
-- App Store Connect API key has **no expiry**, but rotate after a team member
-  leaves, a key is exposed, or as a best-practice security measure
-- Provisioning profile changes when device UDIDs change
-
-### How to rotate
-
-1. Generate a new `.p12` certificate or re-export in Keychain Access.
-2. Re-upload the new `.p12`, `.p8`, and `.mobileprovision` as base64 to the
-   GitHub secrets (update, do not leave old values).
-3. For the API key: revoke the old key in App Store Connect, then create a new one.
-4. Re-run the upload workflow to confirm the new credentials work.
-
----
-
-## Failed-Upload Recovery
-
-| Symptom                                        | Likely cause                              | Action                                          |
-| --------------------------------------------- | ---------------------------------------- | ---------------------------------------------- |
-| `altool: no such file or directory`            | Xcode 16 not selected / toolchain issue   | Check `/tmp/xcode-version.txt` artifact         |
-| `No matching provisioning profile found`       | Profile expired or wrong team             | Regenerate `Rallyroo App Store` profile         |
-| `CFBundleVersion N already exists`             | Build number not unique                   | Pass `cfbundleversion` input with a higher number |
-| `Invalid API key` or `401 Unauthorized`        | Secret expired or misconfigured          | Verify secrets in GitHub → Actions              |
-| `Archive verification failed`                  | Signature or entitlement mismatch        | Check `family-app-architecture.md` signing flow |
-
----
-
-## Emergency Revocation
-
-If a signing credential is exposed:
-
-1. **Revoke** the API key: App Store Connect → Integrations → revoke `rallyroo-ci`.
-2. **Revoke** the distribution certificate: App Store Connect → Certificates,
-   Identifiers & Profiles → revoke `Apple Distribution: <Name>`.
-3. **Generate** new credentials (see "How to rotate" above).
-4. **Update** GitHub secrets with the new base64 values and key IDs.
-5. Verify the next upload uses only the new credentials.
-
----
-
-## Security Notes
-
-- All signing material is loaded into a **temporary keychain** and deleted at the
-  end of the job.  No certificate or key is written to the GitHub Actions runner's
-  persistent disk.
-- The `altool` upload log is uploaded as a **non-sensitive artifact** (no
-  certificate, profile, or API key data in the log text).
-- The App Store Connect API key `.p8` is stored as a GitHub Actions **secret**
-  — never visible in logs or UI.
-- The `production-upload` GitHub environment requires a **human approval** before
-  each run.  Automated CI cannot self-approve.
+- Run `./scripts/test-app-store-upload-workflow.sh` locally.
+- Configure secrets and verify required branch protections.
+- Merge an iOS PR; confirm successful iOS CI triggers the exact SHA's upload.
+- Confirm the build finishes processing and appears in Rallyroo Internal.
+- Confirm a retry gets a different build number.
+- Test issue #9 on a physical device; CI smoke tests do not prove delivery.
