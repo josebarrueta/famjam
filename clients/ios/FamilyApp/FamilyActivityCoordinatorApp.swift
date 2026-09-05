@@ -55,9 +55,9 @@ struct FamilyActivityCoordinatorApp: App {
             authentication = remoteAuthentication
             eventStore = RemoteEventStore(baseURL: baseURL, transport: authenticatedTransport)
             reminderStore = RemoteReminderStore(baseURL: baseURL, transport: authenticatedTransport)
-            // Local scheduler runs in both modes so a reminder always fires a local
-            // notification even if the APNs path fails or the server is unreachable.
-            reminderAlertScheduler = LocalReminderAlertScheduler()
+            // Hosted reminders notify assignees through APNs. Scheduling a second
+            // local alert here would duplicate pushes and survive remote edits.
+            reminderAlertScheduler = nil
             memberStore = RemoteFamilyMemberStore(baseURL: baseURL, transport: authenticatedTransport)
             locationSearch = RemoteLocationSearch(baseURL: baseURL, transport: authenticatedTransport)
             invitationStore = RemoteFamilyInvitationStore(
