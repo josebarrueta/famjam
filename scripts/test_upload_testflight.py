@@ -11,6 +11,36 @@ spec.loader.exec_module(upload)
 
 
 class ArchiveValidationTests(unittest.TestCase):
+    def test_fastlane_diagnostics_redact_credentials_personal_data_and_tokens(self):
+        environment = {
+            'APPLE_API_KEY_ID': 'FIXTUREKEY',
+            'APPLE_API_ISSUER_ID': 'fixture-issuer',
+            'ASC_API_PRIVATE_KEY': 'fixture-private-key',
+        }
+        output = '''Failure for FIXTUREKEY and fixture-issuer
+fixture-private-key
+-----BEGIN PRIVATE KEY-----
+secretmaterial
+-----END PRIVATE KEY-----
+Contact person@example.com at /Users/person/project
+Bearer abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN123456
+Actionable: Unauthorized (401)
+'''
+        sanitized = upload.sanitized_failure_output(output, environment)
+        for forbidden in ('FIXTUREKEY', 'fixture-issuer', 'fixture-private-key',
+                          'secretmaterial', 'person@example.com', '/Users/person',
+                          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN123456'):
+            self.assertNotIn(forbidden, sanitized)
+        self.assertIn('Unauthorized (401)', sanitized)
+        self.assertIn('<REDACTED_EMAIL>', sanitized)
+
+    def test_fastlane_diagnostics_are_bounded_to_last_eighty_lines(self):
+        output = '\n'.join(f'line {number}' for number in range(100))
+        sanitized = upload.sanitized_failure_output(output, {})
+        self.assertEqual(len(sanitized.splitlines()), 80)
+        self.assertNotIn('line 19\n', sanitized + '\n')
+        self.assertIn('line 99', sanitized)
+
     def test_archive_rejects_each_invalid_release_field(self):
         good = {"CFBundleIdentifier": "dev.rallyroo.app", "CFBundleVersion": "101.1.0",
                 "CFBundleShortVersionString": "1.0", "RALLYROO_DATA_MODE": "remote",
