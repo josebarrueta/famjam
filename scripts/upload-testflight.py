@@ -22,7 +22,7 @@ def run(args, **kwargs):
 
 
 def security(args):
-    result = run(["security", "-i"], input=(shlex.join(args) + "\nquit\n").encode())
+    result = run(["security", "-i"], input=(shlex.join(args) + "\n").encode())
     return result
 
 
@@ -57,12 +57,10 @@ def main():
     for name in required:
         if not os.environ.get(name):
             raise RuntimeError(f"Missing GitHub secret: {name}")
-    # Unique per workflow run AND retry, bounded to Apple's numeric components.
-    major = 100 + int(os.environ["GITHUB_RUN_NUMBER"])
-    attempt = int(os.environ["GITHUB_RUN_ATTEMPT"])
-    if major > 9999 or not 1 <= attempt <= 99:
-        raise RuntimeError("Build number range exhausted; rotate numbering policy")
-    build = f"{major}.{attempt}.0"
+    # Allocated durably before signing by the serialized deployment queue.
+    build = os.environ['TESTFLIGHT_BUILD_NUMBER']
+    if not build.isdigit() or not 101 <= int(build) <= 9999:
+        raise RuntimeError('Invalid allocated build number')
     os.umask(0o077)
     original_keychains = shlex.split(run(["security", "list-keychains", "-d", "user"]).decode())
     with tempfile.TemporaryDirectory(prefix="rallyroo-signing-", dir=os.environ["RUNNER_TEMP"]) as temp:

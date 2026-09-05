@@ -41,3 +41,15 @@ class ArchiveValidationTests(unittest.TestCase):
             upload.security(["unlock-keychain", "-p", "fixture-password", "fixture.keychain"])
             self.assertEqual(call.call_args.args[0], ["security", "-i"])
             self.assertIn(b"fixture-password", call.call_args.kwargs["input"])
+            self.assertNotIn(b"quit", call.call_args.kwargs["input"])
+
+    @unittest.skipUnless(__import__('sys').platform == 'darwin', 'Requires macOS Security CLI')
+    def test_security_interactive_keychain_lifecycle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            keychain = str(Path(directory) / 'fixture.keychain-db')
+            try:
+                upload.security(['create-keychain', '-p', 'fixture password', keychain])
+                self.assertTrue(Path(keychain).exists())
+                upload.security(['unlock-keychain', '-p', 'fixture password', keychain])
+            finally:
+                __import__('subprocess').run(['security', 'delete-keychain', keychain], capture_output=True)

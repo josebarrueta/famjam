@@ -9,11 +9,24 @@ Issue #8 must remain open until that acceptance run succeeds.
 
 ## Trigger and destination
 
-A successful **iOS** workflow on a **main push** starts TestFlight delivery of that
-workflow's exact `head_sha`, not whatever main points to later. Failed CI and PR
-validation runs cannot upload. The iOS workflow is path-filtered, including iOS
-and API changes; API-only changes can consequently also trigger an upload.
-Manual dispatch is available on main for recovery/bootstrap.
+A successful **iOS** main-push workflow wakes a durable FIFO queue. Main's
+first-parent history, starting at repository variable `TESTFLIGHT_START_SHA`, is
+the queue; GitHub deployments in `rallyroo-testflight` are its completion ledger.
+Set that immutable variable to the initial main commit to publish (full SHA).
+Every subsequent main commit changing `clients/ios/` is queued. Bootstrap is
+included even without an iOS change. PR validation runs cannot upload.
+
+Each wake publishes the oldest unpublished commit after its main-push iOS CI
+succeeds. A failing or unfinished CI run blocks the queue, rather than publishing
+out of order. Re-run that commit's CI to recover. The exact queued SHA is built
+in a detached worktree using the current trusted main delivery scripts.
+
+Manual dispatch and a 15-minute scheduled wake recover coalesced/missed events.
+The workflow concurrency group is only a mutex, not the queue: replacing a pending
+wake does not discard commits. Idle polls run on Ubuntu, not a signing macOS runner.
+One commit is processed per wake; a backlog drains over subsequent scheduled runs.
+GitHub schedule delays may increase latency. Do not force-push main or delete the
+bootstrap commit/deployment ledger.
 
 There is no approval gate for this internal-testing path, as requested. Protect
 main with required PR reviews and required iOS CI checks: merged code can execute
@@ -48,16 +61,18 @@ hosted runner during the first acceptance run.
 
 ## Build numbers and recovery
 
-Build numbers are `(100 + GITHUB_RUN_NUMBER).GITHUB_RUN_ATTEMPT.0`. They are bounded
-to Apple's component limits and unique for each run/retry of this workflow. The
-marketing version remains in the project. Do not delete/recreate the workflow or
-introduce another uploader with an independent counter without migrating the
-numbering policy. App Store Connect remains authoritative for acceptance.
+Build integers start at 101. Before signing, the serialized worker reserves the
+next number in a deployment payload. Failed/interrupted attempts consume their
+numbers; retries allocate a fresh number, never reuse one. The bound is 9999;
+migrate deliberately before exhaustion. The marketing version is unchanged.
 
-Concurrent uploads or reruns of older commits can arrive out of order. Such a
-build may be rejected by Apple; rerun the latest main workflow rather than silently
-reusing an accepted number. This is not a durable FIFO release queue and does not
-guarantee delivery of every historical commit during concurrent merges.
+Only successful processing/distribution marks a commit complete. If an upload
+succeeded but its completion record was lost, a retry can produce a second build
+for that SHA with a new number (at-least-once delivery). Completed commits are
+skipped. Do not use another uploader or delete deployment records: the ledger
+and workflow mutex jointly own numbering and ordering. App Store Connect remains
+authoritative; pre-existing builds above the reserved range require a planned
+numbering migration, not a silent fallback.
 
 ## Verification and credential lifecycle
 
