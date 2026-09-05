@@ -36,6 +36,14 @@ class ArchiveValidationTests(unittest.TestCase):
                 with self.assertRaises(FileNotFoundError):
                     upload.verify(app, "101.1.0")
 
+    def test_signing_keychain_is_added_before_xcode_discovery(self):
+        with patch.object(upload, 'run') as call:
+            upload.activate_keychain('/tmp/signing.keychain-db', ['/Users/runner/login.keychain-db'])
+            call.assert_called_once_with([
+                'security', 'list-keychains', '-d', 'user', '-s',
+                '/tmp/signing.keychain-db', '/Users/runner/login.keychain-db'
+            ])
+
     def test_security_password_uses_stdin_not_argv(self):
         with patch.object(upload, "run") as call:
             upload.security(["unlock-keychain", "-p", "fixture-password", "fixture.keychain"])
