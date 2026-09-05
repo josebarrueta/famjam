@@ -10,6 +10,7 @@ import plistlib
 import secrets
 import shlex
 import shutil
+import re
 import subprocess
 import tempfile
 
@@ -19,6 +20,33 @@ def run(args, **kwargs):
     if result.returncode:
         raise RuntimeError(f"{Path(args[0]).name} failed; raw output withheld")
     return result.stdout
+
+
+def sanitized_failure_output(output, environment):
+    text = output.decode(errors='replace') if isinstance(output, bytes) else output
+    for name in ('APPLE_API_KEY_ID', 'APPLE_API_ISSUER_ID', 'ASC_API_PRIVATE_KEY',
+                 'APPLE_DISTRIBUTION_CERT', 'APPLE_DISTRIBUTION_CERT_PWD',
+                 'APPLE_PROVISIONING_PROFILE'):
+        value = environment.get(name, '')
+        if value:
+            text = text.replace(value, '<REDACTED>')
+    text = re.sub(r'-----BEGIN [^-]+-----.*?-----END [^-]+-----', '<REDACTED_PEM>', text,
+                  flags=re.DOTALL)
+    text = re.sub(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', '<REDACTED_EMAIL>', text)
+    text = re.sub(r'/Users/[^/\s]+', '<HOME>', text)
+    text = re.sub(r'(?<![\w])[A-Za-z0-9_+/=-]{40,}(?![\w])', '<REDACTED_TOKEN>', text)
+    lines = [re.sub(r'\x1b\[[0-9;]*m', '', line) for line in text.splitlines()]
+    return '\n'.join(lines[-80:])
+
+
+def run_fastlane(args, cwd, environment):
+    result = subprocess.run(args, cwd=cwd, env=environment,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if result.returncode:
+        print('--- sanitized Fastlane diagnostic ---', flush=True)
+        print(sanitized_failure_output(result.stdout, environment), flush=True)
+        print('--- end diagnostic ---', flush=True)
+        raise RuntimeError('Fastlane/App Store Connect stage failed')
 
 
 def security(args):
@@ -139,8 +167,12 @@ end
 ''')
             gem_dir = run(["ruby", "-e", "print Gem.user_dir"]).decode()
             print("Verified archive; uploading to internal TestFlight (no App Review submission)", flush=True)
-            run([str(Path(gem_dir) / "bin/fastlane"), "upload"], cwd=root,
-                env={**os.environ, "UPLOAD_IPA": str(ipa), "UPLOAD_VERSION": version, "UPLOAD_BUILD": build})
+            fastlane_environment = {
+                **os.environ, "UPLOAD_IPA": str(ipa),
+                "UPLOAD_VERSION": version, "UPLOAD_BUILD": build,
+            }
+            run_fastlane([str(Path(gem_dir) / "bin/fastlane"), "upload"], root,
+                         fastlane_environment)
             print(f"Uploaded {version} ({build}); internal distribution completed", flush=True)
         finally:
             subprocess.run(["security", "list-keychains", "-d", "user", "-s", *original_keychains],
