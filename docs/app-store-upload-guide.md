@@ -10,11 +10,11 @@ Issue #8 must remain open until that acceptance run succeeds.
 ## Trigger and destination
 
 A successful **iOS** main-push workflow wakes a durable FIFO queue. Main's
-first-parent history, starting at repository variable `TESTFLIGHT_START_SHA`, is
-the queue; GitHub deployments in `rallyroo-testflight` are its completion ledger.
-Set that immutable variable to the initial main commit to publish (full SHA).
-Every subsequent main commit changing `clients/ios/` is queued. Bootstrap is
-included even without an iOS change. PR validation runs cannot upload.
+first-parent history after repository variable `TESTFLIGHT_START_SHA` is the
+queue; GitHub deployments in `rallyroo-testflight` are its completion ledger.
+Set that immutable variable to the last main commit that must **not** be published
+(full SHA), before merging the uploader. Every subsequent main commit changing
+`clients/ios/` is queued. PR validation runs cannot upload.
 
 Each wake publishes the oldest unpublished commit after its main-push iOS CI
 succeeds. A failing or unfinished CI run blocks the queue, rather than publishing
@@ -55,9 +55,9 @@ internal TestFlight distribution (App Manager); do not use an Admin key.
 Create/verify the internal group named exactly `Rallyroo Internal` before enabling.
 No beta-group ID or hardcoded numeric app ID is needed.
 
-The runner pins Xcode 26.3 and Fastlane 2.232.2. Missing tooling fails the job;
-there is no silent fallback to another Xcode. Confirm availability on the selected
-hosted runner during the first acceptance run.
+Both UI CI and signed archives pin Xcode 16.4 on macOS 15; upload tooling pins
+Fastlane 2.232.2. Missing tooling fails the job—there is no silent fallback.
+Confirm availability on the selected hosted runner during the first acceptance run.
 
 ## Build numbers and recovery
 

@@ -17,6 +17,12 @@ ENVIRONMENT = 'rallyroo-testflight'
 REPOSITORY = 'josebarrueta/rallyroo'
 
 
+def commits_after_seed(history, seed):
+    if seed not in history:
+        raise RuntimeError('Bootstrap commit is not on main first-parent history')
+    return list(reversed(history[:history.index(seed)]))
+
+
 def next_commit(commits, completed):
     return next((sha for sha in commits if sha not in completed), None)
 
@@ -59,13 +65,13 @@ def candidate():
     if len(seed) != 40 or any(c not in '0123456789abcdef' for c in seed):
         raise RuntimeError('Set TESTFLIGHT_START_SHA to the immutable bootstrap main commit')
     history = git('rev-list', '--first-parent', 'origin/main').splitlines()
-    if seed not in history:
-        raise RuntimeError('Bootstrap commit is not on main first-parent history')
-    history = list(reversed(history[:history.index(seed) + 1]))
+    # The seed is an exclusive lower bound. Configure it before merging the
+    # uploader so the merge commit becomes the first queue item without a race.
+    history = commits_after_seed(history, seed)
     relevant = []
     for sha in history:
-        files = git('diff-tree', '--no-commit-id', '--name-only', '-r', sha + '^', sha).splitlines()
-        if sha == seed or any(f.startswith('clients/ios/') for f in files):
+        files = git('diff', '--name-only', sha + '^1', sha).splitlines()
+        if any(f.startswith('clients/ios/') for f in files):
             relevant.append(sha)
     deployments = pages('deployments?environment=' + ENVIRONMENT)
     completed = set()

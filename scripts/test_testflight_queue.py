@@ -8,6 +8,11 @@ spec.loader.exec_module(queue)
 
 
 class QueueTests(unittest.TestCase):
+    def test_seed_is_an_exclusive_lower_bound_and_history_becomes_oldest_first(self):
+        self.assertEqual(queue.commits_after_seed(['c', 'b', 'seed', 'old'], 'seed'), ['b', 'c'])
+        with self.assertRaises(RuntimeError):
+            queue.commits_after_seed(['c'], 'missing')
+
     def test_oldest_unpublished_commit_wins_even_when_wakeup_is_for_newest(self):
         self.assertEqual(queue.next_commit(['a', 'b', 'c'], {'a'}), 'b')
 
